@@ -36,8 +36,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("h-full", "antialiased", mavenPro.variable)}>
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+    <html lang="en" className={cn("h-full", "antialiased", mavenPro.variable)} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col font-sans">
+        {children}
+      </body>
     </html>
   );
 }

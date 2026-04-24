@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence, useScroll, useMotionValueEvent, Variants } from "framer-motion"
-import { Menu, X, Home, User, Settings, Mail, Info } from "lucide-react"
+import { Menu, X, Home, User, Settings, Mail, Info, Activity } from "lucide-react"
 import Link from "next/link"
 
 interface MenuItem {
@@ -20,34 +20,34 @@ interface ScrollNavbarProps {
 
 const defaultMenuItems: MenuItem[] = [
   {
-    id: 1,
-    title: "Home",
-    url: "/",
-    icon: <Home className="w-5 h-5" />
-  },
-  {
     id: 2,
-    title: "About",
-    url: "/about",
-    icon: <User className="w-5 h-5" />
+    title: "Tests",
+    url: "#tests",
+    icon: <Settings className="w-5 h-5" />
   },
   {
     id: 3,
     title: "Services",
-    url: "/services",
-    icon: <Settings className="w-5 h-5" />
+    url: "#services",
+    icon: <Activity className="w-5 h-5" />
   },
   {
     id: 4,
-    title: "Contact",
-    url: "/contact",
-    icon: <Mail className="w-5 h-5" />
+    title: "Process",
+    url: "#process",
+    icon: <Info className="w-5 h-5" />
   },
   {
     id: 5,
-    title: "Info",
-    url: "/info",
-    icon: <Info className="w-5 h-5" />
+    title: "Reviews",
+    url: "#testimonials",
+    icon: <User className="w-5 h-5" />
+  },
+  {
+    id: 6,
+    title: "About",
+    url: "/about",
+    icon: <Mail className="w-5 h-5" />
   }
 ]
 
@@ -131,7 +131,7 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className={`fixed top-6 left-0 right-0 z-50 bg-transparent ${className}`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <motion.div
@@ -144,9 +144,9 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
               </Link>
             </motion.div>
 
-            {/* Desktop Menu */}
-            <div className="hidden md:block">
-              <div className="ml-10 flex items-baseline space-x-4">
+            {/* Desktop Menu & Auth Buttons */}
+            <div className="hidden md:flex items-center space-x-8">
+              <div className="flex items-baseline space-x-4">
                 {menuItems.map((item) => (
                   <motion.div
                     key={item.id}
@@ -174,6 +174,26 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
                     )}
                   </motion.div>
                 ))}
+              </div>
+
+              {/* Auth Buttons */}
+              <div className="flex items-center space-x-3 border-l border-border pl-2">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Link
+                    href="/signin"
+                    className="text-sm font-bold text-[#1A3263] hover:text-[#2A4273] transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Link
+                    href="/signup"
+                    className="bg-[#1A3263] text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-[#1A3263]/20 hover:bg-[#2A4273] transition-all"
+                  >
+                    Sign Up
+                  </Link>
+                </motion.div>
               </div>
             </div>
 
@@ -204,7 +224,7 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
       >
         <motion.button
           onClick={toggleMenu}
-          className="w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg flex items-center justify-center"
+          className="w-14 h-14 bg-[#1A3263] text-white rounded-full shadow-lg flex items-center justify-center"
           variants={hamburgerVariants}
           animate={isScrolled ? "scrolled" : "normal"}
           whileHover={{ scale: 1.1, rotate: 180 }}
@@ -235,7 +255,7 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
               exit="closed"
               className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50"
             >
-              <div className="relative bg-background border border-border rounded-3xl p-8 shadow-2xl min-w-[300px]">
+              <div className="relative bg-background border border-border rounded-3xl p-8 shadow-2xl min-w-[320px]">
                 {/* Close Button */}
                 <motion.button
                   onClick={toggleMenu}
@@ -247,32 +267,44 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
                 </motion.button>
 
                 {/* Menu Items */}
-                <div className="space-y-4 mt-8">
+                <div className="space-y-3 mt-8">
                   {menuItems.map((item, index) => (
                     <motion.div
                       key={item.id}
                       variants={itemVariants}
-                      whileHover={{ scale: 1.05, x: 10 }}
-                      whileTap={{ scale: 0.95 }}
+                      whileHover={{ scale: 1.02, x: 5 }}
+                      whileTap={{ scale: 0.98 }}
                     >
                       <Link
                         href={item.url}
                         onClick={toggleMenu}
-                        className="flex items-center space-x-4 p-4 rounded-xl hover:bg-muted transition-colors group"
+                        className="flex items-center space-x-4 p-3 rounded-xl hover:bg-muted transition-colors group"
                       >
-                        <motion.div
-                          className="text-primary"
-                          whileHover={{ rotate: 360 }}
-                          transition={{ duration: 0.3 }}
-                        >
-                          {item.icon}
-                        </motion.div>
-                        <span className="text-lg font-medium text-foreground group-hover:text-primary">
+                        <div className="text-[#1A3263]">{item.icon}</div>
+                        <span className="text-base font-semibold text-foreground group-hover:text-[#1A3263]">
                           {item.title}
                         </span>
                       </Link>
                     </motion.div>
                   ))}
+
+                  {/* Auth Buttons for Mobile */}
+                  <motion.div variants={itemVariants} className="pt-4 space-y-3">
+                    <Link
+                      href="/signin"
+                      onClick={toggleMenu}
+                      className="flex items-center justify-center w-full p-3 rounded-xl border-2 border-[#1A3263] text-[#1A3263] font-bold hover:bg-[#F1F5F9] transition-colors"
+                    >
+                      Sign In
+                    </Link>
+                    <Link
+                      href="/signup"
+                      onClick={toggleMenu}
+                      className="flex items-center justify-center w-full p-3 rounded-xl bg-[#1A3263] text-white font-bold shadow-lg shadow-[#1A3263]/20 transition-all"
+                    >
+                      Sign Up
+                    </Link>
+                  </motion.div>
                 </div>
 
                 {/* Decorative Elements */}
