@@ -22,25 +22,25 @@ const defaultMenuItems: MenuItem[] = [
   {
     id: 2,
     title: "Tests",
-    url: "#tests",
+    url: "/#tests",
     icon: <Settings className="w-5 h-5" />
   },
   {
     id: 3,
     title: "Services",
-    url: "#services",
+    url: "/#services",
     icon: <Activity className="w-5 h-5" />
   },
   {
     id: 4,
     title: "Process",
-    url: "#process",
+    url: "/#process",
     icon: <Info className="w-5 h-5" />
   },
   {
     id: 5,
     title: "Reviews",
-    url: "#testimonials",
+    url: "/#testimonials",
     icon: <User className="w-5 h-5" />
   },
   {

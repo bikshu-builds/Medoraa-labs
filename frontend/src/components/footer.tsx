@@ -43,11 +43,17 @@ export default function Footer() {
                         <div>
                             <h4 className="text-base font-bold mb-4">Quick Links</h4>
                             <ul className="flex flex-col gap-2">
-                                {["Home", "Health Tests", "Book Appointment", "About Us", "Contact Us"].map((link) => (
-                                    <li key={link}>
-                                        <a href="#" className="text-blue-100/70 hover:text-white transition-colors text-sm flex items-center gap-2 group">
+                                {[
+                                    { name: "Home", href: "/" },
+                                    { name: "Health Tests", href: "/#tests" },
+                                    { name: "Book Appointment", href: "/#tests" },
+                                    { name: "About Us", href: "/about" },
+                                    { name: "Contact Us", href: "/about#contact" }
+                                ].map((link) => (
+                                    <li key={link.name}>
+                                        <a href={link.href} className="text-blue-100/70 hover:text-white transition-colors text-sm flex items-center gap-2 group">
                                             <div className="w-1 h-1 rounded-full bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            {link}
+                                            {link.name}
                                         </a>
                                     </li>
                                 ))}
@@ -58,11 +64,17 @@ export default function Footer() {
                         <div>
                             <h4 className="text-base font-bold mb-4">Services</h4>
                             <ul className="flex flex-col gap-2">
-                                {["Full Body Checkup", "Diabetes Screening", "Heart Care Packages", "Home Sample Collection", "Corporate Wellness"].map((service) => (
-                                    <li key={service}>
-                                        <a href="#" className="text-blue-100/70 hover:text-white transition-colors text-sm flex items-center gap-2 group">
+                                {[
+                                    { name: "Full Body Checkup", href: "/#services" },
+                                    { name: "Diabetes Screening", href: "/#services" },
+                                    { name: "Heart Care Packages", href: "/#services" },
+                                    { name: "Home Sample Collection", href: "/#process" },
+                                    { name: "Corporate Wellness", href: "/#services" }
+                                ].map((service) => (
+                                    <li key={service.name}>
+                                        <a href={service.href} className="text-blue-100/70 hover:text-white transition-colors text-sm flex items-center gap-2 group">
                                             <div className="w-1 h-1 rounded-full bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            {service}
+                                            {service.name}
                                         </a>
                                     </li>
                                 ))}
