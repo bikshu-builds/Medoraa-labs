@@ -98,7 +98,7 @@ const EmployeeManagement: React.FC = () => {
 
     const filteredEmployees = employees.filter(emp => 
         emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
+        (emp.staffId && emp.staffId.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     const columns = [
@@ -116,7 +116,7 @@ const EmployeeManagement: React.FC = () => {
                     </div>
                     <div className="flex flex-col min-w-0">
                         <span className="font-bold text-slate-900 truncate">{row.name}</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{row.employeeId}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{row.staffId}</span>
                     </div>
                 </div>
             )
@@ -128,8 +128,8 @@ const EmployeeManagement: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <ShieldCheck className={cn(
                         "w-3.5 h-3.5",
-                        row.role === "Lab Staff" ? "text-blue-500" : 
-                        row.role === "Marketing Team" ? "text-purple-500" : "text-emerald-500"
+                        row.role === "Reception" || row.role === "Admin Staff" ? "text-purple-500" : 
+                        row.role === "Sample Collection Team" ? "text-blue-500" : "text-emerald-500"
                     )} />
                     <span className="text-xs font-bold text-slate-700">{row.role}</span>
                 </div>
@@ -167,7 +167,7 @@ const EmployeeManagement: React.FC = () => {
             render: (row: Employee) => (
                 <span className={cn(
                     "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border",
-                    row.status === "active" 
+                    row.status === "Active" 
                     ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
                     : "bg-slate-50 text-slate-500 border-slate-200"
                 )}>

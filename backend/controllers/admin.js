@@ -1,6 +1,6 @@
 const Admin = require("../models/Admin");
 const Doctor = require("../models/Doctor");
-const Employee = require("../models/Employee");
+const Staff = require("../models/Staff");
 const Patient = require("../models/Patient");
 const HomeCollection = require("../models/HomeCollection");
 const Commission = require("../models/Commission");
@@ -44,7 +44,7 @@ exports.login = async (req, res) => {
         }
 
         const token = jwt.sign(
-            { id: admin._id, role: admin.role },
+            { id: admin._id, role: "admin", roleId: admin.role },
             process.env.JWT_SECRET,
             { expiresIn: "1d" }
         );
@@ -147,7 +147,7 @@ exports.deleteDoctor = async (req, res) => {
 // @desc    Employee Management
 exports.getEmployees = async (req, res) => {
     try {
-        const employees = await Employee.find();
+        const employees = await Staff.find();
         res.status(200).json({ success: true, data: employees });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -156,8 +156,11 @@ exports.getEmployees = async (req, res) => {
 
 exports.addEmployee = async (req, res) => {
     try {
-        const employee = await Employee.create(req.body);
-        await logActivity(req.user.id, req.user.name, "CREATE", "Employees", `Added new employee: ${employee.name}`);
+        if (req.body.password) {
+            req.body.password = await bcrypt.hash(req.body.password, 10);
+        }
+        const employee = await Staff.create(req.body);
+        await logActivity(req.user.id, req.user.name || "Admin", "CREATE", "Employees", `Added new employee: ${employee.name}`);
         res.status(201).json({ success: true, data: employee });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -166,8 +169,15 @@ exports.addEmployee = async (req, res) => {
 
 exports.updateEmployee = async (req, res) => {
     try {
-        const employee = await Employee.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        await logActivity(req.user.id, req.user.name, "UPDATE", "Employees", `Updated employee details for: ${employee.name}`);
+        // Prevent password from being overwritten if empty
+        if (!req.body.password || req.body.password === "") {
+            delete req.body.password;
+        } else {
+            req.body.password = await bcrypt.hash(req.body.password, 10);
+        }
+        
+        const employee = await Staff.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        await logActivity(req.user.id, req.user.name || "Admin", "UPDATE", "Employees", `Updated employee details for: ${employee.name}`);
         res.status(200).json({ success: true, data: employee });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -176,8 +186,8 @@ exports.updateEmployee = async (req, res) => {
 
 exports.deleteEmployee = async (req, res) => {
     try {
-        const employee = await Employee.findByIdAndDelete(req.params.id);
-        await logActivity(req.user.id, req.user.name, "DELETE", "Employees", `Removed employee record: ${employee.name}`);
+        const employee = await Staff.findByIdAndDelete(req.params.id);
+        await logActivity(req.user.id, req.user.name || "Admin", "DELETE", "Employees", `Removed employee record: ${employee.name}`);
         res.status(200).json({ success: true, message: "Employee deleted successfully" });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

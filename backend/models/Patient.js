@@ -5,8 +5,9 @@ const PatientSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, sparse: true },
     password: { type: String },
-    phoneNumber: { type: String, required: true, unique: true },
+    phoneNumber: { type: String, required: true }, // Removed unique: true to allow family sharing
     age: { type: Number, required: true },
+    dob: { type: Date },
     gender: { 
         type: String, 
         enum: ["Male", "Female", "Other"], 
@@ -14,6 +15,8 @@ const PatientSchema = new mongoose.Schema({
     },
     profileImage: { type: String },
     bloodGroup: { type: String },
+    agreedToBloodGroupTest: { type: Boolean, default: false },
+    reasonForTest: { type: String },
     medicalHistory: [{ type: String }],
     allergies: [{ type: String }],
     existingConditions: [{ type: String }],

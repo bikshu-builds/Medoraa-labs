@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { 
-    login, 
-    getDashboardData, 
+const {
+    login,
+    getDashboardData,
     getDoctors, addDoctor, updateDoctor, deleteDoctor,
     getEmployees, addEmployee, updateEmployee, deleteEmployee,
     getPatients, addPatient, updatePatient, deletePatient,
@@ -40,6 +40,18 @@ router.get("/roles", getRoles);
 router.post("/roles", addRole);
 router.put("/roles/:id", updateRole);
 router.delete("/roles/:id", deleteRole);
+
+// Doctor Management
+router.get("/doctors", getDoctors);
+router.post("/doctors", addDoctor);
+router.put("/doctors/:id", updateDoctor);
+router.delete("/doctors/:id", deleteDoctor);
+
+// Employee Management
+router.get("/employees", getEmployees);
+router.post("/employees", addEmployee);
+router.put("/employees/:id", updateEmployee);
+router.delete("/employees/:id", deleteEmployee);
 
 // Activity Logs
 router.get("/activity-logs", getActivityLogs);

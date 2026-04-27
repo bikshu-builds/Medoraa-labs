@@ -13,15 +13,16 @@ export interface Doctor {
 
 export interface Employee {
     _id: string;
-    employeeId: string;
+    staffId: string;
     name: string;
-    phoneNumber: string;
+    role: "Sample Collection Team" | "Sample Processing Team" | "Report Approval Team" | "Dispatch Team" | "Reception" | "Admin Staff" | "Lab Staff" | "Marketing Team" | "Home Collection Staff" | "Admin";
     email: string;
-    role: 'Lab Staff' | 'Marketing Team' | 'Home Collection Staff';
+    phoneNumber: string;
+    password?: string;
     address?: string;
     profileImage?: string;
     joiningDate: string;
-    status: 'active' | 'inactive';
+    status: "active" | "inactive" | "Active" | "Inactive";
 }
 
 export interface Patient {

@@ -5,7 +5,21 @@ const TestSchema = new mongoose.Schema({
     category: { 
         type: String, 
         required: true,
-        enum: ["Blood Tests", "Diabetes", "Thyroid", "Vitamins", "Women Health", "Men Health", "Senior Citizen", "Fever Packages", "Full Body Checkup", "Other"]
+        enum: [
+            "Diabetes / Sugar", 
+            "Liver (Hepatic)", 
+            "Kidney / Renal", 
+            "Heart / Cardiac", 
+            "Thyroid / Hormones", 
+            "Infections / Fever", 
+            "Immunology / Autoimmune", 
+            "Microbiology", 
+            "General Health Profiles", 
+            "Cancer Markers", 
+            "Bone / Mineral", 
+            "Urine / Stool",
+            "Other"
+        ]
     },
     price: { type: Number, required: true },
     description: { type: String },
@@ -16,8 +30,12 @@ const TestSchema = new mongoose.Schema({
         enum: ["Active", "Inactive"], 
         default: "Active" 
     },
-    tat: { type: String }, // Turnaround Time
-    sampleType: { type: String } // e.g., "Blood", "Urine"
+    tat: { type: String }, // Turnaround Time string representation
+    reportTimeHours: { type: Number, default: 24 }, // Numerical representation for dynamic calculation
+    sampleType: { type: String }, // e.g., "Blood", "Urine"
+    isPanel: { type: Boolean, default: false },
+    includedTests: [{ type: mongoose.Schema.Types.ObjectId, ref: "Test" }],
+    suggestionTags: [{ type: String }]
 }, { timestamps: true });
 
 module.exports = mongoose.model("Test", TestSchema);

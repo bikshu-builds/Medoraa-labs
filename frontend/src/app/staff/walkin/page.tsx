@@ -32,6 +32,9 @@ export default function StaffWalkin() {
     });
     const [isLoading, setIsLoading] = useState(false);
     const [step, setStep] = useState(1);
+    const [sourceType, setSourceType] = useState("Walk-in");
+    const [doctorReferral, setDoctorReferral] = useState("");
+    const [doctors, setDoctors] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchTests = async () => {
@@ -39,7 +42,16 @@ export default function StaffWalkin() {
             const d = await res.json();
             if (d.success) setTests(d.data);
         };
+        const fetchDoctors = async () => {
+            const token = localStorage.getItem("staffToken");
+            const res = await fetch(getApiUrl("/api/staff/doctors"), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const d = await res.json();
+            if (d.success) setDoctors(d.data);
+        };
         fetchTests();
+        fetchDoctors();
     }, []);
 
     const toggleTest = (test: any) => {
@@ -63,7 +75,9 @@ export default function StaffWalkin() {
                 body: JSON.stringify({
                     patientData,
                     tests: selectedTests.map(t => t._id),
-                    paymentMethod: "Cash"
+                    paymentMethod: "Cash",
+                    sourceType,
+                    doctorReferral: sourceType === "Referring Doctor" ? doctorReferral : undefined
                 })
             });
             const d = await res.json();
@@ -125,11 +139,42 @@ export default function StaffWalkin() {
                                     </select>
                                 </div>
                             </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Source</label>
+                                    <select 
+                                        className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-100/50 outline-none transition-all appearance-none"
+                                        value={sourceType}
+                                        onChange={(e) => setSourceType(e.target.value)}
+                                    >
+                                        <option value="Walk-in">Walk-in</option>
+                                        <option value="Referring Doctor">Referring Doctor</option>
+                                        <option value="Home Collection">Home Collection</option>
+                                        <option value="Corporate / Camps">Corporate / Camps</option>
+                                    </select>
+                                </div>
+                                {sourceType === "Referring Doctor" && (
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Referring Doctor</label>
+                                        <select 
+                                            className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-100/50 outline-none transition-all appearance-none"
+                                            value={doctorReferral}
+                                            onChange={(e) => setDoctorReferral(e.target.value)}
+                                        >
+                                            <option value="">Select Doctor...</option>
+                                            {doctors.map(d => (
+                                                <option key={d._id} value={d._id}>{d.name} ({d.hospitalName})</option>
+                                            ))}
+                                        </select>
+                                        {doctors.length === 0 && <p className="text-[10px] text-rose-500 ml-4 mt-1">Doctor not available. Please contact Admin.</p>}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <button 
                             onClick={() => setStep(2)}
-                            disabled={!patientData.name || !patientData.phoneNumber}
+                            disabled={!patientData.name || !patientData.phoneNumber || (sourceType === 'Referring Doctor' && !doctorReferral)}
                             className="w-full bg-slate-900 hover:bg-blue-600 text-white py-6 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-slate-900/10 active:scale-95 transition-all flex items-center justify-center gap-4 disabled:bg-slate-200"
                         >
                             Next: Select Tests <ArrowRight className="w-5 h-5" />

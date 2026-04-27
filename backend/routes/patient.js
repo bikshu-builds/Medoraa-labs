@@ -4,11 +4,11 @@ const patientController = require("../controllers/patient");
 const authMiddleware = require("../middleware/authMiddleware");
 
 // Public Routes
+router.post("/identify", patientController.identify);
 router.post("/register", patientController.register);
 router.post("/login", patientController.login);
-router.post("/send-otp", patientController.sendOTP);
-router.post("/verify-otp", patientController.verifyOTP);
 router.get("/tests", patientController.getTests);
+router.get("/suggestions", authMiddleware, patientController.getSuggestions);
 
 // Protected Routes
 router.get("/dashboard", authMiddleware, patientController.getDashboard);

@@ -1,14 +1,14 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { 
-    Calendar, 
-    Clock, 
-    MapPin, 
-    User, 
-    ChevronRight, 
-    ArrowRight, 
-    ShieldCheck, 
-    Truck, 
+import {
+    Calendar,
+    Clock,
+    MapPin,
+    User,
+    ChevronRight,
+    ArrowRight,
+    ShieldCheck,
+    Truck,
     Home,
     CheckCircle2,
     Loader2
@@ -20,7 +20,7 @@ export default function PatientCheckout() {
     const [cart, setCart] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [step, setStep] = useState(1);
-    const [bookingType, setBookingType] = useState<"Lab Visit" | "Home Collection">("Home Collection");
+    const [sourceType, setSourceType] = useState<"Walk-in" | "Home Collection">("Home Collection");
     const [selectedDate, setSelectedDate] = useState("");
     const [selectedSlot, setSelectedSlot] = useState("");
 
@@ -50,7 +50,7 @@ export default function PatientCheckout() {
             const token = localStorage.getItem("patientToken");
             const res = await fetch(getApiUrl("/api/patient/book-test"), {
                 method: "POST",
-                headers: { 
+                headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
@@ -58,7 +58,7 @@ export default function PatientCheckout() {
                     tests: cart.items.map((i: any) => i.test._id),
                     date: selectedDate,
                     time: selectedSlot,
-                    bookingType
+                    sourceType
                 })
             });
             const d = await res.json();
@@ -90,29 +90,29 @@ export default function PatientCheckout() {
                     <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
                         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Service Preference</h3>
                         <div className="grid grid-cols-2 gap-4">
-                            <button 
-                                onClick={() => setBookingType("Home Collection")}
+                            <button
+                                onClick={() => setSourceType("Home Collection")}
                                 className={cn(
                                     "p-6 rounded-[1.5rem] border-2 text-left transition-all relative overflow-hidden group",
-                                    bookingType === "Home Collection" ? "border-blue-600 bg-blue-50/50" : "border-slate-100 hover:border-blue-200"
+                                    sourceType === "Home Collection" ? "border-blue-600 bg-blue-50/50" : "border-slate-100 hover:border-blue-200"
                                 )}
                             >
-                                <Truck className={cn("w-6 h-6 mb-4", bookingType === "Home Collection" ? "text-blue-600" : "text-slate-400")} />
+                                <Truck className={cn("w-6 h-6 mb-4", sourceType === "Home Collection" ? "text-blue-600" : "text-slate-400")} />
                                 <h4 className="text-sm font-black text-slate-900">Home Collection</h4>
                                 <p className="text-[10px] font-bold text-slate-400 mt-1">Free Phlebotomist Visit</p>
-                                {bookingType === "Home Collection" && <CheckCircle2 className="absolute top-6 right-6 w-5 h-5 text-blue-600 animate-in zoom-in duration-300" />}
+                                {sourceType === "Home Collection" && <CheckCircle2 className="absolute top-6 right-6 w-5 h-5 text-blue-600 animate-in zoom-in duration-300" />}
                             </button>
-                            <button 
-                                onClick={() => setBookingType("Lab Visit")}
+                            <button
+                                onClick={() => setSourceType("Walk-in")}
                                 className={cn(
                                     "p-6 rounded-[1.5rem] border-2 text-left transition-all relative overflow-hidden group",
-                                    bookingType === "Lab Visit" ? "border-blue-600 bg-blue-50/50" : "border-slate-100 hover:border-blue-200"
+                                    sourceType === "Walk-in" ? "border-blue-600 bg-blue-50/50" : "border-slate-100 hover:border-blue-200"
                                 )}
                             >
-                                <Home className={cn("w-6 h-6 mb-4", bookingType === "Lab Visit" ? "text-blue-600" : "text-slate-400")} />
+                                <Home className={cn("w-6 h-6 mb-4", sourceType === "Walk-in" ? "text-blue-600" : "text-slate-400")} />
                                 <h4 className="text-sm font-black text-slate-900">Walk-in to Lab</h4>
                                 <p className="text-[10px] font-bold text-slate-400 mt-1">Fast Processing</p>
-                                {bookingType === "Lab Visit" && <CheckCircle2 className="absolute top-6 right-6 w-5 h-5 text-blue-600 animate-in zoom-in duration-300" />}
+                                {sourceType === "Walk-in" && <CheckCircle2 className="absolute top-6 right-6 w-5 h-5 text-blue-600 animate-in zoom-in duration-300" />}
                             </button>
                         </div>
                     </div>
@@ -120,12 +120,12 @@ export default function PatientCheckout() {
                     {/* DateTime Selection */}
                     <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
                         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Schedule Slot</h3>
-                        
+
                         <div className="space-y-8">
                             <div>
                                 <label className="text-xs font-black text-slate-900 block mb-4">Preferred Date</label>
-                                <input 
-                                    type="date" 
+                                <input
+                                    type="date"
                                     value={selectedDate}
                                     onChange={(e) => setSelectedDate(e.target.value)}
                                     className="w-full md:w-64 px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white outline-none transition-all"
@@ -136,14 +136,14 @@ export default function PatientCheckout() {
                                 <label className="text-xs font-black text-slate-900 block mb-4">Available Time Slots</label>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     {slots.map((slot) => (
-                                        <button 
+                                        <button
                                             key={slot}
                                             onClick={() => setSelectedSlot(slot)}
                                             className={cn(
                                                 "px-6 py-4 rounded-2xl text-xs font-bold border transition-all text-left flex items-center justify-between",
-                                                selectedSlot === slot 
-                                                ? "border-blue-600 bg-blue-50 text-blue-600 shadow-sm" 
-                                                : "border-slate-100 hover:border-blue-200 text-slate-500"
+                                                selectedSlot === slot
+                                                    ? "border-blue-600 bg-blue-50 text-blue-600 shadow-sm"
+                                                    : "border-slate-100 hover:border-blue-200 text-slate-500"
                                             )}
                                         >
                                             {slot}
@@ -156,13 +156,13 @@ export default function PatientCheckout() {
                     </div>
 
                     {/* Address (If Home Collection) */}
-                    {bookingType === "Home Collection" && (
+                    {sourceType === "Home Collection" && (
                         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
                             <div className="flex items-center justify-between mb-8">
                                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Collection Address</h3>
                                 <button className="text-[10px] font-black text-blue-600 uppercase tracking-widest">+ New Address</button>
                             </div>
-                            
+
                             <div className="p-6 rounded-2xl border-2 border-blue-600 bg-blue-50/30 flex items-start gap-4">
                                 <div className="p-3 bg-white rounded-xl text-blue-600 shadow-sm shrink-0">
                                     <MapPin className="w-5 h-5" />
@@ -183,7 +183,7 @@ export default function PatientCheckout() {
                 <div className="space-y-6">
                     <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-slate-900/20">
                         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Review Order</h3>
-                        
+
                         <div className="space-y-4 mb-10">
                             {cart?.items?.map((item: any) => (
                                 <div key={item.test._id} className="flex justify-between items-start">
@@ -211,7 +211,7 @@ export default function PatientCheckout() {
                             </div>
                         </div>
 
-                        <button 
+                        <button
                             onClick={handleBooking}
                             disabled={!selectedDate || !selectedSlot}
                             className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 transition-all flex items-center justify-center gap-3 active:scale-95"

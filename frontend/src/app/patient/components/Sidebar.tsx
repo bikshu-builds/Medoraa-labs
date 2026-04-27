@@ -2,16 +2,16 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-    LayoutDashboard, 
-    Search, 
-    ClipboardList, 
-    FileText, 
-    CreditCard, 
-    Bell, 
-    Truck, 
-    User, 
-    HelpCircle, 
+import {
+    LayoutDashboard,
+    Search,
+    ClipboardList,
+    FileText,
+    CreditCard,
+    Bell,
+    Truck,
+    User,
+    HelpCircle,
     LogOut,
     PlusCircle,
     X,
@@ -62,14 +62,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
                         const isActive = pathname === item.path;
                         return (
                             <li key={item.path}>
-                                <Link 
+                                <Link
                                     href={item.path}
                                     onClick={onClose}
                                     className={cn(
                                         "flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all group",
-                                        isActive 
-                                        ? "bg-blue-50 text-blue-600 shadow-sm" 
-                                        : "hover:bg-slate-50 text-slate-500 hover:text-slate-900"
+                                        isActive
+                                            ? "bg-blue-50 text-blue-600 shadow-sm"
+                                            : "hover:bg-slate-50 text-slate-500 hover:text-slate-900"
                                     )}
                                 >
                                     <item.icon className={cn(
@@ -87,10 +87,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
 
             {/* Footer */}
             <div className="p-6 border-t border-slate-100">
-                <button 
+                <button
                     onClick={() => {
                         localStorage.removeItem("patientToken");
-                        window.location.href = "/patient/login";
+                        window.location.href = "/signin";
                     }}
                     className="flex items-center gap-3 w-full px-4 py-3 text-rose-500 hover:bg-rose-50 rounded-2xl text-sm font-bold transition-all"
                 >

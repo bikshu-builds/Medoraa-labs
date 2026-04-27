@@ -2,16 +2,16 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-    LayoutDashboard, 
-    UserPlus, 
-    Users, 
-    UserCheck, 
-    MapPin, 
-    CircleDollarSign, 
-    Home, 
-    BarChart3, 
-    FileText, 
+import {
+    LayoutDashboard,
+    UserPlus,
+    Users,
+    UserCheck,
+    MapPin,
+    CircleDollarSign,
+    Home,
+    BarChart3,
+    FileText,
     LogOut,
     Clock,
     Bell,
@@ -33,37 +33,49 @@ const Sidebar: React.FC = () => {
     const pathname = usePathname();
 
     const menuItems = [
-        { group: "Main", items: [
-            { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
-            { name: "Activity Logs", icon: Clock, path: "/admin/activityLogs" },
-            { name: "Notifications", icon: Bell, path: "/admin/notifications" },
-        ]},
-        { group: "Operations", items: [
-            { name: "Bookings", icon: Calendar, path: "/admin/bookings" },
-            { name: "Report Approval", icon: ShieldCheck, path: "/admin/reportApproval" },
-            { name: "Internal Notes", icon: StickyNote, path: "/admin/internalNotes" },
-        ]},
-        { group: "Directory", items: [
-            { name: "Doctors", icon: UserPlus, path: "/admin/doctors" },
-            { name: "Employees", icon: Users, path: "/admin/employees" },
-            { name: "Patients", icon: UserCheck, path: "/admin/patients" },
-        ]},
-        { group: "Financials", items: [
-            { name: "Billing & Revenue", icon: CircleDollarSign, path: "/admin/billing" },
-            { name: "Commissions", icon: Wallet, path: "/admin/commissions" },
-        ]},
-        { group: "Analytics", items: [
-            { name: "Doctor Performance", icon: BarChart3, path: "/admin/doctorPerformance" },
-            { name: "Staff Performance", icon: LineChart, path: "/admin/staffPerformance" },
-            { name: "Heatmap", icon: Map, path: "/admin/heatmap" },
-            { name: "AI Insights", icon: Sparkles, path: "/admin/insights" },
-        ]},
-        { group: "System", items: [
-            { name: "Roles & Permissions", icon: Shield, path: "/admin/roles" },
-            { name: "Alerts Center", icon: AlertTriangle, path: "/admin/alerts" },
-            { name: "Database Backup", icon: Database, path: "/admin/backup" },
-            { name: "Settings", icon: Settings, path: "/admin/settings" },
-        ]},
+        {
+            group: "Main", items: [
+                { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
+                { name: "Activity Logs", icon: Clock, path: "/admin/activityLogs" },
+                { name: "Notifications", icon: Bell, path: "/admin/notifications" },
+            ]
+        },
+        {
+            group: "Operations", items: [
+                { name: "Bookings", icon: Calendar, path: "/admin/bookings" },
+                { name: "Report Approval", icon: ShieldCheck, path: "/admin/reportApproval" },
+                { name: "Internal Notes", icon: StickyNote, path: "/admin/internalNotes" },
+            ]
+        },
+        {
+            group: "Directory", items: [
+                { name: "Doctors", icon: UserPlus, path: "/admin/doctors" },
+                { name: "Employees", icon: Users, path: "/admin/employees" },
+                { name: "Patients", icon: UserCheck, path: "/admin/patients" },
+            ]
+        },
+        {
+            group: "Financials", items: [
+                { name: "Billing & Revenue", icon: CircleDollarSign, path: "/admin/billing" },
+                { name: "Commissions", icon: Wallet, path: "/admin/commissions" },
+            ]
+        },
+        {
+            group: "Analytics", items: [
+                { name: "Doctor Performance", icon: BarChart3, path: "/admin/doctorPerformance" },
+                { name: "Staff Performance", icon: LineChart, path: "/admin/staffPerformance" },
+                { name: "Heatmap", icon: Map, path: "/admin/heatmap" },
+                { name: "AI Insights", icon: Sparkles, path: "/admin/insights" },
+            ]
+        },
+        {
+            group: "System", items: [
+                { name: "Roles & Permissions", icon: Shield, path: "/admin/roles" },
+                { name: "Alerts Center", icon: AlertTriangle, path: "/admin/alerts" },
+                { name: "Database Backup", icon: Database, path: "/admin/backup" },
+                { name: "Settings", icon: Settings, path: "/admin/settings" },
+            ]
+        },
     ];
 
     return (
@@ -75,7 +87,7 @@ const Sidebar: React.FC = () => {
                 </div>
                 <span className="text-white font-bold text-lg tracking-tight">Medoraa Labs</span>
             </div>
-            
+
             {/* Navigation */}
             <nav className="flex-1 overflow-y-auto px-3 py-6 no-scrollbar">
                 {menuItems.map((group, gIdx) => (
@@ -88,13 +100,13 @@ const Sidebar: React.FC = () => {
                                 const isActive = pathname === item.path;
                                 return (
                                     <li key={item.path}>
-                                        <Link 
+                                        <Link
                                             href={item.path}
                                             className={cn(
                                                 "flex items-center gap-3 px-4 py-2 rounded-md text-sm font-medium transition-colors",
-                                                isActive 
-                                                ? "bg-blue-600 text-white" 
-                                                : "hover:bg-slate-800 hover:text-white"
+                                                isActive
+                                                    ? "bg-blue-600 text-white"
+                                                    : "hover:bg-slate-800 hover:text-white"
                                             )}
                                         >
                                             <item.icon className={cn(
@@ -122,10 +134,10 @@ const Sidebar: React.FC = () => {
                         <span className="text-[10px] text-slate-500 truncate">admin@medoraa.com</span>
                     </div>
                 </div>
-                <button 
+                <button
                     onClick={() => {
                         localStorage.removeItem("adminToken");
-                        window.location.href = "/admin/login";
+                        window.location.href = "/signin";
                     }}
                     className="flex items-center gap-3 w-full px-3 py-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-md text-sm transition-all"
                 >

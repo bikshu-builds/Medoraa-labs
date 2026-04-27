@@ -12,38 +12,58 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
 // Auth Controllers
+exports.identify = async (req, res) => {
+    try {
+        const { phoneNumber } = req.body;
+        if (!phoneNumber) {
+            return res.status(400).json({ success: false, message: "Phone number is required" });
+        }
+
+        const patients = await Patient.find({ phoneNumber }).select('_id name age gender');
+
+        if (patients.length === 0) {
+            return res.status(200).json({ success: true, exists: false, patients: [] });
+        }
+
+        return res.status(200).json({ success: true, exists: true, patients });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 exports.register = async (req, res) => {
     try {
-        const { name, email, phoneNumber, password, age, gender } = req.body;
+        const { name, email, phoneNumber, password, age, dob, gender, bloodGroup, agreedToBloodGroupTest, reasonForTest, medicalHistory } = req.body;
 
-        let patient = await Patient.findOne({ phoneNumber });
-        if (patient && patient.password) {
-            return res.status(400).json({ success: false, message: "Patient already exists" });
+        // Soft warning: if exact name and age exist under same phone
+        const existingDuplicate = await Patient.findOne({ phoneNumber, name, age });
+        if (existingDuplicate && !req.body.forceRegister) {
+            return res.status(409).json({
+                success: false,
+                message: "A patient with this name and age already exists under this phone number.",
+                isDuplicateWarning: true
+            });
         }
 
         const patientId = `PAT-${Math.floor(1000 + Math.random() * 9000)}`;
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = password ? await bcrypt.hash(password, 10) : undefined;
 
-        if (patient) {
-            patient.name = name;
-            patient.email = email;
-            patient.password = hashedPassword;
-            patient.age = age;
-            patient.gender = gender;
-            await patient.save();
-        } else {
-            patient = new Patient({
-                patientId,
-                name,
-                email,
-                phoneNumber,
-                password: hashedPassword,
-                age,
-                gender,
-                sourceType: "Walk-in" // Default
-            });
-            await patient.save();
-        }
+        const patient = new Patient({
+            patientId,
+            name,
+            email,
+            phoneNumber,
+            password: hashedPassword,
+            age,
+            dob,
+            gender,
+            bloodGroup,
+            agreedToBloodGroupTest,
+            reasonForTest,
+            medicalHistory: medicalHistory ? [medicalHistory] : [],
+            sourceType: "Walk-in"
+        });
+        await patient.save();
 
         const token = jwt.sign({ id: patient._id, role: "patient" }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
@@ -55,11 +75,14 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
     try {
-        const { identifier, password } = req.body; // identifier can be email or phone
+        const { identifier, password, specificPatientId } = req.body; // identifier can be email or phone
 
-        const patient = await Patient.findOne({
-            $or: [{ email: identifier }, { phoneNumber: identifier }]
-        });
+        let query = { $or: [{ email: identifier }, { phoneNumber: identifier }] };
+        if (specificPatientId) {
+            query = { _id: specificPatientId };
+        }
+
+        const patient = await Patient.findOne(query);
 
         if (!patient || !patient.password) {
             return res.status(400).json({ success: false, message: "Invalid credentials" });
@@ -78,57 +101,7 @@ exports.login = async (req, res) => {
     }
 };
 
-exports.sendOTP = async (req, res) => {
-    try {
-        const { phoneNumber } = req.body;
-        const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
-        
-        let patient = await Patient.findOne({ phoneNumber });
-        if (!patient) {
-            const patientId = `PAT-${Math.floor(1000 + Math.random() * 9000)}`;
-            patient = new Patient({
-                patientId,
-                name: "Guest User",
-                phoneNumber,
-                age: 0,
-                gender: "Other",
-                sourceType: "Walk-in"
-            });
-        }
 
-        patient.otp = {
-            code: otpCode,
-            expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 mins
-        };
-        await patient.save();
-
-        // In production, send SMS here. For now, return in response
-        res.status(200).json({ success: true, message: "OTP sent", otp: otpCode });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
-};
-
-exports.verifyOTP = async (req, res) => {
-    try {
-        const { phoneNumber, code } = req.body;
-        const patient = await Patient.findOne({ phoneNumber });
-
-        if (!patient || !patient.otp || patient.otp.code !== code || patient.otp.expiresAt < Date.now()) {
-            return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
-        }
-
-        patient.isVerified = true;
-        patient.otp = undefined;
-        await patient.save();
-
-        const token = jwt.sign({ id: patient._id, role: "patient" }, process.env.JWT_SECRET, { expiresIn: "7d" });
-
-        res.status(200).json({ success: true, message: "OTP verified", token, data: patient });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
-};
 
 // Profile Controllers
 exports.getProfile = async (req, res) => {
@@ -161,14 +134,54 @@ exports.getTests = async (req, res) => {
     }
 };
 
+exports.getSuggestions = async (req, res) => {
+    try {
+        const patient = await Patient.findById(req.user.id);
+        if (!patient) return res.status(404).json({ success: false, message: "Patient not found" });
+
+        let tagsToMatch = [];
+        if (patient.age > 40) tagsToMatch.push("Age>40");
+        if (patient.gender === "Female") tagsToMatch.push("Female");
+        if (patient.gender === "Male") tagsToMatch.push("Men");
+        
+        if (patient.medicalHistory && patient.medicalHistory.length > 0) {
+            const historyStr = patient.medicalHistory.join(" ").toLowerCase();
+            if (historyStr.includes("diabetes") || historyStr.includes("sugar")) tagsToMatch.push("Diabetes");
+            if (historyStr.includes("fever")) tagsToMatch.push("Fever");
+            if (historyStr.includes("heart") || historyStr.includes("cardiac")) tagsToMatch.push("Cardiac");
+            // Add more rules as needed
+        }
+
+        if (patient.reasonForTest) {
+            const reason = patient.reasonForTest.toLowerCase();
+            if (reason.includes("fever")) tagsToMatch.push("Fever");
+            if (reason.includes("sugar") || reason.includes("diabetes")) tagsToMatch.push("Diabetes");
+        }
+
+        if (tagsToMatch.length === 0) {
+            // Default suggestions if no specific tags match
+            tagsToMatch.push("Age>40");
+        }
+
+        const suggestedTests = await Test.find({ 
+            status: "Active", 
+            suggestionTags: { $in: tagsToMatch } 
+        }).limit(5);
+
+        res.status(200).json({ success: true, data: suggestedTests });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // Booking Controllers
 exports.bookTest = async (req, res) => {
     try {
-        const { tests, date, time, bookingType, addressId, notes } = req.body;
+        const { tests, date, time, sourceType, addressId, notes } = req.body;
         const patient = await Patient.findById(req.user.id);
 
         const bookingId = `BK-${Date.now().toString().slice(-6)}`;
-        
+
         let totalAmount = 0;
         const testDocs = await Test.find({ _id: { $in: tests } });
         testDocs.forEach(t => totalAmount += t.price);
@@ -180,7 +193,7 @@ exports.bookTest = async (req, res) => {
             tests,
             date,
             time,
-            bookingType,
+            sourceType,
             totalAmount,
             notes
         });
@@ -310,7 +323,7 @@ exports.getDashboard = async (req, res) => {
         const bookings = await Booking.countDocuments({ patient: req.user.id });
         const pendingReports = await Report.countDocuments({ patient: req.user.id, status: "Pending" });
         const completedTests = await Booking.countDocuments({ patient: req.user.id, status: "Completed" });
-        
+
         const recentReports = await Report.find({ patient: req.user.id }).sort({ createdAt: -1 }).limit(3).populate("test");
         const latestNotifications = await Notification.find({ recipient: req.user.id }).sort({ createdAt: -1 }).limit(5);
 

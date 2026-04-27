@@ -7,14 +7,16 @@ const Approval = require("../models/Approval");
 const Dispatch = require("../models/Dispatch");
 const Booking = require("../models/Booking");
 const Patient = require("../models/Patient");
+const Doctor = require("../models/Doctor");
+const Test = require("../models/Test");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
 // Auth
 exports.login = async (req, res) => {
     try {
-        const { staffId, password } = req.body;
-        const staff = await Staff.findOne({ staffId });
+        const { email, password } = req.body;
+        const staff = await Staff.findOne({ email });
 
         if (!staff || staff.status === "Inactive") {
             return res.status(401).json({ success: false, message: "Invalid credentials or account inactive" });
@@ -250,7 +252,7 @@ exports.approveResult = async (req, res) => {
 // Walk-in Registration
 exports.walkinRegistration = async (req, res) => {
     try {
-        const { patientData, tests, paymentMethod } = req.body;
+        const { patientData, tests, paymentMethod, sourceType, doctorReferral } = req.body;
         
         // 1. Find or Create Patient
         let patient = await Patient.findOne({ phoneNumber: patientData.phoneNumber });
@@ -272,7 +274,8 @@ exports.walkinRegistration = async (req, res) => {
             tests,
             date: new Date(),
             time: new Date().toLocaleTimeString(),
-            bookingType: "Lab Visit",
+            sourceType: sourceType || "Walk-in",
+            doctorReferral: doctorReferral || undefined,
             totalAmount,
             paymentStatus: "Paid", // Assuming walk-in pays immediately
             status: "Scheduled"
@@ -313,6 +316,15 @@ exports.getHospitalOrders = async (req, res) => {
     try {
         const orders = await HospitalOrder.find().populate("tests").sort({ createdAt: -1 });
         res.status(200).json({ success: true, data: orders });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.getDoctors = async (req, res) => {
+    try {
+        const doctors = await Doctor.find({ status: "active" }).select("name hospitalName branch");
+        res.status(200).json({ success: true, data: doctors });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

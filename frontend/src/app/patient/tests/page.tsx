@@ -1,12 +1,12 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { 
-    Search, 
-    Filter, 
-    ShoppingCart, 
-    Info, 
-    Clock, 
-    Zap, 
+import {
+    Search,
+    Filter,
+    ShoppingCart,
+    Info,
+    Clock,
+    Zap,
     ArrowRight,
     Star,
     ChevronDown,
@@ -24,13 +24,28 @@ export default function TestBrowsing() {
     const [searchQuery, setSearchQuery] = useState("");
     const [activeCategory, setActiveCategory] = useState("All");
     const [cart, setCart] = useState<any[]>([]);
+    const [suggestions, setSuggestions] = useState<any[]>([]);
 
     const categories = [
-        "All", "Blood Tests", "Diabetes", "Thyroid", "Vitamins", "Women Health", "Men Health", "Full Body Checkup"
+        "All",
+        "Diabetes / Sugar",
+        "Liver (Hepatic)",
+        "Kidney / Renal",
+        "Heart / Cardiac",
+        "Thyroid / Hormones",
+        "Infections / Fever",
+        "Immunology / Autoimmune",
+        "Microbiology",
+        "General Health Profiles",
+        "Cancer Markers",
+        "Bone / Mineral",
+        "Urine / Stool"
     ];
 
     useEffect(() => {
         fetchTests();
+        fetchCart();
+        fetchSuggestions();
     }, []);
 
     const fetchTests = async () => {
@@ -45,12 +60,40 @@ export default function TestBrowsing() {
         }
     };
 
+    const fetchCart = async () => {
+        try {
+            const token = localStorage.getItem("patientToken");
+            if (!token) return;
+            const res = await fetch(getApiUrl("/api/patient/cart"), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const d = await res.json();
+            if (d.success && d.data?.items) setCart(d.data.items);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const fetchSuggestions = async () => {
+        try {
+            const token = localStorage.getItem("patientToken");
+            if (!token) return;
+            const res = await fetch(getApiUrl("/api/patient/suggestions"), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const d = await res.json();
+            if (d.success) setSuggestions(d.data);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     const addToCart = async (testId: string) => {
         try {
             const token = localStorage.getItem("patientToken");
             const res = await fetch(getApiUrl("/api/patient/cart"), {
                 method: "POST",
-                headers: { 
+                headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
@@ -80,12 +123,12 @@ export default function TestBrowsing() {
                 <div className="relative z-10 max-w-2xl">
                     <h1 className="text-4xl font-black tracking-tight mb-4">Find Your Diagnostic Test</h1>
                     <p className="text-slate-400 font-bold mb-8">Search from over 200+ specialized tests and packages at competitive prices.</p>
-                    
+
                     <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md p-2 rounded-3xl border border-white/10 group focus-within:bg-white focus-within:border-white transition-all shadow-2xl">
                         <div className="flex-1 flex items-center gap-4 px-4 py-2">
                             <Search className="w-5 h-5 text-slate-400 group-focus-within:text-blue-600" />
-                            <input 
-                                type="text" 
+                            <input
+                                type="text"
                                 placeholder="E.g. Full Body Checkup, Thyroid..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -99,17 +142,53 @@ export default function TestBrowsing() {
                 </div>
             </div>
 
+            {/* Suggestions Section */}
+            {suggestions.length > 0 && (
+                <div className="mb-10">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                        <h2 className="text-lg font-black text-slate-900">Recommended For You</h2>
+                    </div>
+                    <div className="flex items-center gap-6 overflow-x-auto no-scrollbar pb-4">
+                        {suggestions.map((test) => (
+                            <div key={test._id} className="min-w-[300px] bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 p-6 rounded-[2rem] shadow-sm">
+                                <div className="flex justify-between items-start mb-4">
+                                    <h3 className="font-black text-slate-900 leading-tight">{test.name}</h3>
+                                    <div className="p-1.5 bg-amber-100 rounded-lg text-amber-600">
+                                        <Star className="w-4 h-4 fill-amber-500" />
+                                    </div>
+                                </div>
+                                <p className="text-[10px] font-bold text-slate-500 mb-4 line-clamp-1">{test.description}</p>
+                                <div className="flex items-center justify-between mt-auto">
+                                    <span className="font-black text-lg">₹{test.price}</span>
+                                    {cart.some((c: any) => (c.test?._id || c.test) === test._id) ? (
+                                        <button disabled className="px-4 py-2 bg-white/50 text-slate-400 rounded-xl text-[10px] font-bold uppercase tracking-widest border border-amber-200">Added</button>
+                                    ) : (
+                                        <button
+                                            onClick={() => addToCart(test._id)}
+                                            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md transition-all active:scale-95"
+                                        >
+                                            Add to Cart
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Categories Scroll */}
             <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
                 {categories.map((cat) => (
-                    <button 
+                    <button
                         key={cat}
                         onClick={() => setActiveCategory(cat)}
                         className={cn(
                             "px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border",
-                            activeCategory === cat 
-                            ? "bg-blue-600 text-white border-blue-600 shadow-xl shadow-blue-600/20" 
-                            : "bg-white text-slate-400 border-slate-100 hover:border-blue-200 hover:text-blue-600"
+                            activeCategory === cat
+                                ? "bg-blue-600 text-white border-blue-600 shadow-xl shadow-blue-600/20"
+                                : "bg-white text-slate-400 border-slate-100 hover:border-blue-200 hover:text-blue-600"
                         )}
                     >
                         {cat}
@@ -139,7 +218,7 @@ export default function TestBrowsing() {
                                 </div>
                                 <h3 className="text-xl font-black text-slate-900 leading-tight mb-2 group-hover:text-blue-600 transition-colors">{test.name}</h3>
                                 <p className="text-xs font-bold text-slate-400 line-clamp-2 mb-6">{test.description}</p>
-                                
+
                                 <div className="flex items-center gap-4 text-slate-400 mb-8">
                                     <div className="flex items-center gap-1.5">
                                         <Clock className="w-3.5 h-3.5" />
@@ -158,12 +237,22 @@ export default function TestBrowsing() {
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Price</span>
                                     <span className="text-2xl font-black text-slate-900">₹{test.price}</span>
                                 </div>
-                                <button 
-                                    onClick={() => addToCart(test._id)}
-                                    className="w-12 h-12 rounded-2xl bg-blue-600 hover:bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-blue-600/20 transition-all active:scale-90"
-                                >
-                                    <Plus className="w-6 h-6" />
-                                </button>
+                                {cart.some((c: any) => (c.test?._id || c.test) === test._id) ? (
+                                    <button
+                                        disabled
+                                        className="px-4 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center font-bold text-xs cursor-not-allowed"
+                                    >
+                                        Added
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => addToCart(test._id)}
+                                        className="w-12 h-12 rounded-2xl bg-blue-600 hover:bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-blue-600/20 transition-all active:scale-90 group"
+                                        title="Add to Cart"
+                                    >
+                                        <ShoppingCart className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))
@@ -178,11 +267,13 @@ export default function TestBrowsing() {
                 )}
             </div>
 
-            {/* Sticky Cart Button (Mobile) */}
-            <Link href="/patient/cart" className="md:hidden fixed bottom-28 right-6 w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-2xl shadow-blue-600/40 z-50 animate-bounce">
-                <ShoppingCart className="w-7 h-7" />
-                <span className="absolute top-0 right-0 w-6 h-6 bg-rose-500 rounded-full border-4 border-white flex items-center justify-center text-[10px] font-black">2</span>
-            </Link>
+            {/* Sticky Cart Button */}
+            {cart.length > 0 && (
+                <Link href="/patient/checkout" className="fixed bottom-10 right-10 w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-2xl shadow-blue-600/40 z-50 hover:scale-110 transition-transform">
+                    <ShoppingCart className="w-7 h-7" />
+                    <span className="absolute -top-2 -right-2 w-7 h-7 bg-rose-500 rounded-full border-4 border-white flex items-center justify-center text-[10px] font-black">{cart.length}</span>
+                </Link>
+            )}
         </div>
     );
 }

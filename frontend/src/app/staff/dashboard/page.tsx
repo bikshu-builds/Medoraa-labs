@@ -144,7 +144,7 @@ export default function StaffDashboard() {
                                         </td>
                                         <td className="px-8 py-6">
                                             <p className="text-xs font-bold text-slate-600">{order.tests[0]?.name || "Diagnostic Profile"}</p>
-                                            <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mt-1">{order.bookingType}</p>
+                                            <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mt-1">{order.sourceType}</p>
                                         </td>
                                         <td className="px-8 py-6">
                                             <span className={cn(

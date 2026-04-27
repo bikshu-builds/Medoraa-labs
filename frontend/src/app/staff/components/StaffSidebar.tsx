@@ -2,18 +2,18 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-    LayoutDashboard, 
-    Truck, 
-    UserPlus, 
-    Building2, 
-    Inbox, 
-    FlaskConical, 
-    FileCheck, 
-    FileText, 
-    CreditCard, 
-    Bell, 
-    User, 
+import {
+    LayoutDashboard,
+    Truck,
+    UserPlus,
+    Building2,
+    Inbox,
+    FlaskConical,
+    FileCheck,
+    FileText,
+    CreditCard,
+    Bell,
+    User,
     LogOut,
     ChevronRight,
     Activity
@@ -39,7 +39,7 @@ export default function StaffSidebar({ onClose }: { onClose?: () => void }) {
 
     const handleLogout = () => {
         localStorage.removeItem("staffToken");
-        window.location.href = "/staff/login";
+        window.location.href = "/signin";
     };
 
     return (
@@ -62,14 +62,14 @@ export default function StaffSidebar({ onClose }: { onClose?: () => void }) {
                 {menuItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
-                        <Link 
-                            key={item.name} 
+                        <Link
+                            key={item.name}
                             href={item.href}
                             onClick={onClose}
                             className={cn(
                                 "flex items-center justify-between px-4 py-3.5 rounded-2xl transition-all duration-300 group",
-                                isActive 
-                                    ? "bg-blue-50 text-blue-600 shadow-sm" 
+                                isActive
+                                    ? "bg-blue-50 text-blue-600 shadow-sm"
                                     : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
                             )}
                         >
@@ -93,7 +93,7 @@ export default function StaffSidebar({ onClose }: { onClose?: () => void }) {
 
             {/* Footer */}
             <div className="p-6 border-t border-slate-50">
-                <button 
+                <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-rose-500 hover:bg-rose-50 transition-all font-black text-[11px] uppercase tracking-widest"
                 >

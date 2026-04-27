@@ -14,13 +14,14 @@ interface EmployeeModalProps {
 const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSave, employee }) => {
     const [formData, setFormData] = useState<Partial<Employee>>({
         name: "",
-        employeeId: "",
-        role: "Lab Staff",
+        staffId: "",
+        role: "Reception",
         phoneNumber: "",
         email: "",
         joiningDate: new Date().toISOString().split('T')[0],
-        status: "active",
-        profileImage: ""
+        status: "Active",
+        profileImage: "",
+        password: ""
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -32,13 +33,14 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSave, 
         } else {
             setFormData({
                 name: "",
-                employeeId: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
-                role: "Lab Staff",
+                staffId: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
+                role: "Reception",
                 phoneNumber: "",
                 email: "",
                 joiningDate: new Date().toISOString().split('T')[0],
-                status: "active",
-                profileImage: ""
+                status: "Active",
+                profileImage: "",
+                password: ""
             });
         }
     }, [employee, isOpen]);
@@ -70,7 +72,7 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSave, 
                             {employee ? "Update Employee Profile" : "Register Team Member"}
                         </h2>
                         <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                            {employee ? `ID: ${employee.employeeId}` : "New Staff Onboarding"}
+                            {employee ? `ID: ${employee.staffId}` : "New Staff Onboarding"}
                         </p>
                     </div>
                     <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
@@ -115,8 +117,8 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSave, 
                             <input 
                                 type="text" 
                                 required
-                                value={formData.employeeId}
-                                onChange={(e) => setFormData({...formData, employeeId: e.target.value})}
+                                value={formData.staffId || ""}
+                                onChange={(e) => setFormData({...formData, staffId: e.target.value})}
                                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 transition-all"
                             />
                         </div>
@@ -128,9 +130,12 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSave, 
                                 onChange={(e) => setFormData({...formData, role: e.target.value as any})}
                                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
                             >
-                                <option value="Lab Staff">Laboratory Staff</option>
-                                <option value="Marketing Team">Marketing & Field</option>
-                                <option value="Admin">Administrative</option>
+                                <option value="Reception">Reception</option>
+                                <option value="Sample Collection Team">Sample Collection Team</option>
+                                <option value="Sample Processing Team">Sample Processing Team</option>
+                                <option value="Report Approval Team">Report Approval Team</option>
+                                <option value="Dispatch Team">Dispatch Team</option>
+                                <option value="Admin Staff">Admin Staff</option>
                             </select>
                         </div>
 
@@ -165,6 +170,21 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSave, 
                             </div>
                         </div>
 
+                        <div className="space-y-4">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Password</label>
+                            <div className="relative">
+                                <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <input 
+                                    type="password" 
+                                    required={!employee}
+                                    value={formData.password || ""}
+                                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                    placeholder={employee ? "Leave blank to keep current password" : "Secure Password"}
+                                />
+                            </div>
+                        </div>
+
                         {/* Joining & Status */}
                         <div className="space-y-4">
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Joining Date</label>
@@ -187,8 +207,8 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ isOpen, onClose, onSave, 
                                 onChange={(e) => setFormData({...formData, status: e.target.value as any})}
                                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
                             >
-                                <option value="active">Active On-Duty</option>
-                                <option value="inactive">Resigned / Inactive</option>
+                                <option value="Active">Active On-Duty</option>
+                                <option value="Inactive">Resigned / Inactive</option>
                             </select>
                         </div>
                     </div>

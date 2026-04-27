@@ -99,7 +99,7 @@ export default function PatientBookings() {
                             <div className="mt-8 pt-8 border-t border-slate-50 flex flex-wrap gap-6 items-center">
                                 <div className="flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full bg-blue-600" />
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Type: {booking.bookingType}</span>
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Type: {booking.sourceType}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <div className={`w-2 h-2 rounded-full ${booking.paymentStatus === 'Paid' ? 'bg-emerald-500' : 'bg-amber-500'}`} />

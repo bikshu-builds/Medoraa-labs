@@ -7,11 +7,13 @@ const BookingSchema = new mongoose.Schema({
     tests: [{ type: mongoose.Schema.Types.ObjectId, ref: "Test" }],
     date: { type: Date, required: true },
     time: { type: String, required: true },
-    bookingType: { 
+
+    sourceType: { 
         type: String, 
-        enum: ["Lab Visit", "Home Collection"], 
-        required: true 
+        enum: ["Walk-in", "Referring Doctor", "Home Collection", "Corporate / Camps"], 
+        default: "Walk-in"
     },
+    doctorReferral: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
     totalAmount: { type: Number, required: true },
     paymentStatus: { 
         type: String, 

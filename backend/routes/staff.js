@@ -9,6 +9,9 @@ router.post("/login", staffController.login);
 // Protected
 router.use(staffMiddleware);
 
+// Doctors
+router.get("/doctors", staffController.getDoctors);
+
 router.get("/dashboard", staffController.getDashboard);
 
 // Collections
