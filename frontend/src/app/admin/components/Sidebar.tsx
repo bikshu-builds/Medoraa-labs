@@ -58,6 +58,7 @@ const Sidebar: React.FC = () => {
             group: "Financials", items: [
                 { name: "Billing & Revenue", icon: CircleDollarSign, path: "/admin/billing" },
                 { name: "Commissions", icon: Wallet, path: "/admin/commissions" },
+                { name: "Packages & Plans", icon: Sparkles, path: "/admin/packages" },
             ]
         },
         {

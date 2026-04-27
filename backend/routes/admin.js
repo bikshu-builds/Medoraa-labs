@@ -7,7 +7,7 @@ const {
     getEmployees, addEmployee, updateEmployee, deleteEmployee,
     getPatients, addPatient, updatePatient, deletePatient,
     getSourceTracking,
-    getCommissions,
+    getCommissions, payCommission,
     getHomeCollections,
     getRoles, addRole, updateRole, deleteRole,
     getActivityLogs,
@@ -21,7 +21,9 @@ const {
     getAlerts,
     getLiveDashboard,
     getHeatmap,
-    getInsights
+    getInsights,
+    getPackages, addPackage, updatePackage, deletePackage,
+    getTests, addTest
 } = require("../controllers/admin");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
@@ -100,6 +102,17 @@ router.put("/patients/:id", updatePatient);
 router.delete("/patients/:id", deletePatient);
 router.get("/source-tracking", getSourceTracking);
 router.get("/commission", getCommissions);
+router.post("/commission/pay/:doctorId", payCommission);
 router.get("/home-collection", getHomeCollections);
+
+// Packages & Membership Plans
+router.get("/packages", getPackages);
+router.post("/packages", addPackage);
+router.put("/packages/:id", updatePackage);
+router.delete("/packages/:id", deletePackage);
+
+// Test Management (for packages)
+router.get("/tests", getTests);
+router.post("/tests", addTest);
 
 module.exports = router;

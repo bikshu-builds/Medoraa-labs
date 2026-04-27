@@ -72,7 +72,11 @@ const PatientModal: React.FC<PatientModalProps> = ({ isOpen, onClose, onSave, pa
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            await onSave(formData);
+            const payload = { ...formData };
+            if (payload.sourceType !== "Referring Doctor" || !payload.doctorReferral) {
+                delete payload.doctorReferral;
+            }
+            await onSave(payload);
             onClose();
         } catch (err) {
             console.error(err);

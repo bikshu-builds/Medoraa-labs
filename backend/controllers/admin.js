@@ -13,6 +13,8 @@ const ReportApproval = require("../models/ReportApproval");
 const Alert = require("../models/Alert");
 const Setting = require("../models/Setting");
 const InternalNote = require("../models/InternalNote");
+const Package = require("../models/Package");
+const Test = require("../models/Test");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
@@ -21,7 +23,7 @@ const logActivity = async (adminId, adminName, action, module, description, ip =
     try {
         await ActivityLog.create({
             admin: adminId,
-            adminName,
+            adminName: adminName || "Admin",
             action,
             module,
             description,
@@ -206,6 +208,9 @@ exports.getPatients = async (req, res) => {
 
 exports.addPatient = async (req, res) => {
     try {
+        if (!req.body.doctorReferral) {
+            delete req.body.doctorReferral;
+        }
         const patient = await Patient.create(req.body);
         await logActivity(req.user.id, req.user.name, "CREATE", "Patients", `Registered new patient: ${patient.name}`);
         // Create auto notification
@@ -222,6 +227,12 @@ exports.addPatient = async (req, res) => {
 
 exports.updatePatient = async (req, res) => {
     try {
+        if (req.body.doctorReferral === "") {
+            req.body.doctorReferral = null; // or unset
+        }
+        if (!req.body.doctorReferral && req.body.doctorReferral !== null) {
+            delete req.body.doctorReferral;
+        }
         const patient = await Patient.findByIdAndUpdate(req.params.id, req.body, { new: true });
         await logActivity(req.user.id, req.user.name, "UPDATE", "Patients", `Updated patient profile for: ${patient.name}`);
         res.status(200).json({ success: true, data: patient });
@@ -255,8 +266,88 @@ exports.getSourceTracking = async (req, res) => {
 // @desc    Commission Management
 exports.getCommissions = async (req, res) => {
     try {
-        const commissions = await Commission.find().populate("doctor", "name");
-        res.status(200).json({ success: true, data: commissions });
+        const savedCommissions = await Commission.find().populate("doctor", "name");
+
+        const patientsByDoctor = await Patient.aggregate([
+            { $match: { doctorReferral: { $exists: true, $ne: null, $ne: "" } } },
+            { $group: { 
+                _id: "$doctorReferral", 
+                patientCount: { $sum: 1 }, 
+                totalRevenue: { $sum: "$revenue" } 
+            }}
+        ]);
+
+        const populatedCommissions = [];
+        const currentMonth = new Date().toISOString().slice(0, 7);
+
+        for (const item of patientsByDoctor) {
+            const doctor = await Doctor.findById(item._id);
+            if (doctor) {
+                const commissionPercentage = doctor.commissionPercentage || 10;
+                const totalCommission = (item.totalRevenue * commissionPercentage) / 100;
+                
+                const existing = savedCommissions.find(c => c.doctor && c.doctor._id.toString() === doctor._id.toString() && c.month === currentMonth);
+
+                if (existing) {
+                    populatedCommissions.push({
+                        _id: existing._id,
+                        doctor: { _id: doctor._id, name: doctor.name },
+                        patientCount: existing.patientCount,
+                        commissionPercentage: existing.commissionPercentage,
+                        totalCommission: existing.totalCommission,
+                        month: existing.month,
+                        status: existing.status
+                    });
+                } else {
+                    populatedCommissions.push({
+                        _id: doctor._id,
+                        doctor: { _id: doctor._id, name: doctor.name },
+                        patientCount: item.patientCount,
+                        commissionPercentage: commissionPercentage,
+                        totalCommission: totalCommission,
+                        month: currentMonth,
+                        status: "Unpaid"
+                    });
+                }
+            }
+        }
+        
+        for (const saved of savedCommissions) {
+            const alreadyAdded = populatedCommissions.find(p => p.doctor && p.doctor._id.toString() === saved.doctor._id.toString() && p.month === saved.month);
+            if (!alreadyAdded) {
+                populatedCommissions.push(saved);
+            }
+        }
+
+        res.status(200).json({ success: true, data: populatedCommissions });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.payCommission = async (req, res) => {
+    try {
+        const doctorId = req.params.doctorId;
+        const { month, totalCommission, patientCount, commissionPercentage } = req.body;
+
+        let commission = await Commission.findOne({ doctor: doctorId, month: month });
+        if (commission) {
+            commission.status = "Paid";
+            commission.totalCommission = totalCommission;
+            commission.patientCount = patientCount;
+            await commission.save();
+        } else {
+            commission = await Commission.create({
+                doctor: doctorId,
+                patientCount: patientCount,
+                commissionPercentage: commissionPercentage,
+                totalCommission: totalCommission,
+                month: month,
+                status: "Paid"
+            });
+        }
+        await logActivity(req.user.id, req.user.name, "UPDATE", "Commissions", `Marked commission for ${month} as Paid.`);
+        res.status(200).json({ success: true, data: commission });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -366,8 +457,50 @@ exports.updateBooking = async (req, res) => {
 // @desc    Billing & Revenue
 exports.getBilling = async (req, res) => {
     try {
-        const billing = await Billing.find().populate("patient", "name");
-        res.status(200).json({ success: true, data: billing });
+        const bookings = await Booking.find().populate("patient", "name");
+        const patients = await Patient.find({ revenue: { $gt: 0 } });
+
+        const billingRecords = [];
+
+        for (const b of bookings) {
+            let status = b.paymentStatus || "Pending";
+            if (status === "Pending") status = "Unpaid";
+
+            billingRecords.push({
+                _id: b._id,
+                patientName: b.patientName || (b.patient ? b.patient.name : "Unknown"),
+                testName: b.sourceType || "Walk-in",
+                totalAmount: b.totalAmount,
+                paymentMethod: "CASH", 
+                status: status,
+                paymentDate: b.createdAt
+            });
+        }
+
+        for (const p of patients) {
+            billingRecords.push({
+                _id: p._id,
+                patientName: p.name,
+                testName: p.sourceType || "Direct Registry",
+                totalAmount: p.revenue,
+                paymentMethod: "CASH",
+                status: "Paid",
+                paymentDate: p.date || p.createdAt
+            });
+        }
+
+        // Sort ascending to generate sequential invoice IDs by date
+        billingRecords.sort((a, b) => new Date(a.paymentDate) - new Date(b.paymentDate));
+
+        billingRecords.forEach((record, index) => {
+            const year = new Date(record.paymentDate).getFullYear() || new Date().getFullYear();
+            record.invoiceId = `INV-${year}-${String(index + 1).padStart(4, '0')}`;
+        });
+
+        // Re-sort descending for the dashboard display
+        billingRecords.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate));
+
+        res.status(200).json({ success: true, data: billingRecords });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -375,14 +508,32 @@ exports.getBilling = async (req, res) => {
 
 exports.getRevenueStats = async (req, res) => {
     try {
-        const totalRevenue = await Billing.aggregate([{ $match: { status: "Paid" } }, { $group: { _id: null, total: { $sum: "$totalAmount" } } }]);
-        const pendingPayments = await Billing.aggregate([{ $match: { status: "Pending" } }, { $group: { _id: null, total: { $sum: "$totalAmount" } } }]);
+        const patientRevSource = await Patient.aggregate([{ $group: { _id: "$sourceType", total: { $sum: "$revenue" } } }]);
+        const bookingRevSource = await Booking.aggregate([{ $match: { paymentStatus: "Paid" } }, { $group: { _id: "$sourceType", total: { $sum: "$totalAmount" } } }]);
         
+        const sources = ["Walk-in", "Referring Doctor", "Home Collection"];
+        const bySource = {
+            "Walk-in": 0,
+            "Referring Doctor": 0,
+            "Home Collection": 0
+        };
+
+        [...patientRevSource, ...bookingRevSource].forEach(item => {
+            const type = item._id || "Walk-in";
+            if (bySource[type] !== undefined) {
+                bySource[type] += item.total;
+            } else {
+                bySource[type] = item.total;
+            }
+        });
+
+        const totalRevenue = Object.values(bySource).reduce((a, b) => a + b, 0);
+
         res.status(200).json({ 
             success: true, 
             data: { 
-                totalRevenue: totalRevenue[0]?.total || 0,
-                pendingPayments: pendingPayments[0]?.total || 0
+                bySource,
+                totalRevenue
             } 
         });
     } catch (err) {
@@ -553,3 +704,68 @@ exports.getInsights = async (req, res) => {
     }
 };
 
+// @desc    Package Management
+exports.getPackages = async (req, res) => {
+    try {
+        const packages = await Package.find();
+        res.status(200).json({ success: true, data: packages });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.addPackage = async (req, res) => {
+    try {
+        const newPackage = await Package.create(req.body);
+        await logActivity(req.user.id, req.user.name, "CREATE", "Packages", `Created package: ${newPackage.name}`);
+        res.status(201).json({ success: true, data: newPackage });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.updatePackage = async (req, res) => {
+    try {
+        const updatedPackage = await Package.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!updatedPackage) {
+            return res.status(404).json({ success: false, message: "Package not found" });
+        }
+        await logActivity(req.user.id, req.user.name, "UPDATE", "Packages", `Updated package: ${updatedPackage.name}`);
+        res.status(200).json({ success: true, data: updatedPackage });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.deletePackage = async (req, res) => {
+    try {
+        const deletedPackage = await Package.findByIdAndDelete(req.params.id);
+        if (!deletedPackage) {
+            return res.status(404).json({ success: false, message: "Package not found" });
+        }
+        await logActivity(req.user.id, req.user.name, "DELETE", "Packages", `Deleted package: ${deletedPackage.name}`);
+        res.status(200).json({ success: true, message: "Package deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Test Management
+exports.getTests = async (req, res) => {
+    try {
+        const tests = await Test.find();
+        res.status(200).json({ success: true, data: tests });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.addTest = async (req, res) => {
+    try {
+        const newTest = await Test.create(req.body);
+        await logActivity(req.user.id, req.user.name, "CREATE", "Tests", `Created test: ${newTest.name}`);
+        res.status(201).json({ success: true, data: newTest });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};

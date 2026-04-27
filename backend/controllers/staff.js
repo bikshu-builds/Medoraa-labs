@@ -258,7 +258,14 @@ exports.walkinRegistration = async (req, res) => {
         let patient = await Patient.findOne({ phoneNumber: patientData.phoneNumber });
         if (!patient) {
             const patientId = `PAT-${Math.floor(1000 + Math.random() * 9000)}`;
-            patient = new Patient({ ...patientData, patientId, sourceType: "Walk-in" });
+            const newPatientData = { ...patientData, patientId, sourceType: "Walk-in" };
+            if (!newPatientData.doctorReferral) {
+                delete newPatientData.doctorReferral;
+            }
+            if (!newPatientData.doctorReference) {
+                delete newPatientData.doctorReference;
+            }
+            patient = new Patient(newPatientData);
             await patient.save();
         }
 
@@ -267,7 +274,7 @@ exports.walkinRegistration = async (req, res) => {
         const testDocs = await Test.find({ _id: { $in: tests } });
         const totalAmount = testDocs.reduce((acc, t) => acc + t.price, 0);
 
-        const booking = new Booking({
+        const bookingData = {
             bookingId,
             patient: patient._id,
             patientName: patient.name,
@@ -275,11 +282,15 @@ exports.walkinRegistration = async (req, res) => {
             date: new Date(),
             time: new Date().toLocaleTimeString(),
             sourceType: sourceType || "Walk-in",
-            doctorReferral: doctorReferral || undefined,
             totalAmount,
             paymentStatus: "Paid", // Assuming walk-in pays immediately
             status: "Scheduled"
-        });
+        };
+        if (doctorReferral) {
+            bookingData.doctorReferral = doctorReferral;
+        }
+
+        const booking = new Booking(bookingData);
         await booking.save();
 
         // 3. Auto-generate Samples (since it's walk-in, collection happens now)

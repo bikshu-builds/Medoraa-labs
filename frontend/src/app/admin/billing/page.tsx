@@ -16,6 +16,10 @@ import {
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
+
 interface BillingRecord {
     _id: string;
     invoiceId: string;
@@ -23,13 +27,13 @@ interface BillingRecord {
     testName: string;
     totalAmount: number;
     paymentMethod: string;
-    status: 'Paid' | 'Pending' | 'Failed';
+    status: 'Paid' | 'Pending' | 'Failed' | 'Unpaid' | 'Partially Paid';
     paymentDate: string;
 }
 
 const BillingPage = () => {
     const [records, setRecords] = useState<BillingRecord[]>([]);
-    const [stats, setStats] = useState({ totalRevenue: 0, pendingPayments: 0 });
+    const [stats, setStats] = useState<any>({ bySource: { "Walk-in": 0, "Referring Doctor": 0, "Home Collection": 0 } });
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchBilling = async () => {
@@ -53,6 +57,36 @@ const BillingPage = () => {
     useEffect(() => {
         fetchBilling();
     }, []);
+
+    const handleExportExcel = () => {
+        const worksheet = XLSX.utils.json_to_sheet(records.map(r => ({
+            "Invoice Reference": r.invoiceId,
+            "Financial Details": `₹${r.totalAmount} (${r.paymentMethod})`,
+            "Patient / Subject": `${r.patientName} (${r.testName})`,
+            "Settlement Status": r.status,
+            "Transaction Date": new Date(r.paymentDate).toLocaleDateString('en-IN')
+        })));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Billing Records");
+        XLSX.writeFile(workbook, "Billing_Records.xlsx");
+    };
+
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+        doc.text("Financial Dashboard - Billing Records", 14, 15);
+        autoTable(doc, {
+            head: [['Invoice Reference', 'Financial Details', 'Patient / Subject', 'Settlement Status', 'Transaction Date']],
+            body: records.map(r => [
+                r.invoiceId,
+                `Rs. ${r.totalAmount} (${r.paymentMethod})`,
+                `${r.patientName}\n(${r.testName})`,
+                r.status,
+                new Date(r.paymentDate).toLocaleDateString('en-IN')
+            ]),
+            startY: 20
+        });
+        doc.save("Billing_Records.pdf");
+    };
 
     const columns = [
         { 
@@ -95,7 +129,8 @@ const BillingPage = () => {
                     "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.1em] w-fit border",
                     row.status === 'Paid' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
                     row.status === 'Failed' ? "bg-rose-50 text-rose-700 border-rose-100" :
-                    "bg-amber-50 text-amber-700 border-amber-100"
+                    (row.status === 'Unpaid' || row.status === 'Pending') ? "bg-amber-50 text-amber-700 border-amber-100" :
+                    "bg-blue-50 text-blue-700 border-blue-100" // E.g., Partially Paid
                 )}>
                     {row.status}
                 </div>
@@ -119,49 +154,65 @@ const BillingPage = () => {
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Financial Dashboard</h1>
                     <p className="text-slate-500 text-sm mt-1 font-medium">Revenue oversight, payment settlement, and invoice tracking.</p>
                 </div>
-                <button className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-[1.25rem] font-bold text-xs hover:bg-slate-800 transition-all active:scale-95 shadow-2xl shadow-slate-900/20">
-                    <Download className="w-4 h-4" />
-                    Consolidated Export
-                </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-xl hover:shadow-blue-600/5 transition-all">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <TrendingUp className="w-20 h-20 text-blue-600" />
-                    </div>
-                    <div className="relative z-10">
-                        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-6">
-                            <Wallet className="w-6 h-6" />
-                        </div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Gross Revenue</p>
-                        <h2 className="text-3xl font-black text-slate-900 tracking-tight">₹{stats.totalRevenue.toLocaleString()}</h2>
-                        <div className="mt-4 flex items-center gap-2 text-emerald-500">
-                            <ArrowUpRight className="w-4 h-4" />
-                            <span className="text-[11px] font-bold">+12.4% vs last month</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden group hover:shadow-xl hover:shadow-amber-600/5 transition-all">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Clock className="w-20 h-20 text-amber-600" />
-                    </div>
-                    <div className="relative z-10">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-6">
-                            <CreditCard className="w-6 h-6" />
-                        </div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Unsettled Balance</p>
-                        <h2 className="text-3xl font-black text-slate-900 tracking-tight">₹{stats.pendingPayments.toLocaleString()}</h2>
-                        <div className="mt-4 flex items-center gap-2 text-amber-500">
-                            <ArrowUpRight className="w-4 h-4" />
-                            <span className="text-[11px] font-bold">14 invoices pending</span>
-                        </div>
-                    </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-50 transition-all active:scale-95 shadow-sm">
+                        <Download className="w-3.5 h-3.5" />
+                        Export Excel
+                    </button>
+                    <button onClick={handleExportPDF} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-slate-800 transition-all active:scale-95 shadow-sm">
+                        <FileText className="w-3.5 h-3.5" />
+                        Export PDF
+                    </button>
                 </div>
             </div>
 
-            <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-2 overflow-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-slate-900 p-4 rounded-xl shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-slate-800 text-white flex items-center justify-center">
+                            <Wallet className="w-4 h-4" />
+                        </div>
+                        <TrendingUp className="w-6 h-6 text-slate-800 group-hover:text-slate-700 transition-colors" />
+                    </div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Revenue</p>
+                    <h2 className="text-xl font-black text-white tracking-tight">₹{((stats.totalRevenue) || Object.values(stats.bySource || {}).reduce((a: any, b: any) => a + b, 0) || 0).toLocaleString()}</h2>
+                </div>
+
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-blue-200 hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <FileText className="w-4 h-4" />
+                        </div>
+                        <TrendingUp className="w-6 h-6 text-slate-100 group-hover:text-blue-50 transition-colors" />
+                    </div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Walk-in Revenue</p>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">₹{(stats.bySource?.["Walk-in"] || 0).toLocaleString()}</h2>
+                </div>
+
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-amber-200 hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                            <CreditCard className="w-4 h-4" />
+                        </div>
+                        <TrendingUp className="w-6 h-6 text-slate-100 group-hover:text-amber-50 transition-colors" />
+                    </div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Doctor Referral</p>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">₹{(stats.bySource?.["Referring Doctor"] || 0).toLocaleString()}</h2>
+                </div>
+
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-emerald-200 hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <DollarSign className="w-4 h-4" />
+                        </div>
+                        <TrendingUp className="w-6 h-6 text-slate-100 group-hover:text-emerald-50 transition-colors" />
+                    </div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Mobile Collection</p>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">₹{(stats.bySource?.["Home Collection"] || 0).toLocaleString()}</h2>
+                </div>
+            </div>
+
+            <div className="pt-4">
                 <Table 
                     columns={columns} 
                     data={records} 
