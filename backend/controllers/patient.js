@@ -8,6 +8,7 @@ const Address = require("../models/Address");
 const Cart = require("../models/Cart");
 const FamilyMember = require("../models/FamilyMember");
 const SupportTicket = require("../models/SupportTicket");
+const staffController = require("./staff");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
@@ -46,14 +47,13 @@ exports.register = async (req, res) => {
         }
 
         const patientId = `PAT-${Math.floor(1000 + Math.random() * 9000)}`;
-        const hashedPassword = password ? await bcrypt.hash(password, 10) : undefined;
 
         const patient = new Patient({
             patientId,
             name,
             email,
             phoneNumber,
-            password: hashedPassword,
+            password,
             age,
             dob,
             gender,
@@ -88,7 +88,7 @@ exports.login = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid credentials" });
         }
 
-        const isMatch = await bcrypt.compare(password, patient.password);
+        const isMatch = await patient.comparePassword(password);
         if (!isMatch) {
             return res.status(400).json({ success: false, message: "Invalid credentials" });
         }
@@ -117,7 +117,15 @@ exports.getProfile = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
     try {
-        const patient = await Patient.findByIdAndUpdate(req.user.id, req.body, { new: true });
+        const patient = await Patient.findById(req.user.id);
+        if (!patient) return res.status(404).json({ success: false, message: "Patient not found" });
+
+        Object.keys(req.body).forEach(key => {
+            if (key === "password" && !req.body[key]) return;
+            patient[key] = req.body[key];
+        });
+
+        await patient.save();
         res.status(200).json({ success: true, message: "Profile updated", data: patient });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -211,6 +219,21 @@ exports.bookTest = async (req, res) => {
             status: "Pending"
         });
         await billing.save();
+
+        // 4. Auto-assign if Home Collection
+        if (sourceType === "Home Collection") {
+            // Get patient address for location
+            const address = await Address.findById(addressId);
+            if (address && address.coordinates && address.coordinates.latitude) {
+                await staffController.autoAssignCollectionAgent(booking._id, {
+                    lat: address.coordinates.latitude,
+                    lng: address.coordinates.longitude
+                });
+            } else {
+                // Default fallback location or handle as unassigned
+                console.warn("No coordinates found for Home Collection booking");
+            }
+        }
 
         res.status(201).json({ success: true, message: "Booking created", data: booking });
     } catch (err) {

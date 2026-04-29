@@ -233,7 +233,18 @@ exports.updatePatient = async (req, res) => {
         if (!req.body.doctorReferral && req.body.doctorReferral !== null) {
             delete req.body.doctorReferral;
         }
-        const patient = await Patient.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const patient = await Patient.findById(req.params.id);
+        if (!patient) return res.status(404).json({ success: false, message: "Patient not found" });
+
+        const immutableFields = ["_id", "patientId", "createdAt", "updatedAt", "__v"];
+        Object.keys(req.body).forEach(key => {
+            if (immutableFields.includes(key)) return;
+            if (key === "password" && !req.body[key]) return;
+            patient[key] = req.body[key];
+        });
+
+        await patient.save();
+
         await logActivity(req.user.id, req.user.name, "UPDATE", "Patients", `Updated patient profile for: ${patient.name}`);
         res.status(200).json({ success: true, data: patient });
     } catch (err) {
@@ -765,6 +776,83 @@ exports.addTest = async (req, res) => {
         const newTest = await Test.create(req.body);
         await logActivity(req.user.id, req.user.name, "CREATE", "Tests", `Created test: ${newTest.name}`);
         res.status(201).json({ success: true, data: newTest });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.getReferralAnalytics = async (req, res) => {
+    try {
+        const last30Days = new Date();
+        last30Days.setDate(last30Days.getDate() - 30);
+
+        // 1. Source Distribution
+        const sourceDistribution = await Booking.aggregate([
+            { $match: { createdAt: { $gte: last30Days } } },
+            { $group: { 
+                _id: "$sourceType", 
+                count: { $sum: 1 }, 
+                revenue: { $sum: "$totalAmount" } 
+            }},
+            { $sort: { count: -1 } }
+        ]);
+
+        // 2. Doctor Referral Performance
+        const doctorPerformance = await Booking.aggregate([
+            { $match: { 
+                doctorReferral: { $exists: true, $ne: null },
+                createdAt: { $gte: last30Days }
+            }},
+            { $group: { 
+                _id: "$doctorReferral", 
+                patientCount: { $sum: 1 }, 
+                revenue: { $sum: "$totalAmount" } 
+            }},
+            { $lookup: { 
+                from: "doctors", 
+                localField: "_id", 
+                foreignField: "_id", 
+                as: "doctor" 
+            }},
+            { $unwind: "$doctor" },
+            { $project: { 
+                name: "$doctor.name", 
+                specialty: "$doctor.specialty",
+                hospital: "$doctor.hospitalName",
+                patientCount: 1, 
+                revenue: 1 
+            }},
+            { $sort: { patientCount: -1 } }
+        ]);
+
+        // 3. Corporate / Camp Analytics
+        const corporateAnalytics = await Patient.aggregate([
+            { $match: { 
+                sourceType: "Corporate / Camps",
+                "corporateDetails.corporateName": { $exists: true, $ne: "" }
+            }},
+            { $group: { 
+                _id: "$corporateDetails.corporateName", 
+                count: { $sum: 1 },
+                camps: { $addToSet: "$corporateDetails.campName" }
+            }},
+            { $project: {
+                corporateName: "$_id",
+                count: 1,
+                campCount: { $size: "$camps" }
+            }},
+            { $sort: { count: -1 } }
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                period: "Last 30 Days",
+                sourceDistribution,
+                doctorPerformance,
+                corporateAnalytics
+            }
+        });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { X, User, Phone, Calendar, Loader2, CheckCircle2, HeartPulse, UserPlus, DollarSign, Tag } from "lucide-react";
+import { X, User, Phone, Calendar, Loader2, CheckCircle2, HeartPulse, UserPlus, DollarSign, Tag, Lock } from "lucide-react";
 import { Patient, Doctor } from "../types";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -162,34 +162,78 @@ const PatientModal: React.FC<PatientModalProps> = ({ isOpen, onClose, onSave, pa
                             </div>
                         </div>
 
+                        <div className="space-y-4">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Account Password</label>
+                            <div className="relative">
+                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <input 
+                                    type="password" 
+                                    value={formData.password || ""}
+                                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                    placeholder={patient ? "Leave blank to keep current" : "Set initial password"}
+                                />
+                            </div>
+                        </div>
+
                         {/* Referral Source */}
                         <div className="space-y-4">
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Traffic Source</label>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Patient Source (*)</label>
                             <select 
                                 value={formData.sourceType}
                                 onChange={(e) => setFormData({...formData, sourceType: e.target.value as any})}
                                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
                             >
-                                <option value="Walk-in">Direct Walk-in</option>
-                                <option value="Referring Doctor">Physician Referral</option>
-                                <option value="Home Collection">Mobile Collection</option>
+                                <option value="Walk-in">Walk-in</option>
+                                <option value="Referring Doctor">Referring Doctor</option>
+                                <option value="Home Collection">Home Collection</option>
+                                <option value="Corporate / Camps">Corporate / Camps</option>
+                                <option value="Online Booking">Online Booking</option>
+                                <option value="Insurance Partner">Insurance Partner</option>
+                                <option value="Marketing Campaign">Marketing Campaign</option>
+                                <option value="Repeat Patient">Repeat Patient</option>
+                                <option value="Hospital Tie-up">Hospital Tie-up</option>
+                                <option value="Diagnostic Package Campaign">Diagnostic Package Campaign</option>
                             </select>
                         </div>
 
                         {formData.sourceType === "Referring Doctor" && (
                             <div className="space-y-4">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Referring Physician</label>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Referring Physician Master (*)</label>
                                 <select 
                                     required
                                     value={formData.doctorReferral as string}
                                     onChange={(e) => setFormData({...formData, doctorReferral: e.target.value})}
                                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
                                 >
-                                    <option value="">Select Doctor</option>
+                                    <option value="">Select From Master Database</option>
                                     {doctors.map(doc => (
-                                        <option key={doc._id} value={doc._id}>{doc.name}</option>
+                                        <option key={doc._id} value={doc._id}>{doc.name} - {doc.hospitalName}</option>
                                     ))}
                                 </select>
+                                <p className="text-[9px] font-bold text-slate-400 italic">Doctor not available? Please contact Admin to add to Master.</p>
+                            </div>
+                        )}
+
+                        {formData.sourceType === "Corporate / Camps" && (
+                            <div className="md:col-span-2 p-4 bg-blue-50/50 rounded-xl border border-blue-100 space-y-4">
+                                <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">Corporate Details Tracking</label>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Corporate Name"
+                                        value={formData.corporateDetails?.corporateName || ""}
+                                        onChange={(e) => setFormData({...formData, corporateDetails: {...formData.corporateDetails, corporateName: e.target.value}})}
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm outline-none"
+                                    />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Camp ID / Name"
+                                        value={formData.corporateDetails?.campName || ""}
+                                        onChange={(e) => setFormData({...formData, corporateDetails: {...formData.corporateDetails, campName: e.target.value}})}
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-sm outline-none"
+                                    />
+                                </div>
                             </div>
                         )}
 

@@ -23,7 +23,8 @@ const {
     getHeatmap,
     getInsights,
     getPackages, addPackage, updatePackage, deletePackage,
-    getTests, addTest
+    getTests, addTest,
+    getReferralAnalytics
 } = require("../controllers/admin");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
@@ -101,6 +102,7 @@ router.post("/patients", addPatient);
 router.put("/patients/:id", updatePatient);
 router.delete("/patients/:id", deletePatient);
 router.get("/source-tracking", getSourceTracking);
+router.get("/referral-analytics", getReferralAnalytics);
 router.get("/commission", getCommissions);
 router.post("/commission/pay/:doctorId", payCommission);
 router.get("/home-collection", getHomeCollections);

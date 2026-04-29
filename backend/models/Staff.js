@@ -22,6 +22,10 @@ const StaffSchema = new mongoose.Schema({
     status: { type: String, enum: ["Active", "Inactive"], default: "Active" },
     profileImage: { type: String },
     assignedRoute: { type: String }, // For collection team
+    currentLocation: {
+        lat: { type: Number },
+        lng: { type: Number }
+    },
     lastLogin: { type: Date }
 }, { timestamps: true });
 

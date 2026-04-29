@@ -6,7 +6,12 @@ export interface Doctor {
     phoneNumber: string;
     email: string;
     commissionPercentage: number;
+    specialty?: string;
+    registrationNumber?: string;
     status: 'active' | 'inactive';
+    preferredCommunication: 'Email' | 'WhatsApp' | 'SMS';
+    referralCategory: 'General' | 'Specialist' | 'Corporate';
+    notes?: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -30,10 +35,31 @@ export interface Patient {
     patientId: string;
     name: string;
     phoneNumber: string;
+    password?: string;
     age: number;
     gender: 'Male' | 'Female' | 'Other';
-    sourceType: 'Walk-in' | 'Referring Doctor' | 'Home Collection' | 'Corporate / Camps';
+    sourceType: 
+        | 'Walk-in' 
+        | 'Referring Doctor' 
+        | 'Home Collection' 
+        | 'Corporate / Camps'
+        | 'Online Booking'
+        | 'Insurance Partner'
+        | 'Marketing Campaign'
+        | 'Repeat Patient'
+        | 'Hospital Tie-up'
+        | 'Diagnostic Package Campaign';
     doctorReferral?: Doctor | string;
+    corporateDetails?: {
+        corporateName?: string;
+        campName?: string;
+        campId?: string;
+        hrCoordinator?: string;
+        bulkUploadId?: string;
+        corporateDiscount?: number;
+        billingAccount?: string;
+        contractValidity?: string;
+    };
     testStatus: 'Pending' | 'Sample Collected' | 'Processing' | 'Completed';
     revenue: number;
     date: string;

@@ -10,10 +10,17 @@ import {
     Activity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import SampleLookupModal from "./SampleLookupModal";
 
 export default function StaffNavbar({ onMenuClick }: { onMenuClick: () => void }) {
+    const [isLookupOpen, setIsLookupOpen] = React.useState(false);
+
     return (
         <header className="h-24 bg-white border-b border-slate-100 flex items-center justify-between px-8 sticky top-0 z-30">
+            <SampleLookupModal 
+                isOpen={isLookupOpen} 
+                onClose={() => setIsLookupOpen(false)} 
+            />
             {/* Mobile Menu Toggle */}
             <button 
                 onClick={onMenuClick}
@@ -23,13 +30,12 @@ export default function StaffNavbar({ onMenuClick }: { onMenuClick: () => void }
             </button>
 
             {/* Search - Hidden on mobile */}
-            <div className="hidden md:flex items-center gap-4 bg-slate-50 px-6 py-3 rounded-2xl w-96 group focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all border border-transparent focus-within:border-blue-200">
-                <Search className="w-4 h-4 text-slate-400 group-focus-within:text-blue-600" />
-                <input 
-                    type="text" 
-                    placeholder="Search patients, samples or tests..." 
-                    className="bg-transparent border-none outline-none text-xs font-bold text-slate-600 w-full placeholder:text-slate-400 uppercase tracking-widest"
-                />
+            <div 
+                onClick={() => setIsLookupOpen(true)}
+                className="hidden md:flex items-center gap-4 bg-slate-50 px-6 py-3 rounded-2xl w-96 group hover:bg-slate-100 transition-all border border-transparent cursor-pointer"
+            >
+                <Search className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Search patients or samples...</span>
             </div>
 
             {/* Right Actions */}

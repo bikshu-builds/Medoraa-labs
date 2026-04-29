@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 const Dashboard: React.FC = () => {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [liveStats, setLiveStats] = useState<any>(null);
+    const [referralAnalytics, setReferralAnalytics] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchData = async () => {
@@ -33,16 +34,19 @@ const Dashboard: React.FC = () => {
                 return;
             }
 
-            const [sRes, lRes] = await Promise.all([
+            const [sRes, lRes, rRes] = await Promise.all([
                 fetch(getApiUrl("/api/admin/dashboard"), { headers: { "Authorization": `Bearer ${token}` } }),
-                fetch(getApiUrl("/api/admin/live-dashboard"), { headers: { "Authorization": `Bearer ${token}` } })
+                fetch(getApiUrl("/api/admin/live-dashboard"), { headers: { "Authorization": `Bearer ${token}` } }),
+                fetch(getApiUrl("/api/admin/referral-analytics"), { headers: { "Authorization": `Bearer ${token}` } })
             ]);
             
             const sData = await sRes.json();
             const lData = await lRes.json();
+            const rData = await rRes.json();
             
             if (sData.success) setStats(sData.data);
             if (lData.success) setLiveStats(lData.data);
+            if (rData.success) setReferralAnalytics(rData.data);
         } catch (err) {
             console.error("Failed to fetch dashboard data", err);
         } finally {
@@ -152,6 +156,66 @@ const Dashboard: React.FC = () => {
                 <DashboardCard title="Medical Partners" value={displayStats.totalDoctors} icon={UserPlus} color="emerald" description="Active Doctors" />
                 <DashboardCard title="Laboratory Staff" value={displayStats.totalEmployees} icon={Calendar} color="purple" description="Departmental total" />
                 <DashboardCard title="Monthly Revenue" value={`₹${displayStats.monthlyRevenue.toLocaleString()}`} icon={DollarSign} color="amber" description="Current Month" />
+            </div>
+
+            {/* Referral Intelligence */}
+            <div className="bg-white border border-slate-200 rounded-[2.5rem] shadow-sm overflow-hidden p-8">
+                <div className="flex items-center justify-between mb-8">
+                    <div>
+                        <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4 text-blue-600" />
+                            Referral & Acquisition Intelligence
+                        </h2>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Growth breakdown by acquisition source</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                    <div className="space-y-6">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Top Acquisition Channels</h3>
+                        <div className="grid grid-cols-1 gap-3">
+                            {referralAnalytics?.sourceDistribution?.slice(0, 5).map((source: any, i: number) => (
+                                <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-[10px]">
+                                            {i + 1}
+                                        </div>
+                                        <span className="text-xs font-bold text-slate-700">{source._id || 'Direct'}</span>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs font-black text-slate-900">{source.count} Patients</p>
+                                        <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest">₹{source.revenue?.toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="space-y-6">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Top Performing Doctors</h3>
+                        <div className="grid grid-cols-1 gap-3">
+                            {referralAnalytics?.doctorPerformance?.slice(0, 5).map((doc: any, i: number) => (
+                                <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">
+                                            DR
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-700 uppercase tracking-tight">{doc.name}</p>
+                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{doc.hospital}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs font-black text-slate-900">{doc.patientCount} Ref.</p>
+                                        <div className="flex items-center gap-1 justify-end">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                            <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Tier 1</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Content Area */}
