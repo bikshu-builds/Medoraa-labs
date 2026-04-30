@@ -3,6 +3,8 @@ const Doctor = require("../models/Doctor");
 const Staff = require("../models/Staff");
 const Patient = require("../models/Patient");
 const HomeCollection = require("../models/HomeCollection");
+const Collection = require("../models/Collection");
+const Employee = require("../models/Staff");
 const Commission = require("../models/Commission");
 const Role = require("../models/Role");
 const ActivityLog = require("../models/ActivityLog");
@@ -69,7 +71,7 @@ exports.getDashboardData = async (req, res) => {
         const totalPatients = await Patient.countDocuments();
         const totalDoctors = await Doctor.countDocuments();
         const totalEmployees = await Employee.countDocuments();
-        const homeCollectionRequests = await HomeCollection.countDocuments({ status: "Scheduled" });
+        const homeCollectionRequests = await Collection.countDocuments({ status: "Order Received" });
         
         // Simple monthly revenue calculation
         const startOfMonth = new Date();
@@ -365,12 +367,45 @@ exports.payCommission = async (req, res) => {
 };
 
 // @desc    Home Collection Tracking
+// @desc    Home Collection Tracking (Unified)
 exports.getHomeCollections = async (req, res) => {
     try {
-        const collections = await HomeCollection.find()
-            .populate("patient", "name phoneNumber")
-            .populate("assignedStaff", "name employeeId");
+        const collections = await Collection.find()
+            .populate({
+                path: "booking",
+                populate: { path: "patient tests" }
+            })
+            .populate("assignedStaff", "name employeeId role");
         res.status(200).json({ success: true, data: collections });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Manually assign staff to collection
+// @route   PUT /api/admin/home-collection/assign/:id
+exports.assignCollection = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { staffId } = req.body;
+
+        const collection = await Collection.findById(id);
+        if (!collection) return res.status(404).json({ success: false, message: "Collection not found" });
+
+        const staff = await Staff.findById(staffId);
+        if (!staff) return res.status(404).json({ success: false, message: "Staff not found" });
+
+        collection.assignedStaff = staffId;
+        collection.status = "Assigned";
+        await collection.save();
+
+        // Sync booking
+        await Booking.findByIdAndUpdate(collection.booking, { 
+            assignedStaff: staffId,
+            status: "Assigned"
+        });
+
+        res.status(200).json({ success: true, message: `Assigned to ${staff.name}` });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

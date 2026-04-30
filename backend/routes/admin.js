@@ -8,7 +8,7 @@ const {
     getPatients, addPatient, updatePatient, deletePatient,
     getSourceTracking,
     getCommissions, payCommission,
-    getHomeCollections,
+    getHomeCollections, assignCollection,
     getRoles, addRole, updateRole, deleteRole,
     getActivityLogs,
     getNotifications, markNotificationRead,
@@ -106,6 +106,7 @@ router.get("/referral-analytics", getReferralAnalytics);
 router.get("/commission", getCommissions);
 router.post("/commission/pay/:doctorId", payCommission);
 router.get("/home-collection", getHomeCollections);
+router.put("/home-collection/assign/:id", assignCollection);
 
 // Packages & Membership Plans
 router.get("/packages", getPackages);

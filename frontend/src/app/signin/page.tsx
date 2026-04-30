@@ -51,6 +51,8 @@ export default function UnifiedSignIn() {
 
             if (data.success) {
                 localStorage.setItem(`${role}Token`, data.token);
+                if (data.data) localStorage.setItem("staffUser", JSON.stringify(data.data));
+                if (data.admin) localStorage.setItem("adminUser", JSON.stringify(data.admin));
                 window.location.href = `/${role}/dashboard`;
             } else {
                 setError(data.message || "Invalid credentials");

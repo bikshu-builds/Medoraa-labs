@@ -34,13 +34,7 @@ export default function StaffApprovals() {
             });
             const d = await res.json();
             if (d.success) setPending(d.data);
-            else {
-                // Mocking for UI if empty
-                setPending([
-                    { _id: "1", sample: { sampleId: "SMP-782104" }, booking: { patientName: "Rahul Sharma" }, test: { name: "Full Body Profile" }, examiner: { name: "Lab Staff A" }, status: "Submitted", parameters: [{ name: "Hemoglobin", value: "14.5", unit: "g/dL", range: "13-17", isAbnormal: false }] },
-                    { _id: "2", sample: { sampleId: "SMP-109283" }, booking: { patientName: "Anita Devi" }, test: { name: "Thyroid Profile" }, examiner: { name: "Lab Staff B" }, status: "Submitted", parameters: [{ name: "TSH", value: "5.2", unit: "uIU/mL", range: "0.4-4.2", isAbnormal: true }] }
-                ]);
-            }
+            else setPending([]);
         } catch (err) {
             console.error(err);
         } finally {

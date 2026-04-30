@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 export default function StaffBilling() {
     const [billings, setBillings] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [stats, setStats] = useState<any>(null);
 
     useEffect(() => {
         fetchBilling();
@@ -29,12 +30,14 @@ export default function StaffBilling() {
     const fetchBilling = async () => {
         try {
             const token = localStorage.getItem("staffToken");
-            // Mocking data for now
-            setBillings([
-                { _id: "1", invoiceId: "INV-22101", patientName: "Rahul Sharma", amount: 1250, status: "Paid", method: "UPI", date: "2024-03-21" },
-                { _id: "2", invoiceId: "INV-22102", patientName: "Anita Devi", amount: 2800, status: "Pending", method: "N/A", date: "2024-03-21" },
-                { _id: "3", invoiceId: "INV-22103", patientName: "Sumit Kumar", amount: 850, status: "Paid", method: "Cash", date: "2024-03-21" }
-            ]);
+            const res = await fetch(getApiUrl("/api/staff/billing"), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const d = await res.json();
+            if (d.success) {
+                setBillings(d.data);
+                setStats(d.stats);
+            }
         } catch (err) {
             console.error(err);
         } finally {
@@ -61,10 +64,10 @@ export default function StaffBilling() {
 
             {/* Financial Overview */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <FinCard label="Daily Collection" value="₹24,500" icon={Wallet} color="blue" trend="+12% from yesterday" />
-                <FinCard label="Cash in Hand" value="₹8,200" icon={Activity} color="indigo" trend="4 Invoices" />
-                <FinCard label="Digital Payments" value="₹16,300" icon={ShieldCheck} color="emerald" trend="12 UPI / Card" />
-                <FinCard label="Outstanding" value="₹4,800" icon={Clock} color="rose" trend="Action Required" />
+                <FinCard label="Daily Collection" value={`₹${stats?.dailyCollection || 0}`} icon={Wallet} color="blue" trend="+12% from yesterday" />
+                <FinCard label="Cash in Hand" value={stats?.cashInHand || 0} icon={Activity} color="indigo" trend="Invoices" />
+                <FinCard label="Digital Payments" value={stats?.digitalPayments || 0} icon={ShieldCheck} color="emerald" trend="UPI / Card" />
+                <FinCard label="Outstanding" value={stats?.outstanding || 0} icon={Clock} color="rose" trend="Action Required" />
             </div>
 
             {/* Filter Section */}

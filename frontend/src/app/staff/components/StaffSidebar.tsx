@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -23,19 +23,37 @@ import { cn } from "@/lib/utils";
 export default function StaffSidebar({ onClose }: { onClose?: () => void }) {
     const pathname = usePathname();
 
-    const menuItems = [
-        { name: "Dashboard", icon: LayoutDashboard, href: "/staff/dashboard" },
-        { name: "Collections", icon: Truck, href: "/staff/collections" },
-        { name: "Walk-In Entry", icon: UserPlus, href: "/staff/walkin" },
-        { name: "Hospital Orders", icon: Building2, href: "/staff/hospitals" },
-        { name: "Sample Reception", icon: Inbox, href: "/staff/sampleReception" },
-        { name: "Lab Testing", icon: FlaskConical, href: "/staff/labTesting" },
-        { name: "Approvals", icon: FileCheck, href: "/staff/approvals" },
-        { name: "Reports", icon: FileText, href: "/staff/reports" },
-        { name: "Billing", icon: CreditCard, href: "/staff/billing" },
-        { name: "Notifications", icon: Bell, href: "/staff/notifications" },
-        { name: "Profile", icon: User, href: "/staff/profile" },
+    const [role, setRole] = useState<string>("");
+
+    useEffect(() => {
+        const storedUser = localStorage.getItem("staffUser");
+        console.log("Stored User Data:", storedUser);
+        if (storedUser) {
+            const user = JSON.parse(storedUser);
+            console.log("Current Staff Role:", user.role);
+            setRole(user.role);
+        }
+    }, []);
+
+    const allMenuItems = [
+        { name: "Dashboard", icon: LayoutDashboard, href: "/staff/dashboard", roles: ["all"] },
+        { name: "Collections", icon: Truck, href: "/staff/collections", roles: ["Sample Collection Team", "Admin Staff"] },
+        { name: "Walk-In Entry", icon: UserPlus, href: "/staff/walkin", roles: ["Reception", "Admin Staff", "Sample Collection Team"] },
+        // { name: "Hospital Orders", icon: Building2, href: "/staff/hospitals", roles: ["Dispatch Team", "Admin Staff", "Sample Collection Team"] },
+        { name: "Sample Reception", icon: Inbox, href: "/staff/sampleReception", roles: ["Reception", "Sample Processing Team", "Admin Staff", "Sample Collection Team"] },
+        { name: "Lab Testing", icon: FlaskConical, href: "/staff/labTesting", roles: ["Sample Processing Team", "Admin Staff", "Sample Collection Team"] },
+        { name: "Approvals", icon: FileCheck, href: "/staff/approvals", roles: ["Report Approval Team", "Admin Staff", "Sample Collection Team"] },
+        { name: "Reports", icon: FileText, href: "/staff/reports", roles: ["all"] },
+        { name: "Billing", icon: CreditCard, href: "/staff/billing", roles: ["Reception", "Admin Staff", "Sample Collection Team"] },
+        { name: "Notifications", icon: Bell, href: "/staff/notifications", roles: ["all"] },
+        { name: "Profile", icon: User, href: "/staff/profile", roles: ["all"] },
     ];
+
+    const menuItems = allMenuItems.filter(item => 
+        item.roles.includes("all") || 
+        item.roles.includes(role) || 
+        role === "Sample Collection Team" // Direct bypass for this role
+    );
 
     const handleLogout = () => {
         localStorage.removeItem("staffToken");

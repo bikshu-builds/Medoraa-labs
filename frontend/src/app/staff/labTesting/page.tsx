@@ -35,17 +35,13 @@ export default function LabTesting() {
     const fetchInTesting = async () => {
         try {
             const token = localStorage.getItem("staffToken");
-            // For now, let's assume an endpoint or use dashboard data
-            const res = await fetch(getApiUrl("/api/staff/dashboard"), {
+            const res = await fetch(getApiUrl("/api/staff/received-samples"), {
                 headers: { "Authorization": `Bearer ${token}` }
             });
             const d = await res.json();
             if (d.success) {
-                // Mocking samples for now if not available
-                setSamples([
-                    { _id: "1", sampleId: "SMP-782104", patient: { name: "Rahul Sharma" }, test: { name: "Full Body Profile", parameters: ["Hemoglobin", "WBC Count", "Platelets"] }, status: "In Testing" },
-                    { _id: "2", sampleId: "SMP-109283", patient: { name: "Anita Devi" }, test: { name: "Thyroid Profile", parameters: ["T3", "T4", "TSH"] }, status: "In Testing" }
-                ]);
+                // Filter for samples that are ready for testing
+                setSamples(d.data.filter((s: any) => ["Received", "In Testing"].includes(s.status)));
             }
         } catch (err) {
             console.error(err);
@@ -56,7 +52,15 @@ export default function LabTesting() {
 
     const handleSelectSample = (sample: any) => {
         setSelectedSample(sample);
-        setResults(sample.test.parameters.map((p: string) => ({ name: p, value: "", unit: "mg/dL", range: "70-110", isAbnormal: false })));
+        // Use real parameters from test object, or default to a generic one
+        const params = sample.test?.parameters || ["Observation"];
+        setResults(params.map((p: string) => ({ 
+            name: p, 
+            value: "", 
+            unit: sample.test?.sampleType === "Urine" ? "mg/dL" : "mg/dL", // Should ideally come from parameter metadata
+            range: "70-110", 
+            isAbnormal: false 
+        })));
         setObservations("");
     };
 

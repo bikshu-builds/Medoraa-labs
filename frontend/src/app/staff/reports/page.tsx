@@ -19,9 +19,15 @@ import {
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
+import ReportModal from "../components/ReportModal";
+
 export default function StaffReports() {
     const [reports, setReports] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [stats, setStats] = useState<any>(null);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [selectedReport, setSelectedReport] = useState<any>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     useEffect(() => {
         fetchReports();
@@ -30,12 +36,28 @@ export default function StaffReports() {
     const fetchReports = async () => {
         try {
             const token = localStorage.getItem("staffToken");
-            // Mocking data for now
-            setReports([
-                { _id: "1", reportId: "REP-90210", patientName: "Rahul Sharma", testName: "Full Body Profile", status: "Ready", dispatchStatus: "Sent", date: "2024-03-20" },
-                { _id: "2", reportId: "REP-88291", patientName: "Anita Devi", testName: "Thyroid Profile", status: "Ready", dispatchStatus: "Pending", date: "2024-03-21" },
-                { _id: "3", reportId: "REP-77211", patientName: "Sumit Kumar", testName: "Diabetes Profile", status: "Ready", dispatchStatus: "Pending", date: "2024-03-21" }
-            ]);
+            const res = await fetch(getApiUrl("/api/staff/reports"), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const d = await res.json();
+            if (d.success) {
+                // Map backend data to frontend format
+                const mapped = d.data.map((item: any) => ({
+                    _id: item._id,
+                    reportId: `REP-${item._id.slice(-5).toUpperCase()}`,
+                    patientName: item.booking?.patient?.name || item.booking?.patientName || "N/A",
+                    phoneNumber: item.booking?.patient?.phoneNumber || "",
+                    testName: item.test?.name || "Diagnostic Profile",
+                    status: item.status,
+                    dispatchStatus: item.dispatchStatus,
+                    date: new Date(item.updatedAt).toLocaleDateString(),
+                    channels: item.channels || [],
+                    parameters: item.parameters,
+                    observations: item.observations
+                }));
+                setReports(mapped);
+                setStats(d.stats);
+            }
         } catch (err) {
             console.error(err);
         } finally {
@@ -43,10 +65,27 @@ export default function StaffReports() {
         }
     };
 
+    const filteredReports = reports.filter(r => 
+        r.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.reportId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.phoneNumber.includes(searchQuery)
+    );
+
+    const openReport = (report: any) => {
+        setSelectedReport(report);
+        setIsModalOpen(true);
+    };
+
     if (isLoading) return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="w-12 h-12 text-blue-600 animate-spin" /></div>;
 
     return (
         <div className="space-y-12 animate-in fade-in duration-700">
+            <ReportModal 
+                report={selectedReport}
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+            />
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
@@ -62,16 +101,22 @@ export default function StaffReports() {
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <StatCard label="Today Generated" value="48" icon={FileText} color="blue" />
-                <StatCard label="Pending Dispatch" value="12" icon={Clock} color="amber" />
-                <StatCard label="Delivered" value="36" icon={CheckCircle2} color="emerald" />
+                <StatCard label="Today Generated" value={stats?.todayGenerated || 0} icon={FileText} color="blue" />
+                <StatCard label="Pending Dispatch" value={stats?.pendingDispatch || 0} icon={Clock} color="amber" />
+                <StatCard label="Delivered" value={stats?.delivered || 0} icon={CheckCircle2} color="emerald" />
             </div>
 
             {/* Search & Filter */}
             <div className="flex items-center justify-between gap-6 bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
                 <div className="flex-1 flex items-center gap-4 px-6 py-2 bg-slate-50 rounded-2xl group focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all border border-transparent focus-within:border-blue-100">
                     <Search className="w-4 h-4 text-slate-400 group-focus-within:text-blue-600" />
-                    <input type="text" placeholder="Search by Patient Name, ID or Phone..." className="bg-transparent border-none outline-none text-xs font-bold text-slate-600 w-full placeholder:text-slate-400 uppercase tracking-widest" />
+                    <input 
+                        type="text" 
+                        placeholder="Search by Patient Name, ID or Phone..." 
+                        className="bg-transparent border-none outline-none text-xs font-bold text-slate-600 w-full placeholder:text-slate-400 uppercase tracking-widest"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
                 </div>
                 <div className="flex items-center gap-2">
                     <button className="p-4 bg-slate-50 rounded-2xl text-slate-400 hover:text-blue-600 transition-all">
@@ -82,7 +127,7 @@ export default function StaffReports() {
 
             {/* Reports List */}
             <div className="grid grid-cols-1 gap-6">
-                {reports.map((report) => (
+                {filteredReports.map((report) => (
                     <div key={report._id} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/40 transition-all group flex flex-col md:flex-row items-center gap-8">
                         <div className="w-16 h-16 rounded-[1.5rem] bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
                             <FileText className="w-8 h-8" />
@@ -111,19 +156,32 @@ export default function StaffReports() {
                         <div className="flex items-center gap-2">
                             <ChannelButton icon={MessageCircle} color="emerald" label="WhatsApp" active={report.dispatchStatus === "Sent"} />
                             <ChannelButton icon={Mail} color="blue" label="Email" active={report.dispatchStatus === "Sent"} />
-                            <ChannelButton icon={Eye} color="slate" label="Portal" active={true} />
+                            <ChannelButton icon={Eye} color="slate" label="Portal" active={true} onClick={() => openReport(report)} />
                         </div>
 
                         <div className="flex items-center gap-3 pl-8 border-l border-slate-100">
-                            <button className="p-4 bg-blue-600 text-white rounded-2xl hover:bg-slate-900 transition-all shadow-lg shadow-blue-100 active:scale-95">
+                            <button 
+                                onClick={() => openReport(report)}
+                                className="p-4 bg-blue-600 text-white rounded-2xl hover:bg-slate-900 transition-all shadow-lg shadow-blue-100 active:scale-95"
+                            >
                                 <Download className="w-5 h-5" />
                             </button>
-                            <button className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-white hover:text-blue-600 hover:shadow-md transition-all border border-transparent hover:border-slate-100">
+                            <button 
+                                onClick={() => openReport(report)}
+                                className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-white hover:text-blue-600 hover:shadow-md transition-all border border-transparent hover:border-slate-100"
+                            >
                                 <ArrowUpRight className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
                 ))}
+                
+                {filteredReports.length === 0 && (
+                    <div className="py-20 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 opacity-60">
+                        <FileText className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No reports found matching your search.</p>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -149,7 +207,7 @@ function StatCard({ label, value, icon: Icon, color }: any) {
     );
 }
 
-function ChannelButton({ icon: Icon, color, label, active }: any) {
+function ChannelButton({ icon: Icon, color, label, active, onClick }: any) {
     const colors: any = {
         emerald: "text-emerald-500 bg-emerald-50 border-emerald-100",
         blue: "text-blue-500 bg-blue-50 border-blue-100",
@@ -157,7 +215,7 @@ function ChannelButton({ icon: Icon, color, label, active }: any) {
     };
 
     return (
-        <div className="relative group cursor-pointer">
+        <div className="relative group cursor-pointer" onClick={onClick}>
             <div className={cn(
                 "w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all",
                 active ? colors[color] : "bg-white border-slate-50 text-slate-200 grayscale opacity-40 hover:grayscale-0 hover:opacity-100"

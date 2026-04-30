@@ -49,6 +49,7 @@ const Sidebar: React.FC = () => {
         },
         {
             group: "Directory", items: [
+                { name: "Home Collection", icon: MapPin, path: "/admin/homeCollection" },
                 { name: "Doctors", icon: UserPlus, path: "/admin/doctors" },
                 { name: "Employees", icon: Users, path: "/admin/employees" },
                 { name: "Patients", icon: UserCheck, path: "/admin/patients" },

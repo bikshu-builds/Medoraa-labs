@@ -35,6 +35,7 @@ const TestSchema = new mongoose.Schema({
     sampleType: { type: String }, // e.g., "Blood", "Urine"
     isPanel: { type: Boolean, default: false },
     includedTests: [{ type: mongoose.Schema.Types.ObjectId, ref: "Test" }],
+    parameters: [{ type: String }], // e.g., ["Hemoglobin", "WBC Count"]
     suggestionTags: [{ type: String }]
 }, { timestamps: true });
 

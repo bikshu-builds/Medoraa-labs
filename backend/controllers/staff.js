@@ -136,30 +136,36 @@ exports.getDashboard = async (req, res) => {
 
         let stats = {};
 
-        if (role === "Sample Collection Team") {
-            stats.pendingCollections = await Collection.countDocuments({ assignedStaff: staffId, status: { $ne: "Collected" } });
-            stats.completedToday = await Collection.countDocuments({ 
-                assignedStaff: staffId, 
-                status: "Collected",
-                updatedAt: { $gte: new Date().setHours(0,0,0,0) }
-            });
-        }
-
-        if (role === "Sample Processing Team") {
+        if (role === "Sample Collection Team" || role === "Admin Staff") {
+            stats.pendingCollections = await Collection.countDocuments({ status: "Order Received" });
             stats.pendingReception = await Sample.countDocuments({ status: "Pending" });
             stats.inTesting = await Sample.countDocuments({ status: "In Testing" });
-        }
-
-        if (role === "Report Approval Team") {
             stats.pendingApprovals = await LabResult.countDocuments({ status: "Submitted" });
-        }
-
-        if (role === "Dispatch Team") {
             stats.pendingDispatch = await Dispatch.countDocuments({ "channels.status": "Pending" });
+        } else {
+            if (role === "Sample Processing Team") {
+                stats.pendingReception = await Sample.countDocuments({ status: "Pending" });
+                stats.inTesting = await Sample.countDocuments({ status: "In Testing" });
+            }
+            if (role === "Report Approval Team") {
+                stats.pendingApprovals = await LabResult.countDocuments({ status: "Submitted" });
+            }
+            if (role === "Dispatch Team") {
+                stats.pendingDispatch = await Dispatch.countDocuments({ "channels.status": "Pending" });
+            }
         }
 
-        // Common stats
-        const activeOrders = await Booking.find({ status: { $ne: "Completed" } }).limit(5).populate("patient tests");
+        // Common stats - filtered by role
+        let orderQuery = { status: { $ne: "Completed" } };
+        if (role !== "Sample Collection Team" && role !== "Admin Staff") {
+            orderQuery.sourceType = { $ne: "Home Collection" };
+        }
+
+        const activeOrders = await Booking.find(orderQuery)
+            .limit(10)
+            .populate("patient tests")
+            .sort({ createdAt: -1 });
+
         const notifications = []; // Mock for now
 
         res.status(200).json({ success: true, data: { stats, activeOrders, notifications } });
@@ -432,6 +438,74 @@ exports.approveResult = async (req, res) => {
     }
 };
 
+exports.getReports = async (req, res) => {
+    try {
+        const results = await LabResult.find({ status: "Approved" })
+            .populate({
+                path: "booking",
+                populate: { path: "patient" }
+            })
+            .populate("test")
+            .sort({ updatedAt: -1 })
+            .limit(100);
+
+        // Get dispatch status for these results
+        const bookingIds = results.map(r => r.booking._id);
+        const dispatches = await Dispatch.find({ booking: { $in: bookingIds } });
+
+        const mappedData = results.map(result => {
+            const dispatch = dispatches.find(d => d.booking.toString() === result.booking._id.toString());
+            return {
+                ...result.toObject(),
+                dispatchStatus: dispatch ? (dispatch.channels.find(c => c.status === "Sent") ? "Sent" : "Pending") : "Not Initiated"
+            };
+        });
+
+        // Calculate stats
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const stats = {
+            todayGenerated: await LabResult.countDocuments({ status: "Approved", updatedAt: { $gte: today } }),
+            pendingDispatch: await Dispatch.countDocuments({ "channels.status": "Pending" }),
+            delivered: await Dispatch.countDocuments({ "channels.status": "Sent" })
+        };
+
+        res.status(200).json({ success: true, data: mappedData, stats });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.getBilling = async (req, res) => {
+    try {
+        const billings = await Billing.find()
+            .populate("patient", "name patientId")
+            .sort({ createdAt: -1 })
+            .limit(100);
+
+        // Calculate stats
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const dailyCollection = await Billing.aggregate([
+            { $match: { status: "Paid", createdAt: { $gte: today } } },
+            { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+        ]);
+
+        const stats = {
+            dailyCollection: dailyCollection[0]?.total || 0,
+            cashInHand: await Billing.countDocuments({ paymentMethod: "Cash", status: "Paid" }),
+            digitalPayments: await Billing.countDocuments({ paymentMethod: { $in: ["UPI", "Card", "Online"] }, status: "Paid" }),
+            outstanding: await Billing.countDocuments({ status: "Pending" })
+        };
+
+        res.status(200).json({ success: true, data: billings, stats });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // Walk-in Registration
 exports.walkinRegistration = async (req, res) => {
     try {
@@ -492,30 +566,48 @@ exports.walkinRegistration = async (req, res) => {
         const booking = new Booking(bookingData);
         await booking.save();
 
-        // 3. Auto-generate Samples (since it's walk-in, collection happens now)
-        const samples = [];
-        for (const test of testDocs) {
-            const sampleId = `SMP-${Math.floor(100000 + Math.random() * 900000)}`;
-            const sample = new Sample({
-                sampleId,
+        // 3. Handle different Source Types
+        let samples = [];
+        if (sourceType === "Home Collection") {
+            // Create a Collection record instead of immediate samples
+            const collection = new Collection({
                 booking: booking._id,
-                patient: patient._id,
-                test: test._id,
-                status: "Pending", // Ready for collection at reception
-                notes: "Walk-in collection"
+                scheduledDate: booking.date || new Date(),
+                timeSlot: booking.time || "Morning (08:00 - 10:00)",
+                status: "Order Received",
+                location: {
+                    type: "Point",
+                    coordinates: [78.4867, 17.3850] // Default Hyderabad
+                }
             });
-            await sample.save();
-            samples.push({
-                sampleId,
-                testName: test.name,
-                patientName: patient.name,
-                patientId: patient.patientId
-            });
+            await collection.save();
+            booking.status = "Order Received";
+            await booking.save();
+        } else {
+            // Auto-generate Samples (since it's walk-in, collection happens now)
+            for (const test of testDocs) {
+                const sampleId = `SMP-${Math.floor(100000 + Math.random() * 900000)}`;
+                const sample = new Sample({
+                    sampleId,
+                    booking: booking._id,
+                    patient: patient._id,
+                    test: test._id,
+                    status: "Pending", // Ready for collection at reception
+                    notes: "Walk-in collection"
+                });
+                await sample.save();
+                samples.push({
+                    sampleId,
+                    testName: test.name,
+                    patientName: patient.name,
+                    patientId: patient.patientId
+                });
+            }
         }
 
         res.status(201).json({ 
             success: true, 
-            message: "Walk-in booking successful", 
+            message: sourceType === "Home Collection" ? "Home Collection request registered" : "Walk-in booking successful", 
             data: {
                 booking,
                 samples

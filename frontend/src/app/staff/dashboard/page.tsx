@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { 
     Activity, 
     Truck, 
@@ -73,35 +74,35 @@ export default function StaffDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
                 <TaskCard 
                     label="Assigned Tasks" 
-                    value={data?.stats?.pendingCollections || 12} 
+                    value={data?.stats?.pendingCollections || 0} 
                     icon={Truck} 
                     color="blue" 
                     trend="+2 new"
                 />
                 <TaskCard 
                     label="Pending Reception" 
-                    value={data?.stats?.pendingReception || 45} 
+                    value={data?.stats?.pendingReception || 0} 
                     icon={Inbox} 
                     color="amber" 
                     trend="High Priority"
                 />
                 <TaskCard 
                     label="In Testing" 
-                    value={data?.stats?.inTesting || 28} 
+                    value={data?.stats?.inTesting || 0} 
                     icon={FlaskConical} 
                     color="indigo" 
                     trend="On Track"
                 />
                 <TaskCard 
                     label="Pending Approval" 
-                    value={data?.stats?.pendingApprovals || 8} 
+                    value={data?.stats?.pendingApprovals || 0} 
                     icon={FileCheck} 
                     color="emerald" 
                     trend="Stat Urgent"
                 />
                 <TaskCard 
                     label="Dispatch Ready" 
-                    value={15} 
+                    value={data?.stats?.pendingDispatch || 0} 
                     icon={Activity} 
                     color="rose" 
                     trend="Evening Batch"
@@ -176,18 +177,21 @@ export default function StaffDashboard() {
                             desc="Receive & Register Sample" 
                             icon={Search} 
                             color="blue"
+                            href="/staff/sampleReception"
                         />
                         <QuickAction 
                             label="Express Lab Entry" 
                             desc="Mark as In-Testing" 
                             icon={FlaskConical} 
                             color="indigo"
+                            href="/staff/labTesting"
                         />
                         <QuickAction 
                             label="Instant Walk-in" 
                             desc="Register New Patient" 
                             icon={Plus} 
                             color="emerald"
+                            href="/staff/walkin"
                         />
                     </div>
 
@@ -246,9 +250,9 @@ function TaskCard({ label, value, icon: Icon, color, trend }: any) {
     );
 }
 
-function QuickAction({ label, desc, icon: Icon, color }: any) {
+function QuickAction({ label, desc, icon: Icon, color, href }: any) {
     return (
-        <button className="flex items-center gap-5 p-6 bg-white border border-slate-100 rounded-[2rem] hover:border-blue-200 hover:shadow-xl hover:shadow-blue-900/5 transition-all text-left group">
+        <Link href={href || "#"} className="flex items-center gap-5 p-6 bg-white border border-slate-100 rounded-[2rem] hover:border-blue-200 hover:shadow-xl hover:shadow-blue-900/5 transition-all text-left group">
             <div className={cn(
                 "w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:rotate-12",
                 color === "blue" ? "bg-blue-50 text-blue-600" : color === "indigo" ? "bg-indigo-50 text-indigo-600" : "bg-emerald-50 text-emerald-600"
@@ -260,6 +264,6 @@ function QuickAction({ label, desc, icon: Icon, color }: any) {
                 <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{desc}</p>
             </div>
             <ArrowRight className="w-4 h-4 text-slate-200 ml-auto group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
-        </button>
+        </Link>
     );
 }

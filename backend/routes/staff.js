@@ -24,14 +24,14 @@ router.post("/visit-log", authorizeRole("Sample Collection Team", "Admin Staff")
 // Reception & Tracking
 router.get("/received-samples", authorizeRole("Reception", "Sample Processing Team", "Admin Staff", "Sample Collection Team", "Report Approval Team"), staffController.getReceivedSamples);
 router.post("/sample-received", authorizeRole("Reception", "Sample Processing Team", "Admin Staff", "Sample Collection Team", "Report Approval Team"), staffController.receiveSample);
-router.post("/lab-entry", authorizeRole("Sample Processing Team", "Admin Staff"), staffController.startTesting);
+router.post("/lab-entry", authorizeRole("Sample Processing Team", "Admin Staff", "Sample Collection Team"), staffController.startTesting);
 
 // Lab Testing
-router.post("/test-results", authorizeRole("Sample Processing Team", "Admin Staff"), staffController.saveResults);
+router.post("/test-results", authorizeRole("Sample Processing Team", "Admin Staff", "Sample Collection Team"), staffController.saveResults);
 
 // Approvals
-router.get("/pending-approvals", authorizeRole("Report Approval Team", "Admin Staff"), staffController.getPendingApprovals);
-router.post("/approve-report", authorizeRole("Report Approval Team", "Admin Staff"), staffController.approveResult);
+router.get("/pending-approvals", authorizeRole("Report Approval Team", "Admin Staff", "Sample Collection Team"), staffController.getPendingApprovals);
+router.post("/approve-report", authorizeRole("Report Approval Team", "Admin Staff", "Sample Collection Team"), staffController.approveResult);
 
 // Walk-in
 router.get("/walkins", staffController.getWalkins);
@@ -41,6 +41,8 @@ router.post("/walkin-registration", authorizeRole("Reception", "Admin Staff", "S
 // Hospital Orders
 router.post("/hospital-order", authorizeRole("Reception", "Admin Staff", "Sample Collection Team"), staffController.createHospitalOrder);
 router.get("/hospital-orders", authorizeRole("Reception", "Admin Staff", "Dispatch Team", "Sample Collection Team"), staffController.getHospitalOrders);
+router.get("/reports", authorizeRole("Reception", "Admin Staff", "Dispatch Team", "Sample Collection Team", "Report Approval Team"), staffController.getReports);
+router.get("/billing", authorizeRole("Reception", "Admin Staff", "Sample Collection Team"), staffController.getBilling);
 router.get("/lookup/:query", staffController.lookup);
 
 module.exports = router;

@@ -7,52 +7,107 @@ import { HomeCollection as HomeCollectionType } from "../types";
 import { cn } from "@/lib/utils";
 
 const HomeCollection: React.FC = () => {
-    const [collections, setCollections] = useState<HomeCollectionType[]>([]);
+    const [collections, setCollections] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [staffList, setStaffList] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetchCollections = async () => {
-            try {
-                const token = localStorage.getItem("adminToken");
-                const res = await fetch(getApiUrl("/api/admin/home-collection"), {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                const data = await res.json();
-                if (data.success) {
-                    setCollections(data.data);
-                }
-            } catch (err) {
-                console.error("Failed to fetch collections", err);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
         fetchCollections();
+        fetchStaff();
     }, []);
+
+    const fetchCollections = async () => {
+        try {
+            const token = localStorage.getItem("adminToken");
+            const res = await fetch(getApiUrl("/api/admin/home-collection"), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.success) {
+                setCollections(data.data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch collections", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const fetchStaff = async () => {
+        try {
+            const token = localStorage.getItem("adminToken");
+            const res = await fetch(getApiUrl("/api/admin/employees"), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.success) {
+                // Filter for Sample Collection Team
+                setStaffList(data.data.filter((s: any) => s.role === "Sample Collection Team"));
+            }
+        } catch (err) {
+            console.error("Failed to fetch staff", err);
+        }
+    };
+
+    const handleAssign = async (collectionId: string, staffId: string) => {
+        try {
+            const token = localStorage.getItem("adminToken");
+            const res = await fetch(getApiUrl(`/api/admin/home-collection/assign/${collectionId}`), {
+                method: "PUT",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ staffId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                fetchCollections();
+            } else {
+                alert(data.message || "Assignment failed");
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     const columns = [
         { 
             header: "Patient Profile", 
-            accessor: "patient" as const,
-            render: (row: HomeCollectionType) => (
+            accessor: "booking" as const,
+            render: (row: any) => (
                 <div className="flex flex-col">
-                    <span className="font-black text-slate-900 tracking-tight text-base leading-none mb-1">{row.patient.name}</span>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{row.patient.phoneNumber}</span>
+                    <span className="font-black text-slate-900 tracking-tight text-base leading-none mb-1">{row.booking?.patientName}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{row.booking?.bookingId}</span>
                 </div>
             )
         },
         { 
             header: "Assigned Personnel", 
             accessor: "assignedStaff" as const,
-            render: (row: HomeCollectionType) => (
+            render: (row: any) => (
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-black border border-slate-200 shadow-inner group-hover:border-blue-200 transition-all">
-                        {row.assignedStaff.name.charAt(0)}
+                        {row.assignedStaff ? row.assignedStaff.name.charAt(0) : "?"}
                     </div>
                     <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-900 leading-tight">{row.assignedStaff.name}</span>
-                        <span className="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-1">{row.assignedStaff.employeeId}</span>
+                        {row.assignedStaff ? (
+                            <>
+                                <span className="text-sm font-bold text-slate-900 leading-tight">{row.assignedStaff.name}</span>
+                                <span className="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-1">{row.assignedStaff.employeeId}</span>
+                            </>
+                        ) : (
+                            <select 
+                                className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[10px] font-black uppercase tracking-widest text-slate-400 outline-none focus:ring-1 focus:ring-blue-500"
+                                onChange={(e) => handleAssign(row._id, e.target.value)}
+                                defaultValue=""
+                            >
+                                <option value="" disabled>Assign Staff...</option>
+                                {staffList.map(staff => (
+                                    <option key={staff._id} value={staff._id}>{staff.name}</option>
+                                ))}
+                            </select>
+                        )}
                     </div>
                 </div>
             )
@@ -60,22 +115,27 @@ const HomeCollection: React.FC = () => {
         { 
             header: "Cycle Status", 
             accessor: "status" as const,
-            render: (row: HomeCollectionType) => {
-                const statusStyles = {
-                    "Collected": "bg-emerald-50 text-emerald-700 border-emerald-200",
-                    "In Progress": "bg-blue-50 text-blue-700 border-blue-200",
-                    "Scheduled": "bg-amber-50 text-amber-700 border-amber-200",
+            render: (row: any) => {
+                const statusStyles: any = {
+                    "Sample Collected": "bg-emerald-50 text-emerald-700 border-emerald-200",
+                    "Agent En Route": "bg-blue-50 text-blue-700 border-blue-200",
+                    "Arrived": "bg-purple-50 text-purple-700 border-purple-200",
+                    "Order Received": "bg-amber-50 text-amber-700 border-amber-200",
                     "Cancelled": "bg-rose-50 text-rose-700 border-rose-200",
+                    "Assigned": "bg-indigo-50 text-indigo-700 border-indigo-200",
+                    "Payment Completed": "bg-emerald-100 text-emerald-800 border-emerald-300",
+                    "Dispatched to Lab": "bg-slate-50 text-slate-700 border-slate-200"
                 };
+                const status = row.status || "Order Received";
                 return (
                     <div className="flex items-center gap-2">
                         <div className={cn("w-2 h-2 rounded-full", 
-                            row.status === "Collected" ? "bg-emerald-500" :
-                            row.status === "In Progress" ? "bg-blue-500 animate-pulse" :
-                            row.status === "Scheduled" ? "bg-amber-500" : "bg-rose-500"
+                            ["Sample Collected", "Payment Completed"].includes(status) ? "bg-emerald-500" :
+                            ["Agent En Route", "Arrived"].includes(status) ? "bg-blue-500 animate-pulse" :
+                            status === "Order Received" ? "bg-amber-500" : "bg-rose-500"
                         )} />
-                        <span className={cn("px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-[0.1em] border", statusStyles[row.status])}>
-                            {row.status}
+                        <span className={cn("px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-[0.1em] border", statusStyles[status])}>
+                            {status}
                         </span>
                     </div>
                 );
@@ -83,9 +143,16 @@ const HomeCollection: React.FC = () => {
         },
         { 
             header: "Geo-Location", 
-            accessor: "gpsLocation" as const,
-            render: (row: HomeCollectionType) => (
-                <button className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-black text-xs bg-blue-50/50 px-4 py-2 rounded-xl border border-blue-100/50 transition-all hover:shadow-md hover:bg-blue-50 active:scale-95 group">
+            accessor: "location" as const,
+            render: (row: any) => (
+                <button 
+                    onClick={() => {
+                        if (row.location?.coordinates) {
+                            window.open(`https://www.google.com/maps?q=${row.location.coordinates[1]},${row.location.coordinates[0]}`, "_blank");
+                        }
+                    }}
+                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-black text-xs bg-blue-50/50 px-4 py-2 rounded-xl border border-blue-100/50 transition-all hover:shadow-md hover:bg-blue-50 active:scale-95 group"
+                >
                     <Navigation className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
                     Live GPS
                 </button>
@@ -93,12 +160,12 @@ const HomeCollection: React.FC = () => {
         },
         { 
             header: "Proof Log", 
-            accessor: "selfieProof" as const,
-            render: (row: HomeCollectionType) => (
-                row.selfieProof ? (
+            accessor: "status" as const,
+            render: (row: any) => (
+                row.status === "Sample Collected" ? (
                     <button className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-black text-xs bg-emerald-50/50 px-4 py-2 rounded-xl border border-emerald-100/50 transition-all hover:shadow-md hover:bg-emerald-50 active:scale-95">
                         <Camera className="w-3.5 h-3.5" />
-                        Verify Selfie
+                        Verify Proof
                     </button>
                 ) : (
                     <div className="flex items-center gap-1.5 text-slate-400 font-bold text-[10px] uppercase tracking-widest px-4 py-2">
