@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { appEvents } from "@/lib/events";
+import Link from "next/link";
 
 export default function PatientCheckout() {
     const [cart, setCart] = useState<any>(null);
@@ -23,23 +25,39 @@ export default function PatientCheckout() {
     const [sourceType, setSourceType] = useState<"Walk-in" | "Home Collection">("Home Collection");
     const [selectedDate, setSelectedDate] = useState("");
     const [selectedSlot, setSelectedSlot] = useState("");
+    const [addresses, setAddresses] = useState<any[]>([]);
+    const [selectedAddressId, setSelectedAddressId] = useState("");
 
     useEffect(() => {
-        const fetchCart = async () => {
+        const fetchData = async () => {
             try {
                 const token = localStorage.getItem("patientToken");
-                const res = await fetch(getApiUrl("/api/patient/cart"), {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                const d = await res.json();
-                if (d.success) setCart(d.data);
+                const [cartRes, profileRes] = await Promise.all([
+                    fetch(getApiUrl("/api/patient/cart"), {
+                        headers: { "Authorization": `Bearer ${token}` }
+                    }),
+                    fetch(getApiUrl("/api/patient/profile"), {
+                        headers: { "Authorization": `Bearer ${token}` }
+                    })
+                ]);
+
+                const cartData = await cartRes.json();
+                if (cartData.success) setCart(cartData.data);
+
+                const profileData = await profileRes.json();
+                if (profileData.success) {
+                    const addrs = profileData.data.addresses || [];
+                    setAddresses(addrs);
+                    const defaultAddr = addrs.find((a: any) => a.isDefault) || addrs[0];
+                    if (defaultAddr) setSelectedAddressId(defaultAddr._id);
+                }
             } catch (err) {
                 console.error(err);
             } finally {
                 setIsLoading(false);
             }
         };
-        fetchCart();
+        fetchData();
     }, []);
 
     const slots = ["07:00 - 08:00 AM", "08:00 - 09:00 AM", "09:00 - 10:00 AM", "10:00 - 11:00 AM", "11:00 - 12:00 PM"];
@@ -48,22 +66,29 @@ export default function PatientCheckout() {
         setIsLoading(true);
         try {
             const token = localStorage.getItem("patientToken");
+            const body: any = {
+                tests: cart.items.map((i: any) => i.test._id),
+                date: selectedDate,
+                time: selectedSlot,
+                sourceType
+            };
+            if (sourceType === "Home Collection" && selectedAddressId) {
+                body.addressId = selectedAddressId;
+            }
             const res = await fetch(getApiUrl("/api/patient/book-test"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
-                body: JSON.stringify({
-                    tests: cart.items.map((i: any) => i.test._id),
-                    date: selectedDate,
-                    time: selectedSlot,
-                    sourceType
-                })
+                body: JSON.stringify(body)
             });
             const d = await res.json();
             if (d.success) {
+                appEvents.emit("cartUpdated");
                 window.location.href = "/patient/bookings";
+            } else {
+                alert(d.message || "Booking failed");
             }
         } catch (err) {
             console.error(err);
@@ -160,21 +185,40 @@ export default function PatientCheckout() {
                         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
                             <div className="flex items-center justify-between mb-8">
                                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Collection Address</h3>
-                                <button className="text-[10px] font-black text-blue-600 uppercase tracking-widest">+ New Address</button>
+                                <Link href="/patient/address" className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">+ New Address</Link>
                             </div>
 
-                            <div className="p-6 rounded-2xl border-2 border-blue-600 bg-blue-50/30 flex items-start gap-4">
-                                <div className="p-3 bg-white rounded-xl text-blue-600 shadow-sm shrink-0">
-                                    <MapPin className="w-5 h-5" />
+                            {addresses.length > 0 ? (
+                                <div className="space-y-4">
+                                    {addresses.map((addr: any) => (
+                                        <button
+                                            key={addr._id}
+                                            onClick={() => setSelectedAddressId(addr._id)}
+                                            className={`w-full p-6 rounded-2xl border-2 text-left transition-all ${selectedAddressId === addr._id ? "border-blue-600 bg-blue-50/30" : "border-slate-100 hover:border-blue-200"}`}
+                                        >
+                                            <div className="flex items-start gap-4">
+                                                <div className={`p-3 rounded-xl shrink-0 ${selectedAddressId === addr._id ? "bg-white text-blue-600" : "bg-slate-50 text-slate-400"} shadow-sm`}>
+                                                    <MapPin className="w-5 h-5" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="text-xs font-black text-slate-900">{addr.label}</span>
+                                                        {addr.isDefault && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[8px] font-black uppercase">Default</span>}
+                                                        {selectedAddressId === addr._id && <CheckCircle2 className="w-4 h-4 text-blue-600" />}
+                                                    </div>
+                                                    <p className="text-sm font-medium text-slate-500 leading-relaxed">{addr.fullAddress}, {addr.city}, {addr.state} - {addr.pincode}</p>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    ))}
                                 </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-xs font-black text-slate-900">Home</span>
-                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[8px] font-black uppercase">Default</span>
-                                    </div>
-                                    <p className="text-sm font-medium text-slate-500 leading-relaxed">42, Medoraa Tower, Tech Park, Whitefield, Bangalore - 560066</p>
+                            ) : (
+                                <div className="text-center py-8">
+                                    <MapPin className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                                    <p className="text-sm font-bold text-slate-400">No addresses saved yet.</p>
+                                    <Link href="/patient/address" className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">+ Add Address</Link>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -213,7 +257,7 @@ export default function PatientCheckout() {
 
                         <button
                             onClick={handleBooking}
-                            disabled={!selectedDate || !selectedSlot}
+                            disabled={!selectedDate || !selectedSlot || (sourceType === "Home Collection" && !selectedAddressId)}
                             className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 transition-all flex items-center justify-center gap-3 active:scale-95"
                         >
                             Confirm & Pay

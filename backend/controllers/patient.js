@@ -151,7 +151,7 @@ exports.getSuggestions = async (req, res) => {
         if (patient.age > 40) tagsToMatch.push("Age>40");
         if (patient.gender === "Female") tagsToMatch.push("Female");
         if (patient.gender === "Male") tagsToMatch.push("Men");
-        
+
         if (patient.medicalHistory && patient.medicalHistory.length > 0) {
             const historyStr = patient.medicalHistory.join(" ").toLowerCase();
             if (historyStr.includes("diabetes") || historyStr.includes("sugar")) tagsToMatch.push("Diabetes");
@@ -171,9 +171,9 @@ exports.getSuggestions = async (req, res) => {
             tagsToMatch.push("Age>40");
         }
 
-        const suggestedTests = await Test.find({ 
-            status: "Active", 
-            suggestionTags: { $in: tagsToMatch } 
+        const suggestedTests = await Test.find({
+            status: "Active",
+            suggestionTags: { $in: tagsToMatch }
         }).limit(5);
 
         res.status(200).json({ success: true, data: suggestedTests });
@@ -222,16 +222,18 @@ exports.bookTest = async (req, res) => {
 
         // 4. Auto-assign if Home Collection
         if (sourceType === "Home Collection") {
-            // Get patient address for location
-            const address = await Address.findById(addressId);
-            if (address && address.coordinates && address.coordinates.latitude) {
-                await staffController.autoAssignCollectionAgent(booking._id, {
-                    lat: address.coordinates.latitude,
-                    lng: address.coordinates.longitude
-                });
+            if (addressId) {
+                const address = await Address.findById(addressId);
+                if (address && address.coordinates && address.coordinates.latitude) {
+                    await staffController.autoAssignCollectionAgent(booking._id, {
+                        lat: address.coordinates.latitude,
+                        lng: address.coordinates.longitude
+                    });
+                } else {
+                    console.warn("No coordinates found for Home Collection booking - skipping auto-assignment");
+                }
             } else {
-                // Default fallback location or handle as unassigned
-                console.warn("No coordinates found for Home Collection booking");
+                console.warn("No address selected for Home Collection booking - skipping auto-assignment");
             }
         }
 
@@ -254,6 +256,37 @@ exports.getReports = async (req, res) => {
     try {
         const reports = await Report.find({ patient: req.user.id }).populate("test");
         res.status(200).json({ success: true, data: reports });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// Notification Controllers
+exports.getNotifications = async (req, res) => {
+    try {
+        const notifications = await Notification.find({ recipient: req.user.id }).sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data: notifications });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.deleteNotification = async (req, res) => {
+    try {
+        await Notification.findOneAndDelete({ _id: req.params.id, recipient: req.user.id });
+        res.status(200).json({ success: true, message: "Notification deleted" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.markAllNotificationsRead = async (req, res) => {
+    try {
+        await Notification.updateMany(
+            { recipient: req.user.id },
+            { readStatus: true }
+        );
+        res.status(200).json({ success: true, message: "All notifications marked as read" });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -330,6 +363,17 @@ exports.addAddress = async (req, res) => {
     }
 };
 
+exports.deleteAddress = async (req, res) => {
+    try {
+        const address = await Address.findOneAndDelete({ _id: req.params.id, patient: req.user.id });
+        if (!address) return res.status(404).json({ success: false, message: "Address not found" });
+        await Patient.findByIdAndUpdate(req.user.id, { $pull: { addresses: address._id } });
+        res.status(200).json({ success: true, message: "Address deleted" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // Support Controllers
 exports.submitSupport = async (req, res) => {
     try {
@@ -343,9 +387,11 @@ exports.submitSupport = async (req, res) => {
 
 exports.getDashboard = async (req, res) => {
     try {
+        const patient = await Patient.findById(req.user.id).select('name');
         const bookings = await Booking.countDocuments({ patient: req.user.id });
         const pendingReports = await Report.countDocuments({ patient: req.user.id, status: "Pending" });
         const completedTests = await Booking.countDocuments({ patient: req.user.id, status: "Completed" });
+        const homeCollections = await Booking.countDocuments({ patient: req.user.id, sourceType: "Home Collection" });
 
         const recentReports = await Report.find({ patient: req.user.id }).sort({ createdAt: -1 }).limit(3).populate("test");
         const latestNotifications = await Notification.find({ recipient: req.user.id }).sort({ createdAt: -1 }).limit(5);
@@ -353,7 +399,8 @@ exports.getDashboard = async (req, res) => {
         res.status(200).json({
             success: true,
             data: {
-                stats: { bookings, pendingReports, completedTests },
+                patientName: patient.name,
+                stats: { bookings, pendingReports, completedTests, homeCollections },
                 recentReports,
                 latestNotifications
             }

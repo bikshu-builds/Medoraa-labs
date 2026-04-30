@@ -16,13 +16,14 @@ import {
 import Link from "next/link";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { appEvents } from "@/lib/events";
 
 export default function PatientCart() {
     const [cart, setCart] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        fetchCart();
+        fetchCart().then(() => appEvents.emit("cartUpdated"));
     }, []);
 
     const fetchCart = async () => {
@@ -48,7 +49,10 @@ export default function PatientCart() {
                 headers: { "Authorization": `Bearer ${token}` }
             });
             const d = await res.json();
-            if (d.success) fetchCart();
+            if (d.success) {
+                fetchCart();
+                appEvents.emit("cartUpdated");
+            }
         } catch (err) {
             console.error(err);
         }

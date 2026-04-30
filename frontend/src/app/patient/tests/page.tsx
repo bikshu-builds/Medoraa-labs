@@ -17,6 +17,7 @@ import {
 import Link from "next/link";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { appEvents } from "@/lib/events";
 
 export default function TestBrowsing() {
     const [tests, setTests] = useState<any[]>([]);
@@ -44,7 +45,7 @@ export default function TestBrowsing() {
 
     useEffect(() => {
         fetchTests();
-        fetchCart();
+        fetchCart().then(() => appEvents.emit("cartUpdated"));
         fetchSuggestions();
     }, []);
 
@@ -102,7 +103,7 @@ export default function TestBrowsing() {
             const d = await res.json();
             if (d.success) {
                 setCart(d.data.items);
-                // Simple toast or animation
+                appEvents.emit("cartUpdated");
             }
         } catch (err) {
             console.error(err);
@@ -266,14 +267,6 @@ export default function TestBrowsing() {
                     </div>
                 )}
             </div>
-
-            {/* Sticky Cart Button */}
-            {cart.length > 0 && (
-                <Link href="/patient/checkout" className="fixed bottom-10 right-10 w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-2xl shadow-blue-600/40 z-50 hover:scale-110 transition-transform">
-                    <ShoppingCart className="w-7 h-7" />
-                    <span className="absolute -top-2 -right-2 w-7 h-7 bg-rose-500 rounded-full border-4 border-white flex items-center justify-center text-[10px] font-black">{cart.length}</span>
-                </Link>
-            )}
         </div>
     );
 }
