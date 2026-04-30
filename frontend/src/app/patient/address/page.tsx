@@ -1,15 +1,16 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { 
-    MapPin, 
-    Plus, 
-    Home, 
-    Briefcase, 
-    Navigation, 
-    Trash2, 
+import {
+    MapPin,
+    Plus,
+    Home,
+    Briefcase,
+    Navigation,
+    Trash2,
     CheckCircle2,
     Loader2,
-    X
+    X,
+    Map
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 
@@ -17,24 +18,81 @@ export default function PatientAddress() {
     const [addresses, setAddresses] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [label, setLabel] = useState("Home");
+    const [fullAddress, setFullAddress] = useState("");
+    const [city, setCity] = useState("");
+    const [state, setState] = useState("");
+    const [pincode, setPincode] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [latitude, setLatitude] = useState("");
+    const [longitude, setLongitude] = useState("");
+
+    const fetchAddresses = async () => {
+        try {
+            const token = localStorage.getItem("patientToken");
+            const res = await fetch(getApiUrl("/api/patient/profile"), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const d = await res.json();
+            if (d.success) setAddresses(d.data.addresses || []);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchAddresses = async () => {
-            try {
-                const token = localStorage.getItem("patientToken");
-                const res = await fetch(getApiUrl("/api/patient/profile"), {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                const d = await res.json();
-                if (d.success) setAddresses(d.data.addresses || []);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setIsLoading(false);
-            }
-        };
         fetchAddresses();
     }, []);
+
+    const saveAddress = async () => {
+        if (!fullAddress || !city || !pincode) {
+            alert("Please fill in all required fields.");
+            return;
+        }
+        setSaving(true);
+        try {
+            const token = localStorage.getItem("patientToken");
+            const body: any = { label, fullAddress, city, state, pincode };
+            if (latitude && longitude) {
+                body.coordinates = { latitude: parseFloat(latitude), longitude: parseFloat(longitude) };
+            }
+            const res = await fetch(getApiUrl("/api/patient/address"), {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(body)
+            });
+            const d = await res.json();
+            if (d.success) {
+                setShowAddModal(false);
+                setFullAddress(""); setCity(""); setState(""); setPincode("");
+                setLatitude(""); setLongitude("");
+                fetchAddresses();
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const deleteAddress = async (id: string) => {
+        if (!confirm("Delete this address?")) return;
+        try {
+            const token = localStorage.getItem("patientToken");
+            await fetch(getApiUrl(`/api/patient/address/${id}`), {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            fetchAddresses();
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     if (isLoading) return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="w-12 h-12 text-blue-600 animate-spin" /></div>;
 
@@ -68,7 +126,7 @@ export default function PatientAddress() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <button className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 className="w-5 h-5" /></button>
+                                    <button onClick={() => deleteAddress(addr._id)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 className="w-5 h-5" /></button>
                                 </div>
                             </div>
                             <p className="text-sm font-medium text-slate-500 leading-relaxed mb-8">{addr.fullAddress}, {addr.city}, {addr.state} - {addr.pincode}</p>
@@ -97,15 +155,56 @@ export default function PatientAddress() {
                         <div className="space-y-6">
                             <div className="flex gap-4">
                                 {["Home", "Work", "Other"].map(l => (
-                                    <button key={l} className="flex-1 py-3 bg-slate-50 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-blue-600 hover:text-white transition-all">{l}</button>
+                                    <button
+                                        key={l}
+                                        onClick={() => setLabel(l)}
+                                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${label === l ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-500 hover:bg-blue-50"}`}
+                                    >{l}</button>
                                 ))}
                             </div>
-                            <textarea placeholder="Full Address / House No." className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none min-h-[100px]" />
+                            <textarea
+                                placeholder="Full Address / House No."
+                                value={fullAddress}
+                                onChange={e => setFullAddress(e.target.value)}
+                                className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none min-h-[100px]"
+                            />
                             <div className="grid grid-cols-2 gap-4">
-                                <input type="text" placeholder="City" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none" />
-                                <input type="text" placeholder="Pincode" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none" />
+                                <input
+                                    type="text" placeholder="City"
+                                    value={city} onChange={e => setCity(e.target.value)}
+                                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none"
+                                />
+                                <input
+                                    type="text" placeholder="State"
+                                    value={state} onChange={e => setState(e.target.value)}
+                                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none"
+                                />
                             </div>
-                            <button className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20">Save Address</button>
+                            <input
+                                type="text" placeholder="Pincode"
+                                value={pincode} onChange={e => setPincode(e.target.value)}
+                                className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none"
+                            />
+                            <div className="grid grid-cols-2 gap-4">
+                                <input
+                                    type="number" placeholder="Latitude (optional)"
+                                    value={latitude} onChange={e => setLatitude(e.target.value)}
+                                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none"
+                                />
+                                <input
+                                    type="number" placeholder="Longitude (optional)"
+                                    value={longitude} onChange={e => setLongitude(e.target.value)}
+                                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold outline-none"
+                                />
+                            </div>
+                            <p className="text-[10px] font-bold text-slate-400">Coordinates enable accurate home collection agent assignment. You can get them from Google Maps.</p>
+                            <button
+                                onClick={saveAddress}
+                                disabled={saving}
+                                className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 disabled:opacity-50"
+                            >
+                                {saving ? "Saving..." : "Save Address"}
+                            </button>
                         </div>
                     </div>
                 </div>

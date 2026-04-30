@@ -1,37 +1,67 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { 
-    Bell, 
-    CheckCircle2, 
-    Clock, 
-    AlertTriangle, 
-    Trash2, 
+import {
+    Bell,
+    CheckCircle2,
+    Clock,
+    AlertTriangle,
+    Trash2,
     Search,
     Loader2
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
+import { appEvents } from "@/lib/events";
 
 export default function PatientNotifications() {
     const [notifications, setNotifications] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    const fetchNotifications = async () => {
+        try {
+            const token = localStorage.getItem("patientToken");
+            const res = await fetch(getApiUrl("/api/patient/notifications"), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const d = await res.json();
+            if (d.success) setNotifications(d.data);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchNotifications = async () => {
-            try {
-                const token = localStorage.getItem("patientToken");
-                const res = await fetch(getApiUrl("/api/patient/notifications"), {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                const d = await res.json();
-                if (d.success) setNotifications(d.data);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchNotifications();
+        fetchNotifications().then(() => appEvents.emit("notificationsUpdated"));
     }, []);
+
+    const deleteNotification = async (id: string) => {
+        try {
+            const token = localStorage.getItem("patientToken");
+            await fetch(getApiUrl(`/api/patient/notifications/${id}`), {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            setNotifications(prev => prev.filter(n => n._id !== id));
+            appEvents.emit("notificationsUpdated");
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const markAllRead = async () => {
+        try {
+            const token = localStorage.getItem("patientToken");
+            await fetch(getApiUrl("/api/patient/notifications/mark-all-read"), {
+                method: "PUT",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            setNotifications(prev => prev.map(n => ({ ...n, readStatus: true })));
+            appEvents.emit("notificationsUpdated");
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     if (isLoading) return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="w-12 h-12 text-blue-600 animate-spin" /></div>;
 
@@ -42,7 +72,7 @@ export default function PatientNotifications() {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Notification Center</h1>
                     <p className="text-slate-500 font-bold mt-1">Stay updated with your reports and appointments.</p>
                 </div>
-                <button className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">Mark all as read</button>
+                <button onClick={markAllRead} className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">Mark all as read</button>
             </div>
 
             <div className="space-y-4">
@@ -59,7 +89,7 @@ export default function PatientNotifications() {
                                 </div>
                                 <p className="text-sm font-medium text-slate-500 leading-relaxed">{notif.message}</p>
                             </div>
-                            <button className="p-3 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                            <button onClick={() => deleteNotification(notif._id)} className="p-3 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
                                 <Trash2 className="w-5 h-5" />
                             </button>
                         </div>

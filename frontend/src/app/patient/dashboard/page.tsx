@@ -21,6 +21,13 @@ export default function PatientDashboard() {
     const [data, setData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return "Good morning";
+        if (hour < 18) return "Good afternoon";
+        return "Good evening";
+    };
+
     useEffect(() => {
         const fetchDashboard = async () => {
             try {
@@ -61,7 +68,7 @@ export default function PatientDashboard() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Health Overview</h1>
-                    <p className="text-slate-500 font-bold mt-1">Good morning, John! Here's your health summary.</p>
+                    <p className="text-slate-500 font-bold mt-1">{`${getGreeting()}, ${data?.patientName || 'Patient'}! Here's your health summary.`}</p>
                 </div>
                 <div className="flex items-center gap-2 px-5 py-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100">
                     <ShieldCheck className="w-4 h-4" />
@@ -74,7 +81,7 @@ export default function PatientDashboard() {
                 <StatsCard title="Total Bookings" value={data?.stats?.bookings || 0} icon={ClipboardList} color="blue" />
                 <StatsCard title="Pending Reports" value={data?.stats?.pendingReports || 0} icon={Clock} color="amber" />
                 <StatsCard title="Completed Tests" value={data?.stats?.completedTests || 0} icon={FileText} color="emerald" />
-                <StatsCard title="Home Collections" value={0} icon={Truck} color="purple" />
+                <StatsCard title="Home Collections" value={data?.stats?.homeCollections || 0} icon={Truck} color="purple" />
             </div>
 
             {/* Quick Actions */}
