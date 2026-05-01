@@ -53,6 +53,7 @@ const Sidebar: React.FC = () => {
                 { name: "Doctors", icon: UserPlus, path: "/admin/doctors" },
                 { name: "Employees", icon: Users, path: "/admin/employees" },
                 { name: "Patients", icon: UserCheck, path: "/admin/patients" },
+                { name: "Hospitals & B2B", icon: Home, path: "/admin/hospitals" },
             ]
         },
         {

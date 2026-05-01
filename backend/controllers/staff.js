@@ -262,7 +262,7 @@ exports.updateCollectionStatus = async (req, res) => {
         if (status === "Sample Collected") {
             collection.completedAt = new Date();
             // Trigger sample creation for each test in booking
-            const booking = await Booking.findById(collection.booking).populate("tests");
+            const booking = await Booking.findById(collection.booking._id).populate("tests");
             
             // Update Booking status
             booking.status = "Sample Collected";
@@ -285,7 +285,7 @@ exports.updateCollectionStatus = async (req, res) => {
 
         // Sync booking status for other transitions
         if (["Agent En Route", "Arrived", "Dispatched to Lab"].includes(status)) {
-            await Booking.findByIdAndUpdate(collection.booking, { status });
+            await Booking.findByIdAndUpdate(collection.booking._id, { status });
         }
 
         await collection.save();
@@ -729,26 +729,39 @@ exports.saveVisitLog = async (req, res) => {
         const { collectionId, selfieUrl, location, deviceInfo } = req.body;
         const staffId = req.user.id;
 
-        const collection = await Collection.findById(collectionId);
+        const collection = await Collection.findById(collectionId).populate("booking");
         if (!collection) return res.status(404).json({ success: false, message: "Collection record not found" });
 
-        // Distance Validation (Max 500 meters allowance)
+        const booking = collection.booking;
+        if (!booking) return res.status(400).json({ success: false, message: "Booking not attached to collection record" });
+
+        const staff = await Staff.findById(staffId);
+        if (!staff) return res.status(404).json({ success: false, message: "Staff record not found" });
+
+        const visitId = `VISIT-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        // Distance Validation (Increased to 50km allowance)
+        let distance = 0;
         if (collection.location && collection.location.coordinates) {
             const [targetLng, targetLat] = collection.location.coordinates;
-            const distance = calculateDistance(location.lat, location.lng, targetLat, targetLng);
+            distance = calculateDistance(location.lat, location.lng, targetLat, targetLng);
             
-            if (distance > 0.5) { // 500 meters
+            if (distance > 50) { // 50km
                 return res.status(400).json({ 
                     success: false, 
-                    message: `Geofence Violation: You are ${distance.toFixed(2)}km away from the scheduled location. Must be within 500m to check-in.`,
+                    message: `Geofence Violation: You are ${distance.toFixed(2)}km away from the scheduled location. Must be within 50km to check-in.`,
                     distance 
                 });
             }
         }
 
         const visitLog = new VisitLog({
+            visitId,
+            booking: booking._id,
+            patient: booking.patient,
+            employee: staff._id,
             employeeId: staffId,
-            collectionId,
+            staffName: staff.name || "Staff Member",
             selfieUrl,
             location: {
                 type: "Point",

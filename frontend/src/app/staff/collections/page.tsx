@@ -114,9 +114,16 @@ export default function StaffCollections() {
                 body: JSON.stringify(data)
             });
             const d = await res.json();
-            if (d.success) fetchCollections();
+            if (d.success) {
+                fetchCollections();
+                return true;
+            } else {
+                alert(d.message || "Update failed");
+                return false;
+            }
         } catch (err) {
             console.error(err);
+            return false;
         }
     };
 

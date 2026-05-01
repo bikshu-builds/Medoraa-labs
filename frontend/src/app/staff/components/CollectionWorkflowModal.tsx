@@ -17,7 +17,7 @@ interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
     collection: any;
-    onUpdate: (data: any) => Promise<void>;
+    onUpdate: (data: any) => Promise<any>;
 }
 
 export default function CollectionWorkflowModal({ isOpen, onClose, collection, onUpdate }: ModalProps) {
@@ -33,14 +33,16 @@ export default function CollectionWorkflowModal({ isOpen, onClose, collection, o
     const handleSaveDetails = async () => {
         setIsSubmitting(true);
         const signature = canvasRef.current?.toDataURL();
-        await onUpdate({
+        const ok = await onUpdate({
             collectionId: collection._id,
             status: "Sample Collected",
             doctorReference: doctorRef,
             medicalNotes: notes,
             patientSignature: signature
         });
-        setStep(2);
+        if (ok !== false) {
+            setStep(2);
+        }
         setIsSubmitting(false);
     };
 

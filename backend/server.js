@@ -11,9 +11,11 @@ app.use(express.json());
 const adminRoutes = require("./routes/admin");
 const patientRoutes = require("./routes/patient");
 const staffRoutes = require("./routes/staff");
+const hospitalRoutes = require("./routes/hospital");
 app.use("/api/admin", adminRoutes);
 app.use("/api/patient", patientRoutes);
 app.use("/api/staff", staffRoutes);
+app.use("/api/hospital", hospitalRoutes);
 
 app.get("/", (req, res) => {
     res.send("Health route is working bro");

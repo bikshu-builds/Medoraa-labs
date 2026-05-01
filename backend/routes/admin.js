@@ -24,7 +24,8 @@ const {
     getInsights,
     getPackages, addPackage, updatePackage, deletePackage,
     getTests, addTest,
-    getReferralAnalytics
+    getReferralAnalytics,
+    getHospitals, addHospital, updateHospital, deleteHospital
 } = require("../controllers/admin");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
@@ -117,5 +118,11 @@ router.delete("/packages/:id", deletePackage);
 // Test Management (for packages)
 router.get("/tests", getTests);
 router.post("/tests", addTest);
+
+// Hospital Management
+router.get("/hospitals", getHospitals);
+router.post("/hospitals", addHospital);
+router.put("/hospitals/:id", updateHospital);
+router.delete("/hospitals/:id", deleteHospital);
 
 module.exports = router;

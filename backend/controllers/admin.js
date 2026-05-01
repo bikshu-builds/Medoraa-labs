@@ -17,6 +17,7 @@ const Setting = require("../models/Setting");
 const InternalNote = require("../models/InternalNote");
 const Package = require("../models/Package");
 const Test = require("../models/Test");
+const Hospital = require("../models/Hospital");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
@@ -892,3 +893,67 @@ exports.getReferralAnalytics = async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 };
+
+// @desc    Admin: Get all hospitals
+exports.getHospitals = async (req, res) => {
+    try {
+        const hospitals = await Hospital.find().sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data: hospitals });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Admin: Create hospital account
+exports.addHospital = async (req, res) => {
+    try {
+        const hospital = await Hospital.create(req.body);
+        await logActivity(req.user.id, req.user.name, "CREATE", "Hospitals", `Added new hospital: ${hospital.name}`);
+        res.status(201).json({ success: true, data: hospital });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Admin: Update hospital account
+exports.updateHospital = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const hospital = await Hospital.findById(id);
+        if (!hospital) {
+            return res.status(404).json({ success: false, message: "Hospital not found" });
+        }
+
+        // Prevent password overwrite if empty
+        if (!req.body.password || req.body.password === "") {
+            delete req.body.password;
+        }
+
+        Object.keys(req.body).forEach(key => {
+            hospital[key] = req.body[key];
+        });
+
+        await hospital.save();
+
+        await logActivity(req.user.id, req.user.name, "UPDATE", "Hospitals", `Updated hospital details for: ${hospital.name}`);
+        res.status(200).json({ success: true, data: hospital });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Admin: Delete hospital account
+exports.deleteHospital = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const hospital = await Hospital.findByIdAndDelete(id);
+        if (!hospital) {
+            return res.status(404).json({ success: false, message: "Hospital not found" });
+        }
+        await logActivity(req.user.id, req.user.name, "DELETE", "Hospitals", `Removed hospital: ${hospital.name}`);
+        res.status(200).json({ success: true, message: "Hospital deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
