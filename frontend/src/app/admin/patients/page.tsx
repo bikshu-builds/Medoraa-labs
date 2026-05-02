@@ -51,6 +51,13 @@ const PatientMonitoring: React.FC = () => {
 
     useEffect(() => {
         fetchPatients();
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get("new") === "true") {
+                setSelectedPatient(null);
+                setIsModalOpen(true);
+            }
+        }
     }, []);
 
     const handleAdd = () => {
