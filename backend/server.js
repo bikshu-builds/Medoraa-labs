@@ -21,6 +21,14 @@ app.get("/", (req, res) => {
     res.send("Health route is working bro");
 });
 
+app.get("/health", (req, res) => {
+    res.status(200).json({ status: "ok", message: "Server is healthy" });
+});
+
+app.get("/api/health", (req, res) => {
+    res.status(200).json({ status: "ok", message: "API is healthy" });
+});
+
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("Connected to MongoDB"))
