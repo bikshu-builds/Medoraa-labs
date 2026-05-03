@@ -19,7 +19,7 @@ import { appEvents } from "@/lib/events";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-export default function PatientCheckout() {
+function CheckoutContent() {
     const [cart, setCart] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [step, setStep] = useState(1);
@@ -289,5 +289,13 @@ export default function PatientCheckout() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function PatientCheckout() {
+    return (
+        <React.Suspense fallback={<div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="w-12 h-12 text-blue-600 animate-spin" /></div>}>
+            <CheckoutContent />
+        </React.Suspense>
     );
 }
