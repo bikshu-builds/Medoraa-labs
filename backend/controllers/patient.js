@@ -261,6 +261,15 @@ exports.getReports = async (req, res) => {
     }
 };
 
+exports.getBilling = async (req, res) => {
+    try {
+        const bills = await Billing.find({ patient: req.user.id }).sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data: bills });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // Notification Controllers
 exports.getNotifications = async (req, res) => {
     try {
@@ -334,7 +343,7 @@ exports.removeFromCart = async (req, res) => {
             cart.items = cart.items.filter(item => item.test.toString() !== testId);
             await cart.save();
         }
-        res.status(200).json({ success: true, message: "Removed from cart" });
+        res.status(200).json({ success: true, message: "Removed from cart", data: cart });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

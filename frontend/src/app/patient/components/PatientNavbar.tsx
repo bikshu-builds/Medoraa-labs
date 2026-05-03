@@ -122,7 +122,7 @@ const PatientNavbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                 </div>
 
                 {/* Desktop Search */}
-                <div className="hidden md:flex items-center gap-3 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-2xl w-96 group focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                <div className="hidden md:flex items-center gap-3 bg-slate-50 border border-slate-200 px-4 py-2 rounded-lg w-96 group focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100/50 transition-all">
                     <Search className="w-4 h-4 text-slate-400 group-focus-within:text-blue-600" />
                     <input
                         type="text"
@@ -134,7 +134,7 @@ const PatientNavbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
 
             {/* Actions */}
             <div className="flex items-center gap-2 md:gap-5">
-                <Link href="/patient/cart" className="p-3 hover:bg-slate-50 rounded-2xl text-slate-600 relative group transition-all">
+                <Link href="/patient/cart" className="p-2.5 hover:bg-slate-50 rounded-lg text-slate-600 relative group transition-all">
                     <ShoppingCart className="w-5 h-5 group-hover:text-blue-600" />
                     {cartCount > 0 && (
                         <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-blue-600 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white">
@@ -143,7 +143,7 @@ const PatientNavbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                     )}
                 </Link>
 
-                <Link href="/patient/notifications" className="p-3 hover:bg-slate-50 rounded-2xl text-slate-600 relative group transition-all">
+                <Link href="/patient/notifications" className="p-2.5 hover:bg-slate-50 rounded-lg text-slate-600 relative group transition-all">
                     <Bell className="w-5 h-5 group-hover:text-blue-600" />
                     {notifCount > 0 && (
                         <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white">
@@ -154,13 +154,13 @@ const PatientNavbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
 
                 <div className="h-8 w-px bg-slate-100 mx-1 hidden md:block" />
 
-                <Link href="/patient/profile" className="flex items-center gap-3 p-1.5 hover:bg-slate-50 rounded-2xl transition-all group">
-                    <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs group-hover:bg-blue-600 group-hover:text-white transition-all">
+                <Link href="/patient/profile" className="flex items-center gap-3 p-1.5 hover:bg-slate-50 rounded-lg transition-all group border border-transparent hover:border-slate-200">
+                    <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs group-hover:bg-blue-600 group-hover:text-white transition-all">
                         {patient ? getInitials(patient.name) : "??"}
                     </div>
                     <div className="hidden md:flex flex-col items-start mr-1">
-                        <span className="text-xs font-black text-slate-900 leading-tight">{patient?.name || "Patient"}</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{patient?.patientId || ""}</span>
+                        <span className="text-xs font-bold text-slate-900 leading-tight">{patient?.name || "Patient"}</span>
+                        <span className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">{patient?.patientId || "P-XXXXXX"}</span>
                     </div>
                     <ChevronDown className="w-4 h-4 text-slate-400 hidden md:block" />
                 </Link>

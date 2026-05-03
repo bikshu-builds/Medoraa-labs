@@ -8,14 +8,11 @@ import {
     ClipboardList,
     FileText,
     CreditCard,
-    Bell,
-    Truck,
-    User,
-    HelpCircle,
     LogOut,
     PlusCircle,
     X,
-    Activity
+    Activity,
+    User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,69 +29,106 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
         { name: "My Bookings", icon: ClipboardList, path: "/patient/bookings" },
         { name: "Test Reports", icon: FileText, path: "/patient/reports" },
         { name: "Billing", icon: CreditCard, path: "/patient/billing" },
-        { name: "Home Collection", icon: Truck, path: "/patient/homeCollection" },
-        { name: "Notifications", icon: Bell, path: "/patient/notifications" },
-        { name: "Profile", icon: User, path: "/patient/profile" },
-        { name: "Support", icon: HelpCircle, path: "/patient/support" },
+    ];
+
+    const accountItems = [
+        { name: "My Profile", icon: User, path: "/patient/profile" },
     ];
 
     return (
-        <div className="flex flex-col h-full bg-white text-slate-600 font-sans">
+        <div className="flex flex-col h-full bg-[#1e293b] text-slate-300 font-sans shadow-xl">
             {/* Header */}
-            <div className="h-20 flex items-center justify-between px-8 border-b border-slate-100">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-600/20">
-                        <Activity className="w-5 h-5" />
+            <div className="h-20 flex items-center justify-between px-6 border-b border-slate-700/50 bg-[#1e293b]">
+                <Link href="/patient/dashboard" className="flex items-center gap-3 group">
+                    <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg transition-transform group-hover:scale-105">
+                        <Activity className="w-6 h-6" />
                     </div>
-                    <span className="font-black text-slate-900 text-lg tracking-tight">Medoraa</span>
-                </div>
+                    <div className="flex flex-col">
+                        <span className="font-bold text-white text-lg tracking-tight leading-none">Medoraa</span>
+                        <span className="text-[10px] text-slate-400 font-semibold tracking-[0.2em] uppercase mt-1">Patient Portal</span>
+                    </div>
+                </Link>
                 {onClose && (
-                    <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-lg md:hidden">
+                    <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg md:hidden text-slate-400">
                         <X className="w-5 h-5" />
                     </button>
                 )}
             </div>
 
-            {/* Menu */}
-            <nav className="flex-1 overflow-y-auto py-6 px-4 no-scrollbar">
-                <ul className="space-y-1.5">
-                    {menuItems.map((item) => {
-                        const isActive = pathname === item.path;
-                        return (
-                            <li key={item.path}>
-                                <Link
-                                    href={item.path}
-                                    onClick={onClose}
-                                    className={cn(
-                                        "flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all group",
-                                        isActive
-                                            ? "bg-blue-50 text-blue-600 shadow-sm"
-                                            : "hover:bg-slate-50 text-slate-500 hover:text-slate-900"
-                                    )}
-                                >
-                                    <item.icon className={cn(
-                                        "w-5 h-5 transition-colors",
-                                        isActive ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
-                                    )} />
-                                    {item.name}
-                                    {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" />}
-                                </Link>
-                            </li>
-                        );
-                    })}
-                </ul>
-            </nav>
+            {/* Menu Sections */}
+            <div className="flex-1 overflow-y-auto py-6 px-3 space-y-8 no-scrollbar">
+                {/* Main Menu */}
+                <div>
+                    <p className="px-4 mb-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Main Menu</p>
+                    <ul className="space-y-1">
+                        {menuItems.map((item) => {
+                            const isActive = pathname === item.path;
+                            return (
+                                <li key={item.path}>
+                                    <Link
+                                        href={item.path}
+                                        onClick={onClose}
+                                        className={cn(
+                                            "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all group",
+                                            isActive
+                                                ? "bg-blue-600 text-white shadow-md shadow-blue-900/20"
+                                                : "hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                                        )}
+                                    >
+                                        <item.icon className={cn(
+                                            "w-4 h-4 transition-colors",
+                                            isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"
+                                        )} />
+                                        {item.name}
+                                        {isActive && <div className="ml-auto w-1 h-1 rounded-full bg-blue-300" />}
+                                    </Link>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+
+                {/* Account Section */}
+                <div>
+                    <p className="px-4 mb-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Account</p>
+                    <ul className="space-y-1">
+                        {accountItems.map((item) => {
+                            const isActive = pathname === item.path;
+                            return (
+                                <li key={item.path}>
+                                    <Link
+                                        href={item.path}
+                                        onClick={onClose}
+                                        className={cn(
+                                            "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all group",
+                                            isActive
+                                                ? "bg-blue-600 text-white shadow-md shadow-blue-900/20"
+                                                : "hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                                        )}
+                                    >
+                                        <item.icon className={cn(
+                                            "w-4 h-4 transition-colors",
+                                            isActive ? "text-white" : "text-slate-500 group-hover:text-slate-300"
+                                        )} />
+                                        {item.name}
+                                    </Link>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+            </div>
 
             {/* Footer */}
-            <div className="p-6 border-t border-slate-100">
+            <div className="p-4 border-t border-slate-700/50 bg-[#1e293b]">
                 <button
                     onClick={() => {
                         localStorage.removeItem("patientToken");
                         window.location.href = "/signin";
                     }}
-                    className="flex items-center gap-3 w-full px-4 py-3 text-rose-500 hover:bg-rose-50 rounded-2xl text-sm font-bold transition-all"
+                    className="flex items-center gap-3 w-full px-4 py-3 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg text-sm font-medium transition-all group"
                 >
-                    <LogOut className="w-5 h-5" />
+                    <LogOut className="w-4 h-4 group-hover:text-rose-400" />
                     Logout
                 </button>
             </div>
@@ -103,3 +137,4 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
 };
 
 export default Sidebar;
+

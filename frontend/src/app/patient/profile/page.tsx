@@ -5,16 +5,16 @@ import {
     Mail, 
     Phone, 
     MapPin, 
-    Activity, 
     Droplets, 
     AlertCircle, 
     Heart, 
-    Plus, 
     Camera,
     Save,
     Loader2,
-    CheckCircle2,
-    Calendar
+    Calendar,
+    UserCircle,
+    UserCheck,
+    CreditCard
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -65,178 +65,187 @@ export default function PatientProfile() {
     };
 
     if (isLoading) {
-        return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="w-12 h-12 text-blue-600 animate-spin" /></div>;
+        return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div>;
     }
 
     return (
-        <div className="max-w-5xl mx-auto space-y-10 animate-in fade-in duration-700 pb-20">
-            {/* Profile Header */}
-            <div className="bg-white p-12 rounded-[3rem] border border-slate-100 shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                <div className="flex flex-col md:flex-row items-center gap-12 relative z-10">
-                    <div className="relative group">
-                        <div className="w-40 h-40 rounded-[2.5rem] bg-slate-100 border-4 border-white shadow-xl flex items-center justify-center overflow-hidden">
-                            {profile.profileImage ? (
-                                <img src={profile.profileImage} alt={profile.name} className="w-full h-full object-cover" />
-                            ) : (
-                                <User className="w-16 h-16 text-slate-300" />
-                            )}
+        <div className="h-full animate-in fade-in duration-500 max-w-[1400px] mx-auto">
+            <form onSubmit={handleUpdate} className="flex flex-col gap-5 h-full">
+                {/* Compact Header */}
+                <div className="bg-[#1e293b] rounded-2xl p-6 text-white flex items-center justify-between shadow-lg shadow-slate-200/50">
+                    <div className="flex items-center gap-6">
+                        <div className="relative group">
+                            <div className="w-20 h-20 rounded-xl bg-slate-800 border-2 border-slate-700 overflow-hidden flex items-center justify-center shadow-inner">
+                                {profile.profileImage ? (
+                                    <img src={profile.profileImage} alt={profile.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    <UserCircle className="w-10 h-10 text-slate-500" />
+                                )}
+                            </div>
+                            <button className="absolute -bottom-1 -right-1 p-1.5 bg-blue-600 rounded-lg shadow-lg hover:bg-blue-500 transition-all">
+                                <Camera className="w-3.5 h-3.5 text-white" />
+                            </button>
                         </div>
-                        <button className="absolute bottom-2 right-2 p-3 bg-blue-600 text-white rounded-2xl shadow-xl shadow-blue-600/30 hover:scale-110 active:scale-95 transition-all">
-                            <Camera className="w-5 h-5" />
-                        </button>
-                    </div>
-                    <div className="text-center md:text-left space-y-3">
-                        <div className="flex flex-col md:flex-row md:items-center gap-4">
-                            <h1 className="text-4xl font-black text-slate-900 tracking-tight">{profile.name}</h1>
-                            <span className="px-4 py-1.5 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest self-center md:self-auto">
-                                Verified Profile
-                            </span>
+                        <div>
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-2xl font-bold tracking-tight">{profile.name}</h1>
+                                <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                                    <UserCheck className="w-3 h-3" /> Verified
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-4 mt-1.5 text-slate-400 text-xs font-medium">
+                                <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-blue-500" /> {profile.addresses?.[0]?.city || "Location set"}</span>
+                                <span className="w-1 h-1 rounded-full bg-slate-700" />
+                                <span className="flex items-center gap-1.5"><CreditCard className="w-3.5 h-3.5 text-blue-500" /> ID: {profile.patientId}</span>
+                            </div>
                         </div>
-                        <p className="text-slate-500 font-bold flex items-center justify-center md:justify-start gap-4">
-                            <span className="flex items-center gap-2"><MapPin className="w-4 h-4 text-blue-600" /> {profile.addresses?.[0]?.city || "Location Pending"}</span>
-                            <span className="w-1 h-1 rounded-full bg-slate-200" />
-                            <span>Patient ID: {profile.patientId}</span>
-                        </p>
                     </div>
+                    <button 
+                        type="submit"
+                        title="Save Changes"
+                        disabled={isSaving}
+                        className="bg-blue-600 hover:bg-blue-500 w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 shadow-md"
+                    >
+                        {isSaving ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Save className="w-5 h-5 text-white" />}
+                    </button>
                 </div>
-            </div>
 
-            <form onSubmit={handleUpdate} className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                <div className="lg:col-span-2 space-y-8">
-                    {/* Basic Info */}
-                    <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Account Details</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">Email</label>
-                                <div className="relative group">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                    <input 
-                                        type="email" 
-                                        value={profile.email}
-                                        onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                                        className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                                    />
-                                </div>
+                {/* Bento Grid Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    {/* Column 1: Account Details */}
+                    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+                        <div className="flex items-center gap-2 mb-6">
+                            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                                <Mail className="w-4 h-4" />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">Phone</label>
-                                <div className="relative group">
-                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                    <input 
-                                        type="tel" 
-                                        value={profile.phoneNumber}
-                                        disabled
-                                        className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-400 outline-none grayscale"
-                                    />
-                                </div>
+                            <h3 className="text-sm font-bold text-slate-900">Contact Information</h3>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Email Address</label>
+                                <input 
+                                    type="email" 
+                                    value={profile.email}
+                                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-semibold text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                                />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">Age</label>
-                                <div className="relative group">
-                                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Phone Number</label>
+                                <input 
+                                    type="tel" 
+                                    value={profile.phoneNumber}
+                                    disabled
+                                    className="w-full px-4 py-2.5 bg-slate-100/50 border border-slate-100 rounded-xl text-sm font-semibold text-slate-400 outline-none cursor-not-allowed"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Age</label>
                                     <input 
                                         type="number" 
                                         value={profile.age}
                                         onChange={(e) => setProfile({ ...profile, age: e.target.value })}
-                                        className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-semibold text-slate-700 focus:bg-white outline-none transition-all"
                                     />
                                 </div>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">Gender</label>
-                                <select 
-                                    value={profile.gender}
-                                    onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
-                                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all appearance-none"
-                                >
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                    <option value="Other">Other</option>
-                                </select>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Gender</label>
+                                    <select 
+                                        value={profile.gender}
+                                        onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-semibold text-slate-700 focus:bg-white outline-none transition-all"
+                                    >
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Medical Info */}
-                    <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Clinical Profile</h3>
-                        <div className="space-y-8">
-                            <div className="flex items-center gap-6">
-                                <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
-                                    <Droplets className="w-8 h-8" />
-                                </div>
-                                <div className="flex-1">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Blood Group</label>
-                                    <select 
-                                        value={profile.bloodGroup || ""}
-                                        onChange={(e) => setProfile({ ...profile, bloodGroup: e.target.value })}
-                                        className="w-full md:w-48 px-6 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black text-slate-900 focus:bg-white outline-none transition-all"
-                                    >
-                                        <option value="">Unknown</option>
-                                        <option value="A+">A+</option>
-                                        <option value="A-">A-</option>
-                                        <option value="B+">B+</option>
-                                        <option value="B-">B-</option>
-                                        <option value="O+">O+</option>
-                                        <option value="O-">O-</option>
-                                        <option value="AB+">AB+</option>
-                                        <option value="AB-">AB-</option>
-                                    </select>
-                                </div>
+                    {/* Column 2: Clinical Profile */}
+                    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+                        <div className="flex items-center gap-2 mb-6">
+                            <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                                <Droplets className="w-4 h-4" />
                             </div>
-
-                            <div className="space-y-4">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 flex items-center gap-2">
-                                    <AlertCircle className="w-4 h-4 text-amber-500" /> Allergies
+                            <h3 className="text-sm font-bold text-slate-900">Health Profile</h3>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Blood Group</label>
+                                <select 
+                                    value={profile.bloodGroup || ""}
+                                    onChange={(e) => setProfile({ ...profile, bloodGroup: e.target.value })}
+                                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-semibold text-slate-700 focus:bg-white outline-none transition-all"
+                                >
+                                    <option value="">Unknown</option>
+                                    <option value="A+">A+</option>
+                                    <option value="A-">A-</option>
+                                    <option value="B+">B+</option>
+                                    <option value="B-">B-</option>
+                                    <option value="O+">O+</option>
+                                    <option value="O-">O-</option>
+                                    <option value="AB+">AB+</option>
+                                    <option value="AB-">AB-</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1 flex items-center gap-1.5">
+                                    <AlertCircle className="w-3 h-3 text-amber-500" /> Allergies & Notes
                                 </label>
                                 <textarea 
-                                    placeholder="List any medicine or food allergies..."
-                                    className="w-full px-8 py-6 bg-slate-50 border border-slate-100 rounded-[2rem] text-sm font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all min-h-[120px]"
+                                    placeholder="List medicine/food allergies..."
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-medium text-slate-700 focus:bg-white outline-none transition-all h-[104px] resize-none"
                                     defaultValue={profile.allergies?.join(", ")}
                                 />
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div className="space-y-8">
-                    {/* Save Changes */}
-                    <div className="bg-slate-900 p-10 rounded-[2.5rem] shadow-2xl shadow-slate-900/20 text-white relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/20 rounded-full blur-2xl" />
-                        <h3 className="text-xl font-black mb-2 relative z-10">Manage Account</h3>
-                        <p className="text-slate-400 text-xs font-medium mb-8 relative z-10">Keep your information updated for accurate diagnostic insights.</p>
-                        <button 
-                            type="submit"
-                            disabled={isSaving}
-                            className="w-full bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 transition-all flex items-center justify-center gap-3 relative z-10 active:scale-95"
-                        >
-                            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Save Profile</>}
-                        </button>
-                    </div>
+                    {/* Column 3: Emergency & Stats */}
+                    <div className="space-y-5">
+                        <div className="bg-rose-50/50 rounded-2xl p-6 border border-rose-100 shadow-sm">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-lg bg-rose-500 text-white flex items-center justify-center shadow-md shadow-rose-200">
+                                        <Heart className="w-4 h-4" />
+                                    </div>
+                                    <h3 className="text-sm font-bold text-slate-900">Emergency Contact</h3>
+                                </div>
+                                <button type="button" className="text-[10px] font-bold text-rose-600 hover:underline uppercase">Edit</button>
+                            </div>
+                            <div className="flex flex-col gap-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-slate-500">Name</span>
+                                    <span className="text-xs font-bold text-slate-900">{profile.emergencyContact?.name || "Not set"}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-slate-500">Relation</span>
+                                    <span className="text-xs font-bold text-slate-900">{profile.emergencyContact?.relationship || "-"}</span>
+                                </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-rose-100 mt-1">
+                                    <span className="text-xs text-slate-500">Contact</span>
+                                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                        <Phone className="w-3 h-3 text-rose-400" />
+                                        {profile.emergencyContact?.phone || "N/A"}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
 
-                    {/* Emergency Contact */}
-                    <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Emergency Contact</h3>
-                        <div className="space-y-6">
-                            <div className="p-6 bg-rose-50 border border-rose-100 rounded-3xl flex flex-col gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-rose-500 shadow-sm">
-                                        <Heart className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-black text-slate-900">{profile.emergencyContact?.name || "No Name"}</p>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{profile.emergencyContact?.relationship || "Guardian"}</p>
-                                    </div>
+                        {/* Status Card */}
+                        <div className="bg-blue-600 rounded-2xl p-6 text-white shadow-lg shadow-blue-200 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+                            <h3 className="text-sm font-bold mb-1 relative z-10">Last Checkup</h3>
+                            <p className="text-blue-100 text-xs font-medium relative z-10 mb-4">Complete your health profile to get better insights.</p>
+                            <div className="flex items-center gap-3 relative z-10">
+                                <div className="bg-white/20 p-2 rounded-lg">
+                                    <Calendar className="w-4 h-4" />
                                 </div>
-                                <div className="flex items-center gap-3 text-sm font-black text-slate-900">
-                                    <Phone className="w-4 h-4 text-rose-400" />
-                                    {profile.emergencyContact?.phone || "0000000000"}
-                                </div>
-                                <button className="w-full py-3 bg-white text-[10px] font-black uppercase tracking-widest text-slate-500 rounded-xl border border-slate-100 hover:bg-rose-100 hover:text-rose-600 transition-all">
-                                    Change Contact
-                                </button>
+                                <span className="text-sm font-bold">12 Oct, 2025</span>
                             </div>
                         </div>
                     </div>

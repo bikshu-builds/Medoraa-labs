@@ -17,6 +17,7 @@ import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { appEvents } from "@/lib/events";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 export default function PatientCheckout() {
     const [cart, setCart] = useState<any>(null);
@@ -27,6 +28,8 @@ export default function PatientCheckout() {
     const [selectedSlot, setSelectedSlot] = useState("");
     const [addresses, setAddresses] = useState<any[]>([]);
     const [selectedAddressId, setSelectedAddressId] = useState("");
+    const searchParams = useSearchParams();
+    const selectedTestIds = searchParams.get("tests")?.split(",").filter(Boolean) || null;
 
     useEffect(() => {
         const fetchData = async () => {
@@ -62,12 +65,21 @@ export default function PatientCheckout() {
 
     const slots = ["07:00 - 08:00 AM", "08:00 - 09:00 AM", "09:00 - 10:00 AM", "10:00 - 11:00 AM", "11:00 - 12:00 PM"];
 
+    const bookingItems = selectedTestIds
+        ? cart?.items?.filter((i: any) => selectedTestIds.includes(i.test._id))
+        : cart?.items;
+
     const handleBooking = async () => {
+        if (!bookingItems?.length) {
+            alert("No tests selected for booking");
+            return;
+        }
         setIsLoading(true);
         try {
             const token = localStorage.getItem("patientToken");
+            const testIds = selectedTestIds || cart.items.map((i: any) => i.test._id);
             const body: any = {
-                tests: cart.items.map((i: any) => i.test._id),
+                tests: testIds,
                 date: selectedDate,
                 time: selectedSlot,
                 sourceType
@@ -229,7 +241,7 @@ export default function PatientCheckout() {
                         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Review Order</h3>
 
                         <div className="space-y-4 mb-10">
-                            {cart?.items?.map((item: any) => (
+                            {bookingItems?.map((item: any) => (
                                 <div key={item.test._id} className="flex justify-between items-start">
                                     <div className="flex-1 mr-4">
                                         <p className="text-xs font-bold text-slate-100 line-clamp-1">{item.test.name}</p>
@@ -243,15 +255,15 @@ export default function PatientCheckout() {
                         <div className="pt-6 border-t border-white/10 space-y-4 mb-10">
                             <div className="flex justify-between items-center">
                                 <span className="text-xs font-bold text-slate-400">Booking Amount</span>
-                                <span className="text-sm font-black">₹{cart?.items?.reduce((acc: any, i: any) => acc + i.test.price, 0)}</span>
+                                <span className="text-sm font-black">₹{bookingItems?.reduce((acc: any, i: any) => acc + i.test.price, 0)}</span>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-xs font-bold text-slate-400">Convenience Fee</span>
                                 <span className="text-xs font-black text-emerald-400">FREE</span>
                             </div>
                             <div className="flex justify-between items-center pt-4">
-                                <span className="text-sm font-black text-white">Total Payable</span>
-                                <span className="text-2xl font-black text-blue-400">₹{cart?.items?.reduce((acc: any, i: any) => acc + i.test.price, 0)}</span>
+                                <span className="text-sm font-bold text-white">Total Payable</span>
+                                <span className="text-2xl font-black text-blue-400">₹{bookingItems?.reduce((acc: any, i: any) => acc + i.test.price, 0)}</span>
                             </div>
                         </div>
 

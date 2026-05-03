@@ -18,6 +18,7 @@ router.put("/profile", authMiddleware, patientController.updateProfile);
 router.post("/book-test", authMiddleware, patientController.bookTest);
 router.get("/bookings", authMiddleware, patientController.getHistory);
 router.get("/reports", authMiddleware, patientController.getReports);
+router.get("/billing", authMiddleware, patientController.getBilling);
 router.get("/notifications", authMiddleware, patientController.getNotifications);
 router.delete("/notifications/:id", authMiddleware, patientController.deleteNotification);
 router.put("/notifications/mark-all-read", authMiddleware, patientController.markAllNotificationsRead);

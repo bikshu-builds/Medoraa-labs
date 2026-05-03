@@ -2,17 +2,22 @@
 import React, { useEffect, useState } from "react";
 import {
     Search,
-    Filter,
     ShoppingCart,
     Info,
     Clock,
     Zap,
-    ArrowRight,
     Star,
-    ChevronDown,
+    Loader2,
+    ShieldCheck,
     Plus,
+    Minus,
+    FlaskConical,
+    Trash2,
+    Check,
     X,
-    Loader2
+    FileText,
+    Activity,
+    FlaskRound
 } from "lucide-react";
 import Link from "next/link";
 import { getApiUrl } from "@/lib/api";
@@ -26,6 +31,8 @@ export default function TestBrowsing() {
     const [activeCategory, setActiveCategory] = useState("All");
     const [cart, setCart] = useState<any[]>([]);
     const [suggestions, setSuggestions] = useState<any[]>([]);
+    const [selectedTest, setSelectedTest] = useState<any>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const categories = [
         "All",
@@ -102,7 +109,32 @@ export default function TestBrowsing() {
             });
             const d = await res.json();
             if (d.success) {
-                setCart(d.data.items);
+                if (d.data?.items) {
+                    setCart(d.data.items);
+                } else {
+                    fetchCart();
+                }
+                appEvents.emit("cartUpdated");
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const removeFromCart = async (testId: string) => {
+        try {
+            const token = localStorage.getItem("patientToken");
+            const res = await fetch(getApiUrl(`/api/patient/cart/${testId}`), {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const d = await res.json();
+            if (d.success) {
+                if (d.data?.items) {
+                    setCart(d.data.items);
+                } else {
+                    fetchCart(); // Fallback if data is missing
+                }
                 appEvents.emit("cartUpdated");
             }
         } catch (err) {
@@ -116,157 +148,350 @@ export default function TestBrowsing() {
         return matchesSearch && matchesCategory;
     });
 
-    return (
-        <div className="space-y-10 animate-in fade-in duration-700">
-            {/* Search & Header */}
-            <div className="bg-slate-900 rounded-[3rem] p-12 text-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                <div className="relative z-10 max-w-2xl">
-                    <h1 className="text-4xl font-black tracking-tight mb-4">Find Your Diagnostic Test</h1>
-                    <p className="text-slate-400 font-bold mb-8">Search from over 200+ specialized tests and packages at competitive prices.</p>
+    const isInCart = (testId: string) => {
+        return cart.some((c: any) => (c.test?._id || c.test) === testId);
+    };
 
-                    <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md p-2 rounded-3xl border border-white/10 group focus-within:bg-white focus-within:border-white transition-all shadow-2xl">
-                        <div className="flex-1 flex items-center gap-4 px-4 py-2">
-                            <Search className="w-5 h-5 text-slate-400 group-focus-within:text-blue-600" />
-                            <input
-                                type="text"
-                                placeholder="E.g. Full Body Checkup, Thyroid..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="bg-transparent border-none outline-none text-sm font-bold w-full text-slate-100 group-focus-within:text-slate-900 placeholder:text-slate-500"
-                            />
-                        </div>
-                        <button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-[1.25rem] font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-blue-600/20">
+    const openDetails = (test: any) => {
+        setSelectedTest(test);
+        setIsModalOpen(true);
+    };
+
+    const closeDetails = () => {
+        setIsModalOpen(false);
+        setTimeout(() => setSelectedTest(null), 300); // Wait for animation
+    };
+
+    return (
+        <div className="min-h-screen bg-[#F8FAFC]">
+            {/* Hero Search Section */}
+            <div
+                className="pt-10 pb-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden shadow-sm"
+                style={{
+                    backgroundColor: "#1A3263",
+                    backgroundImage: 'url("https://www.transparenttextures.com/patterns/black-thread.png")',
+                    backgroundBlendMode: 'multiply'
+                }}
+            >
+                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#4295A5]/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
+                <div className="relative z-10 max-w-4xl mx-auto text-center">
+                    <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
+                        Find Your Diagnostic Test
+                    </h1>
+                    <p className="text-blue-100 text-base mb-8 font-medium">
+                        Search from our comprehensive catalog of 200+ certified tests
+                    </p>
+
+                    <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md p-2 rounded-xl border border-white/10 focus-within:bg-white/20 transition-all max-w-2xl mx-auto">
+                        <Search className="w-5 h-5 text-blue-200 ml-3 shrink-0" />
+                        <input
+                            type="text"
+                            placeholder="Search tests... e.g. Thyroid, CBC, Diabetes"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="bg-transparent border-none outline-none text-sm font-medium w-full text-white placeholder:text-blue-200/60 py-2"
+                        />
+                        <button className="bg-[#406093] hover:bg-[#124170] text-white px-6 py-2 rounded-lg text-sm font-bold transition-colors shrink-0">
                             Search
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* Suggestions Section */}
-            {suggestions.length > 0 && (
-                <div className="mb-10">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
-                        <h2 className="text-lg font-black text-slate-900">Recommended For You</h2>
-                    </div>
-                    <div className="flex items-center gap-6 overflow-x-auto no-scrollbar pb-4">
-                        {suggestions.map((test) => (
-                            <div key={test._id} className="min-w-[300px] bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 p-6 rounded-[2rem] shadow-sm">
-                                <div className="flex justify-between items-start mb-4">
-                                    <h3 className="font-black text-slate-900 leading-tight">{test.name}</h3>
-                                    <div className="p-1.5 bg-amber-100 rounded-lg text-amber-600">
-                                        <Star className="w-4 h-4 fill-amber-500" />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20">
+                {/* Suggestions Section */}
+                {suggestions.length > 0 && (
+                    <div className="mb-10 pt-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                            {suggestions.map((test) => (
+                                <div
+                                    key={test._id}
+                                    onClick={() => openDetails(test)}
+                                    className="bg-white rounded-[24px] p-5 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-50 hover:shadow-[0_12px_30px_rgb(0,0,0,0.06)] transition-all duration-500 flex flex-col group relative cursor-pointer mt-4"
+                                >
+                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                                        <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-400 text-[#1A3263] rounded-full shadow-md text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">
+                                            <Star className="w-3 h-3 fill-[#1A3263]" /> Recommended For You
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-4">
+                                        <img
+                                            src="https://i.pinimg.com/736x/d0/6a/13/d06a13ce1f4da8d86989657faabf6276.jpg"
+                                            alt="Test Icon"
+                                            className="w-12 h-12 object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500"
+                                        />
+                                    </div>
+                                    <h3 className="font-bold text-[#1A3263] text-sm mb-1 leading-tight">{test.name}</h3>
+                                    <p className="text-[10px] text-gray-400 mb-4 line-clamp-1">{test.description}</p>
+
+                                    <div className="flex items-center justify-between pt-4 border-t border-gray-50 mt-auto">
+                                        <span className="font-bold text-[#1A3263] text-base">₹{test.price}</span>
+                                        {isInCart(test._id) ? (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); removeFromCart(test._id); }}
+                                                className="w-9 h-9 rounded-xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-all active:scale-90"
+                                                title="Remove from Cart"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); addToCart(test._id); }}
+                                                className="w-9 h-9 rounded-xl bg-[#1A3263] hover:bg-[#124170] text-white flex items-center justify-center shadow-md shadow-[#1A3263]/10 transition-all active:scale-90"
+                                                title="Add to Cart"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-                                <p className="text-[10px] font-bold text-slate-500 mb-4 line-clamp-1">{test.description}</p>
-                                <div className="flex items-center justify-between mt-auto">
-                                    <span className="font-black text-lg">₹{test.price}</span>
-                                    {cart.some((c: any) => (c.test?._id || c.test) === test._id) ? (
-                                        <button disabled className="px-4 py-2 bg-white/50 text-slate-400 rounded-xl text-[10px] font-bold uppercase tracking-widest border border-amber-200">Added</button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Categories */}
+                <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-3 mb-6">
+                    {categories.map((cat) => (
+                        <button
+                            key={cat}
+                            onClick={() => setActiveCategory(cat)}
+                            className={cn(
+                                "px-5 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border",
+                                activeCategory === cat
+                                    ? "bg-[#1A3263] text-white border-[#1A3263] shadow-md shadow-[#1A3263]/20"
+                                    : "bg-white text-gray-400 border-gray-200 hover:border-[#1A3263]/30 hover:text-[#1A3263]"
+                            )}
+                        >
+                            {cat}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Test Grid - Homepage Card Style */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pb-16">
+                    {isLoading ? (
+                        Array(8).fill(0).map((_, i) => (
+                            <div key={i} className="bg-white rounded-xl h-72 border border-gray-100 animate-pulse" />
+                        ))
+                    ) : filteredTests.length > 0 ? (
+                        filteredTests.map((test) => (
+                            <div
+                                key={test._id}
+                                className="bg-white rounded-[24px] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-gray-50 hover:shadow-[0_20px_40px_rgb(0,0,0,0.06)] hover:border-[#1A3263]/10 transition-all duration-500 flex flex-col group relative"
+                            >
+                                {/* Category Badge */}
+                                <div className="absolute top-4 left-4">
+                                    <span className="px-3 py-1 bg-[#E8F6F8] text-[#4295A5] rounded-full text-[9px] font-bold uppercase tracking-wider">
+                                        {test.category || "General"}
+                                    </span>
+                                </div>
+
+                                {/* Safe Icon */}
+                                <div className="absolute top-4 right-4">
+                                    <ShieldCheck className="w-4 h-4 text-[#00D084]" />
+                                </div>
+
+                                {/* Icon Section */}
+                                <div className="mt-4 mb-6 flex justify-center">
+                                    <img
+                                        src="https://i.pinimg.com/736x/d0/6a/13/d06a13ce1f4da8d86989657faabf6276.jpg"
+                                        alt={test.name}
+                                        className="w-16 h-16 object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500"
+                                    />
+                                </div>
+
+                                {/* Content Section */}
+                                <div className="flex-1 text-center mb-6">
+                                    <h3 className="text-[15px] font-bold text-[#1A3263] leading-tight mb-2 line-clamp-2 min-h-[2.5rem]">
+                                        {test.name}
+                                    </h3>
+                                    <div className="flex items-center justify-center gap-3 text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                                        <span className="flex items-center gap-1">
+                                            <Clock className="w-3 h-3" /> {test.tat || "24h"}
+                                        </span>
+                                        <span className="w-1 h-1 rounded-full bg-gray-200" />
+                                        <span className="flex items-center gap-1">
+                                            <Activity className="w-3 h-3" /> {test.sampleType || "Blood"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Price Section */}
+                                <div className="flex items-center justify-between mb-6 pt-4 border-t border-gray-50">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Price</span>
+                                        <span className="text-xl font-bold text-[#1A3263]">₹{test.price}</span>
+                                    </div>
+                                    <button
+                                        onClick={() => openDetails(test)}
+                                        className="text-[11px] font-bold text-[#4295A5] hover:text-[#1A3263] transition-colors underline underline-offset-4"
+                                    >
+                                        View Details
+                                    </button>
+                                </div>
+
+                                {/* Action Button */}
+                                {isInCart(test._id) ? (
+                                    <button
+                                        onClick={() => removeFromCart(test._id)}
+                                        className="w-full py-3 rounded-xl bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Remove from Cart
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => addToCart(test._id)}
+                                        className="w-full py-3 rounded-xl bg-[#1A3263] text-white text-xs font-bold hover:bg-[#124170] shadow-lg shadow-[#1A3263]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Add to Cart
+                                    </button>
+                                )}
+                            </div>
+                        ))
+
+                    ) : (
+                        <div className="col-span-full py-20 text-center">
+                            <div className="w-20 h-20 bg-[#F1F5F9] rounded-full flex items-center justify-center mx-auto mb-6">
+                                <Search className="w-10 h-10 text-gray-300" />
+                            </div>
+                            <h3 className="text-xl font-bold text-[#1A3263] mb-2">No tests found</h3>
+                            <p className="text-gray-400 text-sm">
+                                Try adjusting your search or browse a different category.
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Test Details Modal */}
+            {isModalOpen && selectedTest && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-[#1A3263]/40 backdrop-blur-sm animate-in fade-in duration-300"
+                        onClick={closeDetails}
+                    />
+
+                    {/* Modal Content */}
+                    <div className="relative bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-[32px] shadow-2xl animate-in zoom-in-95 duration-300">
+                        {/* Close Button */}
+                        <button
+                            onClick={closeDetails}
+                            className="absolute top-6 right-6 w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all z-10"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        <div className="p-8">
+                            {/* Header Section */}
+                            <div className="flex flex-col sm:flex-row gap-6 mb-8">
+                                <div className="w-24 h-24 rounded-3xl bg-[#F8FAFC] flex items-center justify-center shrink-0 shadow-inner">
+                                    <img
+                                        src="https://i.pinimg.com/736x/d0/6a/13/d06a13ce1f4da8d86989657faabf6276.jpg"
+                                        alt={selectedTest.name}
+                                        className="w-16 h-16 object-contain"
+                                    />
+                                </div>
+                                <div className="flex-1 pt-2">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="px-3 py-1 bg-[#E8F6F8] text-[#4295A5] rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                                            {selectedTest.category}
+                                        </span>
+                                        {selectedTest.isPopular && (
+                                            <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                                                Popular
+                                            </span>
+                                        )}
+                                    </div>
+                                    <h2 className="text-2xl font-bold text-[#1A3263] leading-tight">{selectedTest.name}</h2>
+                                </div>
+                            </div>
+
+                            {/* Description */}
+                            <div className="mb-8">
+                                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                    <FileText className="w-4 h-4 text-[#4295A5]" />
+                                    About this Test
+                                </h3>
+                                <p className="text-sm text-gray-500 leading-relaxed bg-[#F8FAFC] p-4 rounded-2xl border border-gray-50">
+                                    {selectedTest.description || "Comprehensive diagnostic analysis provided by Medoraa Labs certified professionals."}
+                                </p>
+                            </div>
+
+                            {/* Info Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                                <div className="p-4 rounded-2xl border border-gray-100 flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                                        <Clock className="w-5 h-5 text-blue-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Report TAT</p>
+                                        <p className="text-sm font-bold text-[#1A3263]">{selectedTest.tat || "24-48 Hours"}</p>
+                                    </div>
+                                </div>
+                                <div className="p-4 rounded-2xl border border-gray-100 flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
+                                        <Activity className="w-5 h-5 text-purple-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sample Type</p>
+                                        <p className="text-sm font-bold text-[#1A3263]">{selectedTest.sampleType || "Blood"}</p>
+                                    </div>
+                                </div>
+                                <div className="sm:col-span-2 p-4 rounded-2xl border border-gray-100 flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                                        <FlaskRound className="w-5 h-5 text-amber-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Preparation Instructions</p>
+                                        <p className="text-sm font-bold text-[#1A3263]">{selectedTest.preparationInstructions || "No special preparation needed. Overnight fasting may be required for some tests."}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footer Actions */}
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-8 border-t border-gray-100">
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Price</p>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-3xl font-bold text-[#1A3263]">₹{selectedTest.price}</span>
+                                        {selectedTest.originalPrice && selectedTest.originalPrice > selectedTest.price && (
+                                            <div className="flex flex-col">
+                                                <span className="text-xs text-gray-400 line-through">₹{selectedTest.originalPrice}</span>
+                                                <span className="text-[10px] font-bold text-[#00D084]">{Math.round(((selectedTest.originalPrice - selectedTest.price) / selectedTest.originalPrice) * 100)}% OFF</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="w-full sm:w-auto">
+                                    {isInCart(selectedTest._id) ? (
+                                        <button
+                                            onClick={() => { removeFromCart(selectedTest._id); closeDetails(); }}
+                                            className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-red-50 text-red-600 font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <Trash2 className="w-5 h-5" />
+                                            Remove from Cart
+                                        </button>
                                     ) : (
                                         <button
-                                            onClick={() => addToCart(test._id)}
-                                            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md transition-all active:scale-95"
+                                            onClick={() => { addToCart(selectedTest._id); closeDetails(); }}
+                                            className="w-full sm:w-auto px-10 py-4 rounded-2xl bg-[#1A3263] text-white font-bold hover:bg-[#122850] shadow-xl shadow-[#1A3263]/20 transition-all active:scale-[0.98]"
                                         >
                                             Add to Cart
                                         </button>
                                     )}
                                 </div>
                             </div>
-                        ))}
+                        </div>
                     </div>
                 </div>
             )}
-
-            {/* Categories Scroll */}
-            <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-2">
-                {categories.map((cat) => (
-                    <button
-                        key={cat}
-                        onClick={() => setActiveCategory(cat)}
-                        className={cn(
-                            "px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border",
-                            activeCategory === cat
-                                ? "bg-blue-600 text-white border-blue-600 shadow-xl shadow-blue-600/20"
-                                : "bg-white text-slate-400 border-slate-100 hover:border-blue-200 hover:text-blue-600"
-                        )}
-                    >
-                        {cat}
-                    </button>
-                ))}
-            </div>
-
-            {/* Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {isLoading ? (
-                    Array(8).fill(0).map((_, i) => (
-                        <div key={i} className="bg-white rounded-[2.5rem] h-80 border border-slate-100 animate-pulse" />
-                    ))
-                ) : filteredTests.length > 0 ? (
-                    filteredTests.map((test) => (
-                        <div key={test._id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-slate-200/50 transition-all group flex flex-col justify-between">
-                            <div>
-                                <div className="flex justify-between items-start mb-6">
-                                    <div className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase tracking-widest">
-                                        {test.category}
-                                    </div>
-                                    {test.isPopular && (
-                                        <div className="p-2 bg-amber-50 text-amber-500 rounded-xl">
-                                            <Star className="w-4 h-4 fill-amber-500" />
-                                        </div>
-                                    )}
-                                </div>
-                                <h3 className="text-xl font-black text-slate-900 leading-tight mb-2 group-hover:text-blue-600 transition-colors">{test.name}</h3>
-                                <p className="text-xs font-bold text-slate-400 line-clamp-2 mb-6">{test.description}</p>
-
-                                <div className="flex items-center gap-4 text-slate-400 mb-8">
-                                    <div className="flex items-center gap-1.5">
-                                        <Clock className="w-3.5 h-3.5" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest">{test.tat}</span>
-                                    </div>
-                                    <div className="w-px h-3 bg-slate-100" />
-                                    <div className="flex items-center gap-1.5">
-                                        <Zap className="w-3.5 h-3.5" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest">{test.sampleType}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="pt-6 border-t border-slate-50 flex items-center justify-between mt-auto">
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Price</span>
-                                    <span className="text-2xl font-black text-slate-900">₹{test.price}</span>
-                                </div>
-                                {cart.some((c: any) => (c.test?._id || c.test) === test._id) ? (
-                                    <button
-                                        disabled
-                                        className="px-4 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center font-bold text-xs cursor-not-allowed"
-                                    >
-                                        Added
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={() => addToCart(test._id)}
-                                        className="w-12 h-12 rounded-2xl bg-blue-600 hover:bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-blue-600/20 transition-all active:scale-90 group"
-                                        title="Add to Cart"
-                                    >
-                                        <ShoppingCart className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    ))
-                ) : (
-                    <div className="col-span-full py-20 text-center">
-                        <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-slate-100">
-                            <Search className="w-10 h-10 text-slate-200" />
-                        </div>
-                        <h3 className="text-xl font-black text-slate-900">No tests found</h3>
-                        <p className="text-slate-400 font-bold mt-2">Try searching for something else or browse categories.</p>
-                    </div>
-                )}
-            </div>
         </div>
     );
 }
