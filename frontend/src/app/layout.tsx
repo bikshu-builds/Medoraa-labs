@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
+import WhatsAppButton from "@/components/WhatsAppButton";
 
 const mavenPro = localFont({
   src: [
@@ -84,6 +85,7 @@ export default function RootLayout({
     <html lang="en" className={cn("h-full", "antialiased", mavenPro.variable)} suppressHydrationWarning>
       <body className="min-h-full flex flex-col font-sans">
         {children}
+        <WhatsAppButton />
       </body>
     </html>
   );
