@@ -27,6 +27,9 @@ const ActivityLogsPage = () => {
     const [logs, setLogs] = useState<Log[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [activeTab, setActiveTab] = useState<string>("All");
+
+    const tabs = ["All", "Admin", "Staff", "Patient", "Hospital"];
 
     const fetchLogs = async () => {
         try {
@@ -46,6 +49,40 @@ const ActivityLogsPage = () => {
     useEffect(() => {
         fetchLogs();
     }, []);
+
+    const filteredLogs = logs.filter(log => {
+        const matchesSearch = 
+            log.adminName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.module.toLowerCase().includes(searchTerm.toLowerCase());
+
+        if (!matchesSearch) return false;
+        if (activeTab === "All") return true;
+
+        const module = (log.module || "").toLowerCase();
+        const desc = (log.description || "").toLowerCase();
+
+        if (activeTab === "Admin") {
+            return module.includes("role") || module.includes("setting") || module.includes("notification") || 
+                module.includes("alert") || module.includes("commission") || module.includes("source-tracking") || 
+                desc.includes("role") || desc.includes("setting") || desc.includes("notification") || desc.includes("commission");
+        }
+        if (activeTab === "Staff") {
+            return module.includes("staff") || module.includes("employee") || module.includes("doctor") || 
+                module.includes("home-collection") || module.includes("homecollection") || 
+                desc.includes("staff") || desc.includes("employee") || desc.includes("doctor");
+        }
+        if (activeTab === "Patient") {
+            return module.includes("patient") || module.includes("booking") || module.includes("billing") || 
+                module.includes("report") || module.includes("package") || module.includes("test") || 
+                desc.includes("patient") || desc.includes("booking") || desc.includes("billing") || 
+                desc.includes("report") || desc.includes("test");
+        }
+        if (activeTab === "Hospital") {
+            return module.includes("hospital") || desc.includes("hospital");
+        }
+        return true;
+    });
 
     const columns = [
         { 
@@ -115,6 +152,8 @@ const ActivityLogsPage = () => {
                         <input 
                             type="text" 
                             placeholder="Filter by admin or action..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-1 focus:ring-blue-500 transition-all w-64"
                         />
                     </div>
@@ -144,9 +183,27 @@ const ActivityLogsPage = () => {
                 </div>
             </div>
 
+            {/* Filter Tabs */}
+            <div className="flex border-b border-slate-200/60 gap-1 select-none overflow-x-auto">
+                {tabs.map((tab) => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={cn(
+                            "px-6 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition-all whitespace-nowrap",
+                            activeTab === tab
+                                ? "border-blue-600 text-blue-600 bg-blue-50/30"
+                                : "border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                        )}
+                    >
+                        {tab}
+                    </button>
+                ))}
+            </div>
+
             <Table 
                 columns={columns} 
-                data={logs} 
+                data={filteredLogs} 
             />
         </div>
     );

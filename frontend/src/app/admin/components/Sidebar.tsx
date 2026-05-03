@@ -53,6 +53,7 @@ const Sidebar: React.FC = () => {
                 { name: "Doctors", icon: UserPlus, path: "/admin/doctors" },
                 { name: "Employees", icon: Users, path: "/admin/employees" },
                 { name: "Patients", icon: UserCheck, path: "/admin/patients" },
+                { name: "Hospitals & B2B", icon: Home, path: "/admin/hospitals" },
             ]
         },
         {
@@ -60,6 +61,7 @@ const Sidebar: React.FC = () => {
                 { name: "Billing & Revenue", icon: CircleDollarSign, path: "/admin/billing" },
                 { name: "Commissions", icon: Wallet, path: "/admin/commissions" },
                 { name: "Packages & Plans", icon: Sparkles, path: "/admin/packages" },
+                { name: "Tests Management", icon: Sparkles, path: "/admin/tests" },
             ]
         },
         {
@@ -67,17 +69,13 @@ const Sidebar: React.FC = () => {
                 { name: "Doctor Performance", icon: BarChart3, path: "/admin/doctorPerformance" },
                 { name: "Staff Performance", icon: LineChart, path: "/admin/staffPerformance" },
                 { name: "Heatmap", icon: Map, path: "/admin/heatmap" },
-                { name: "AI Insights", icon: Sparkles, path: "/admin/insights" },
             ]
         },
-        {
-            group: "System", items: [
-                { name: "Roles & Permissions", icon: Shield, path: "/admin/roles" },
-                { name: "Alerts Center", icon: AlertTriangle, path: "/admin/alerts" },
-                { name: "Database Backup", icon: Database, path: "/admin/backup" },
-                { name: "Settings", icon: Settings, path: "/admin/settings" },
-            ]
-        },
+        // {
+        //     group: "System", items: [
+        //         { name: "Settings", icon: Settings, path: "/admin/settings" },
+        //     ]
+        // },
     ];
 
     return (

@@ -17,6 +17,7 @@ const Setting = require("../models/Setting");
 const InternalNote = require("../models/InternalNote");
 const Package = require("../models/Package");
 const Test = require("../models/Test");
+const Hospital = require("../models/Hospital");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
@@ -30,6 +31,12 @@ const logActivity = async (adminId, adminName, action, module, description, ip =
             module,
             description,
             ipAddress: ip
+        });
+        await Notification.create({
+            title: `${module} - ${action}`,
+            message: description,
+            type: action === "DELETE" ? "info" : "success",
+            readStatus: false
         });
     } catch (err) {
         console.error("Activity Logging Failed:", err);
@@ -605,12 +612,30 @@ exports.getDoctorPerformance = async (req, res) => {
 
 exports.getStaffPerformance = async (req, res) => {
     try {
-        const performance = await HomeCollection.aggregate([
-            { $group: { _id: "$assignedStaff", visits: { $sum: 1 } } },
-            { $lookup: { from: "employees", localField: "_id", foreignField: "_id", as: "staff" } },
-            { $unwind: "$staff" },
-            { $project: { name: "$staff.name", visits: 1 } }
+        const collectionVisits = await Collection.aggregate([
+            { $match: { assignedStaff: { $ne: null } } },
+            { $group: { _id: "$assignedStaff", visits: { $sum: 1 } } }
         ]);
+        const homeCollectionVisits = await HomeCollection.aggregate([
+            { $match: { assignedStaff: { $ne: null } } },
+            { $group: { _id: "$assignedStaff", visits: { $sum: 1 } } }
+        ]);
+
+        const staffList = await Staff.find();
+        const performance = staffList.map(s => {
+            const cv = collectionVisits.find(v => v._id && v._id.toString() === s._id.toString())?.visits || 0;
+            const hv = homeCollectionVisits.find(v => v._id && v._id.toString() === s._id.toString())?.visits || 0;
+            return { 
+                _id: s._id,
+                staffId: s.staffId,
+                name: s.name, 
+                email: s.email,
+                phoneNumber: s.phoneNumber,
+                role: s.role,
+                status: s.status,
+                visits: cv + hv 
+            };
+        });
         res.status(200).json({ success: true, data: performance });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -620,7 +645,14 @@ exports.getStaffPerformance = async (req, res) => {
 // @desc    Report Approval
 exports.getPendingReports = async (req, res) => {
     try {
-        const reports = await ReportApproval.find({ status: "Pending" });
+        let reports = await ReportApproval.find();
+        if (reports.length === 0) {
+            reports = await ReportApproval.create([
+                { reportId: "RPT-10024", patientName: "Vikram Malhotra", testName: "CBC (Complete Blood Count)", generatedBy: "Dr. Anita (Hematologist)", status: "Pending" },
+                { reportId: "RPT-10025", patientName: "Priyanka Verma", testName: "Thyroid Profile (T3, T4, TSH)", generatedBy: "Dr. Anita (Hematologist)", status: "Pending" },
+                { reportId: "RPT-10026", patientName: "Rahul Sharma", testName: "Lipid Profile & Liver Screen", generatedBy: "Dr. S. K. Roy", status: "Pending" }
+            ]);
+        }
         res.status(200).json({ success: true, data: reports });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -679,10 +711,15 @@ exports.getNotes = async (req, res) => {
 
 exports.addNote = async (req, res) => {
     try {
+        let adminName = "Admin";
+        if (req.user && req.user.id) {
+            const adminUser = await Admin.findById(req.user.id);
+            if (adminUser) adminName = adminUser.name || "Admin";
+        }
         const note = await InternalNote.create({
             ...req.body,
             createdBy: req.user.id,
-            adminName: req.user.name
+            adminName: adminName
         });
         res.status(201).json({ success: true, data: note });
     } catch (err) {
@@ -892,3 +929,118 @@ exports.getReferralAnalytics = async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 };
+
+// @desc    Admin: Get all hospitals
+exports.getHospitals = async (req, res) => {
+    try {
+        const hospitals = await Hospital.find().sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data: hospitals });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Admin: Create hospital account
+exports.addHospital = async (req, res) => {
+    try {
+        const hospital = await Hospital.create(req.body);
+        await logActivity(req.user.id, req.user.name, "CREATE", "Hospitals", `Added new hospital: ${hospital.name}`);
+        res.status(201).json({ success: true, data: hospital });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Admin: Update hospital account
+exports.updateHospital = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const hospital = await Hospital.findById(id);
+        if (!hospital) {
+            return res.status(404).json({ success: false, message: "Hospital not found" });
+        }
+
+        // Prevent password overwrite if empty
+        if (!req.body.password || req.body.password === "") {
+            delete req.body.password;
+        }
+
+        Object.keys(req.body).forEach(key => {
+            hospital[key] = req.body[key];
+        });
+
+        await hospital.save();
+
+        await logActivity(req.user.id, req.user.name, "UPDATE", "Hospitals", `Updated hospital details for: ${hospital.name}`);
+        res.status(200).json({ success: true, data: hospital });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Admin: Delete hospital account
+exports.deleteHospital = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const hospital = await Hospital.findByIdAndDelete(id);
+        if (!hospital) {
+            return res.status(404).json({ success: false, message: "Hospital not found" });
+        }
+        await logActivity(req.user.id, req.user.name, "DELETE", "Hospitals", `Removed hospital: ${hospital.name}`);
+        res.status(200).json({ success: true, message: "Hospital deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Admin: Get all tests
+exports.getTests = async (req, res) => {
+    try {
+        const tests = await Test.find().sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data: tests });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Admin: Create new test
+exports.addTest = async (req, res) => {
+    try {
+        const test = await Test.create(req.body);
+        await logActivity(req.user.id, req.user.name, "CREATE", "Tests", `Added new test: ${test.name}`);
+        res.status(201).json({ success: true, data: test });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Admin: Update existing test
+exports.updateTest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const test = await Test.findByIdAndUpdate(id, req.body, { new: true });
+        if (!test) {
+            return res.status(404).json({ success: false, message: "Test not found" });
+        }
+        await logActivity(req.user.id, req.user.name, "UPDATE", "Tests", `Updated test details for: ${test.name}`);
+        res.status(200).json({ success: true, data: test });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Admin: Delete a test
+exports.deleteTest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const test = await Test.findByIdAndDelete(id);
+        if (!test) {
+            return res.status(404).json({ success: false, message: "Test not found" });
+        }
+        await logActivity(req.user.id, req.user.name, "DELETE", "Tests", `Removed test: ${test.name}`);
+        res.status(200).json({ success: true, message: "Test deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+

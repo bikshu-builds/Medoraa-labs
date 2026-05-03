@@ -24,7 +24,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <div className="flex h-screen bg-white overflow-hidden font-sans antialiased text-slate-900">
             <Sidebar />
             <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50">
-                <Navbar />
                 <main className="flex-1 overflow-y-auto custom-scrollbar">
                     <div className="p-8 max-w-[1600px] mx-auto">
                         {children}

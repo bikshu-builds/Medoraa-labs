@@ -14,7 +14,13 @@ import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface StaffPerformance {
+    _id?: string;
+    staffId?: string;
     name: string;
+    email?: string;
+    phoneNumber?: string;
+    role?: string;
+    status?: string;
     visits: number;
 }
 
@@ -43,40 +49,86 @@ const StaffPerformancePage = () => {
 
     const columns = [
         { 
-            header: "Operational Staff", 
+            header: "Staff Member", 
             accessor: "name" as const,
             render: (row: StaffPerformance) => (
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                        <UserCircle className="w-6 h-6" />
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold border border-slate-200">
+                        {row.name.substring(0, 2).toUpperCase()}
                     </div>
-                    <span className="font-bold text-slate-900">{row.name}</span>
+                    <div>
+                        <span className="font-bold text-slate-900 block leading-snug">{row.name}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{row.staffId || 'STAFF-001'}</span>
+                    </div>
                 </div>
             )
         },
         { 
-            header: "Total Collections", 
+            header: "Role & Email", 
+            accessor: "role" as const,
+            render: (row: StaffPerformance) => (
+                <div>
+                    <span className="text-xs font-bold text-slate-600 block leading-snug">{row.role || 'Sample Collection Team'}</span>
+                    <span className="text-[10px] font-bold text-slate-400 leading-snug">{row.email || 'N/A'}</span>
+                </div>
+            )
+        },
+        { 
+            header: "Contact Details", 
+            accessor: "phoneNumber" as const,
+            render: (row: StaffPerformance) => (
+                <div>
+                    <span className="text-xs font-bold text-slate-700 leading-snug block">{row.phoneNumber || 'N/A'}</span>
+                    <span className="text-[9px] font-bold text-blue-600 uppercase tracking-wider">SMS / CALL ACTIVE</span>
+                </div>
+            )
+        },
+        { 
+            header: "Collections", 
             accessor: "visits" as const,
             render: (row: StaffPerformance) => (
                 <div className="flex items-center gap-4">
-                    <span className="text-sm font-black text-slate-900">{row.visits}</span>
-                    <div className="flex-1 w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="bg-emerald-500 h-full" style={{ width: `${Math.min(100, (row.visits / 20) * 100)}%` }} />
+                    <span className="text-sm font-black text-slate-900 min-w-[20px]">{row.visits}</span>
+                    <div className="flex-1 w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/40">
+                        <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, (row.visits / 20) * 100)}%` }} />
                     </div>
                 </div>
+            )
+        },
+        { 
+            header: "Status", 
+            accessor: "status" as const,
+            render: (row: StaffPerformance) => (
+                <span className={cn(
+                    "px-2.5 py-1 text-[9px] font-black uppercase tracking-widest rounded-full border",
+                    row.status === "Inactive" 
+                        ? "bg-slate-50 text-slate-400 border-slate-200" 
+                        : "bg-emerald-50 text-emerald-600 border-emerald-100"
+                )}>
+                    {row.status || 'Active'}
+                </span>
             )
         },
         { 
             header: "Efficiency Rating", 
             accessor: "visits" as const,
             render: (row: StaffPerformance) => (
-                <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs">
+                <div className="flex items-center gap-2 text-emerald-600 font-black text-xs bg-emerald-50/50 px-2.5 py-1.5 rounded-lg border border-emerald-100/50 w-fit">
                     <Zap className="w-3.5 h-3.5" />
                     9{Math.min(9, row.visits % 10)}.2%
                 </div>
             )
         }
     ];
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
+                <div className="w-8 h-8 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Loading staff metrics...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
@@ -85,35 +137,11 @@ const StaffPerformancePage = () => {
                 <p className="text-slate-500 text-sm mt-1 font-medium">Monitoring collection efficiency and operational throughput.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                    <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-2 overflow-hidden">
-                        <Table 
-                            columns={columns} 
-                            data={performance} 
-                        />
-                    </div>
-                </div>
-                <div className="space-y-6">
-                    <div className="bg-emerald-600 rounded-[2.5rem] p-10 text-white relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-6 opacity-20 transform translate-x-1/4 -translate-y-1/4 group-hover:scale-110 transition-transform duration-700">
-                            <CheckCircle2 className="w-40 h-40" />
-                        </div>
-                        <div className="relative z-10">
-                            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-100 mb-8">Performance Summary</h3>
-                            <div className="space-y-8">
-                                <div>
-                                    <p className="text-4xl font-black tracking-tighter">142</p>
-                                    <p className="text-xs font-bold text-emerald-100 mt-2">Successful Collections Today</p>
-                                </div>
-                                <div>
-                                    <p className="text-4xl font-black tracking-tighter">0.4%</p>
-                                    <p className="text-xs font-bold text-emerald-100 mt-2">Sample Rejection Rate</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div className="overflow-hidden bg-white border border-slate-200/60 rounded-2xl shadow-sm">
+                <Table 
+                    columns={columns} 
+                    data={performance} 
+                />
             </div>
         </div>
     );

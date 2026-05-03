@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 
-type Role = "patient" | "staff" | "admin";
+type Role = "patient" | "staff" | "admin" | "hospital";
 
 export default function UnifiedSignIn() {
     const [role, setRole] = useState<Role>("patient");
@@ -53,6 +53,7 @@ export default function UnifiedSignIn() {
                 localStorage.setItem(`${role}Token`, data.token);
                 if (data.data) localStorage.setItem("staffUser", JSON.stringify(data.data));
                 if (data.admin) localStorage.setItem("adminUser", JSON.stringify(data.admin));
+                if (data.hospital) localStorage.setItem("hospitalUser", JSON.stringify(data.hospital));
                 window.location.href = `/${role}/dashboard`;
             } else {
                 setError(data.message || "Invalid credentials");
@@ -176,6 +177,12 @@ export default function UnifiedSignIn() {
                         >
                             <UserCog className="w-4 h-4" /> <span className="hidden sm:inline">Admin</span>
                         </button>
+                        <button
+                            onClick={() => { setRole("hospital"); setIdentifier(""); setPassword(""); setError(""); }}
+                            className={`flex-1 py-3 px-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${role === "hospital" ? "bg-[#1A3263] text-white shadow-md" : "text-slate-500 hover:text-[#1A3263]"}`}
+                        >
+                            <Activity className="w-4 h-4" /> <span className="hidden sm:inline">Hospital</span>
+                        </button>
                     </div>
 
                     <div className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 relative overflow-hidden">
@@ -242,12 +249,14 @@ export default function UnifiedSignIn() {
 
                                 {role !== "patient" && (
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Email</label>
+                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">
+                                            {role === "hospital" ? "Email / Username" : "Email"}
+                                        </label>
                                         <div className="relative group">
                                             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#1A3263] transition-colors" />
                                             <input
-                                                type="email"
-                                                placeholder="name@example.com"
+                                                type={role === "hospital" ? "text" : "email"}
+                                                placeholder={role === "hospital" ? "Username or Email" : "name@example.com"}
                                                 value={identifier}
                                                 onChange={(e) => setIdentifier(e.target.value)}
                                                 className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all"
