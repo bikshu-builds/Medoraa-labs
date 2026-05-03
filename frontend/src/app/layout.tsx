@@ -27,12 +27,13 @@ const mavenPro = localFont({
 })
 
 export const metadata: Metadata = {
-  title: "Medoraa Labs | Advanced Diagnostics & Expert Care",
-  description: "Medoraa Labs is your trusted laboratory for advanced medical diagnostics, comprehensive health checkups, and expert medical care. Get accurate, reliable, and timely lab reports.",
-  keywords: "Medoraa Labs, Pathology Lab, Blood Test, Diagnostics, Health Checkup, Medical Laboratory, Reliable Test Reports, Full Body Checkup, Clinical Lab",
+  title: "Medoraa Labs | Best Diagnostics & Blood Tests in Vijayawada",
+  description: "Medoraa Labs provides top diagnostic services, accurate blood tests, and complete health checkup packages in Vijayawada. Book lab tests online with home collection.",
+  keywords: "Medoraa Labs, pathology lab Vijayawada, diagnostics Vijayawada, blood test Gollapudi, medical laboratory Andhra Pradesh, full body checkup Vijayawada, NABL accredited lab Vijayawada, health test home collection",
   authors: [{ name: "Medoraa Labs" }],
   creator: "Medoraa Labs",
   publisher: "Medoraa Labs",
+  metadataBase: new URL("https://medoraa.com"),
   formatDetection: {
     email: false,
     address: false,
@@ -58,8 +59,8 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_IN",
     url: "https://medoraa.com",
-    title: "Medoraa Labs | Advanced Diagnostics & Expert Care",
-    description: "Your trusted laboratory for advanced medical diagnostics, comprehensive health checkups, and expert medical care.",
+    title: "Medoraa Labs | Best Diagnostics & Blood Tests in Vijayawada",
+    description: "Your trusted NABL-accredited laboratory for advanced medical diagnostics, comprehensive health checkups, and expert medical care in Vijayawada and Gollapudi.",
     siteName: "Medoraa Labs",
     images: [{
       url: "/logo.png",
@@ -70,11 +71,12 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Medoraa Labs | Advanced Diagnostics & Expert Care",
-    description: "Your trusted laboratory for advanced medical diagnostics, comprehensive health checkups, and expert medical care.",
+    title: "Medoraa Labs | Best Diagnostics & Blood Tests in Vijayawada",
+    description: "Your trusted laboratory for advanced medical diagnostics, comprehensive health checkups, and expert medical care in Vijayawada.",
     images: ["/logo.png"],
   },
 };
+
 
 export default function RootLayout({
   children,
