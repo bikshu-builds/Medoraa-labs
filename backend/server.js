@@ -9,13 +9,7 @@ app.use(express.json());
 
 // Routes
 const adminRoutes = require("./routes/admin");
-const patientRoutes = require("./routes/patient");
-const staffRoutes = require("./routes/staff");
-const hospitalRoutes = require("./routes/hospital");
 app.use("/api/admin", adminRoutes);
-app.use("/api/patient", patientRoutes);
-app.use("/api/staff", staffRoutes);
-app.use("/api/hospital", hospitalRoutes);
 
 app.get("/", (req, res) => {
     res.send("Health route is working bro");
@@ -31,7 +25,25 @@ app.get("/api/health", (req, res) => {
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("Connected to MongoDB"))
+    .then(async () => {
+        console.log("Connected to MongoDB");
+        // Safe database migration for legacy doctor schema ('hospital' -> 'hospitalId')
+        try {
+            const db = mongoose.connection.db;
+            const result = await db.collection("doctors").updateMany(
+                { hospital: { $exists: true }, hospitalId: { $exists: false } },
+                [
+                    { $set: { hospitalId: "$hospital" } },
+                    { $unset: ["hospital"] }
+                ]
+            );
+            if (result.modifiedCount > 0) {
+                console.log(`[Migration] Renamed 'hospital' to 'hospitalId' in ${result.modifiedCount} doctor records.`);
+            }
+        } catch (migrationErr) {
+            console.error("[Migration] Error migrating legacy doctor records:", migrationErr);
+        }
+    })
     .catch(err => console.error("MongoDB connection error:", err));
 
 const PORT = process.env.PORT || 4000;

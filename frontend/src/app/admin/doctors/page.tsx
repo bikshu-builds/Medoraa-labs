@@ -97,47 +97,58 @@ const DoctorManagement: React.FC = () => {
     };
 
     const filteredDoctors = doctors.filter(doctor => 
-        doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doctor.hospitalName.toLowerCase().includes(searchTerm.toLowerCase())
+        doctor.doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (typeof doctor.hospitalId === 'object' ? doctor.hospitalId?.hospitalName : doctor.hospitalId)?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const columns = [
         { 
             header: "Medical Professional", 
-            accessor: "name" as const,
+            accessor: "doctorName" as const,
             render: (row: Doctor) => (
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 shrink-0">
                         <UserCircle2 className="w-6 h-6" />
                     </div>
                     <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-slate-900 truncate">{row.name}</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Ref: {row._id.slice(-6).toUpperCase()}</span>
+                        <span className="font-bold text-slate-900 truncate">{row.doctorName}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Ref: {row.doctorCode || row._id.slice(-6).toUpperCase()}</span>
                     </div>
                 </div>
             )
         },
         { 
-            header: "Affiliation", 
-            accessor: "hospitalName" as const,
-            render: (row: Doctor) => (
-                <div className="flex flex-col">
-                    <div className="flex items-center gap-1.5 text-slate-700 font-bold text-xs">
-                        <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                        {row.hospitalName}
+            header: "Hospital Name", 
+            accessor: "hospitalId" as const,
+            render: (row: Doctor) => {
+                const hospitalName = (typeof row.hospitalId === 'object' && row.hospitalId !== null)
+                    ? row.hospitalId?.hospitalName
+                    : (row.hospitalId || "Not Associated");
+                return (
+                    <div className="flex flex-col max-w-[180px]">
+                        <div className="flex items-start gap-1.5 text-slate-700 font-bold text-xs">
+                            <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                            <span className="line-clamp-2 break-words">{hospitalName}</span>
+                        </div>
                     </div>
-                    <span className="text-[11px] text-slate-500 font-medium ml-5">{row.branch}</span>
-                </div>
+                );
+            }
+        },
+        {
+            header: "Specialization",
+            accessor: "specialization" as const,
+            render: (row: Doctor) => (
+                <div className="text-xs font-bold text-slate-700">{row.specialization}</div>
             )
         },
         { 
             header: "Communication", 
-            accessor: "phoneNumber" as const,
+            accessor: "mobileNumber" as const,
             render: (row: Doctor) => (
                 <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
                         <Phone className="w-3.5 h-3.5 text-slate-400" />
-                        {row.phoneNumber}
+                        {row.mobileNumber}
                     </div>
                     <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
                         <Mail className="w-3.5 h-3.5 text-slate-400" />
@@ -147,24 +158,40 @@ const DoctorManagement: React.FC = () => {
             )
         },
         { 
-            header: "Commission", 
-            accessor: "commissionPercentage" as const,
-            render: (row: Doctor) => (
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-900">{row.commissionPercentage}%</span>
-                    <div className="w-16 bg-slate-100 h-1 rounded-full overflow-hidden hidden sm:block">
-                        <div className="bg-blue-600 h-full" style={{ width: `${row.commissionPercentage}%` }} />
+            header: "Financials (Due)", 
+            accessor: "payment" as const,
+            render: (row: Doctor) => {
+                const total = row.payment?.totalReferralAmount ?? 0;
+                const paid = row.payment?.paidAmount ?? 0;
+                const due = total - paid;
+                const status = row.payment?.paymentStatus ?? "PENDING";
+                
+                return (
+                    <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-900">₹{due} due</span>
+                            <span className="text-[10px] text-slate-400 font-medium">/ ₹{total}</span>
+                        </div>
+                        <span className={cn(
+                            "text-[9px] font-extrabold uppercase tracking-widest mt-0.5 w-fit px-1.5 py-0.5 rounded",
+                            status === "PAID" && "bg-emerald-50 text-emerald-700",
+                            status === "PENDING" && "bg-amber-50 text-amber-700",
+                            status === "PARTIALLY_PAID" && "bg-blue-50 text-blue-700",
+                            status === "CANCELLED" && "bg-slate-100 text-slate-600"
+                        )}>
+                            {status.replace('_', ' ')}
+                        </span>
                     </div>
-                </div>
-            )
+                );
+            }
         },
         { 
             header: "Status", 
             accessor: "status" as const,
             render: (row: Doctor) => (
                 <div className="flex items-center gap-2">
-                    <div className={cn("w-1.5 h-1.5 rounded-full", row.status === "active" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-slate-300")} />
-                    <span className={cn("text-[10px] font-bold uppercase tracking-widest", row.status === "active" ? "text-emerald-700" : "text-slate-500")}>
+                    <div className={cn("w-1.5 h-1.5 rounded-full", row.status === "ACTIVE" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-slate-300")} />
+                    <span className={cn("text-[10px] font-bold uppercase tracking-widest", row.status === "ACTIVE" ? "text-emerald-700" : "text-slate-500")}>
                         {row.status}
                     </span>
                 </div>

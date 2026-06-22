@@ -16,21 +16,16 @@ import {
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 
-type Role = "patient" | "staff" | "admin" | "hospital";
+type Role = "admin";
 
 export default function UnifiedSignIn() {
-    const [role, setRole] = useState<Role>("patient");
+    const [role, setRole] = useState<Role>("admin");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
 
     // Form States
     const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
-
-    // Patient Family Selection States
-    const [patientStep, setPatientStep] = useState<1 | 2>(1);
-    const [foundPatients, setFoundPatients] = useState<any[]>([]);
-    const [selectedPatientId, setSelectedPatientId] = useState("");
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -40,7 +35,7 @@ export default function UnifiedSignIn() {
         try {
             // Adjust endpoint based on role
             const endpoint = `/api/${role}/login`;
-            const payload = role === "patient" ? { identifier, password, specificPatientId: selectedPatientId } : { email: identifier, password };
+            const payload = { email: identifier, password };
 
             const res = await fetch(getApiUrl(endpoint), {
                 method: "POST",
@@ -51,9 +46,7 @@ export default function UnifiedSignIn() {
 
             if (data.success) {
                 localStorage.setItem(`${role}Token`, data.token);
-                if (data.data) localStorage.setItem("staffUser", JSON.stringify(data.data));
                 if (data.admin) localStorage.setItem("adminUser", JSON.stringify(data.admin));
-                if (data.hospital) localStorage.setItem("hospitalUser", JSON.stringify(data.hospital));
                 window.location.href = `/${role}/dashboard`;
             } else {
                 setError(data.message || "Invalid credentials");
@@ -64,40 +57,6 @@ export default function UnifiedSignIn() {
             setIsLoading(false);
         }
     };
-
-    const handleIdentify = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setError("");
-
-        try {
-            const res = await fetch(getApiUrl("/api/patient/identify"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phoneNumber: identifier })
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                if (data.exists && data.patients.length > 0) {
-                    setFoundPatients(data.patients);
-                    if (data.patients.length === 1) {
-                        setSelectedPatientId(data.patients[0]._id);
-                    }
-                    setPatientStep(2);
-                } else {
-                    setError("No account found with this phone number. Please sign up.");
-                }
-            } else {
-                setError(data.message || "Failed to identify patient.");
-            }
-        } catch (err) {
-            setError("Connection failed. Please try again.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
 
     return (
         <div className="h-screen flex flex-col md:flex-row bg-[#F8FAFC] overflow-hidden">
@@ -157,34 +116,6 @@ export default function UnifiedSignIn() {
                         <p className="text-slate-500 font-bold mt-2">Sign in to your account</p>
                     </div>
 
-                    {/* Role Selection Tabs */}
-                    <div className="flex p-1 bg-white rounded-2xl shadow-sm border border-slate-200 w-full mb-4">
-                        <button
-                            onClick={() => { setRole("patient"); setIdentifier(""); setPassword(""); setError(""); setPatientStep(1); setSelectedPatientId(""); }}
-                            className={`flex-1 py-3 px-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${role === "patient" ? "bg-[#1A3263] text-white shadow-md" : "text-slate-500 hover:text-[#1A3263]"}`}
-                        >
-                            <User className="w-4 h-4" /> <span className="hidden sm:inline">Patient</span>
-                        </button>
-                        <button
-                            onClick={() => { setRole("staff"); setIdentifier(""); setPassword(""); setError(""); }}
-                            className={`flex-1 py-3 px-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${role === "staff" ? "bg-[#1A3263] text-white shadow-md" : "text-slate-500 hover:text-[#1A3263]"}`}
-                        >
-                            <Users className="w-4 h-4" /> <span className="hidden sm:inline">Staff</span>
-                        </button>
-                        <button
-                            onClick={() => { setRole("admin"); setIdentifier(""); setPassword(""); setError(""); }}
-                            className={`flex-1 py-3 px-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${role === "admin" ? "bg-[#1A3263] text-white shadow-md" : "text-slate-500 hover:text-[#1A3263]"}`}
-                        >
-                            <UserCog className="w-4 h-4" /> <span className="hidden sm:inline">Admin</span>
-                        </button>
-                        <button
-                            onClick={() => { setRole("hospital"); setIdentifier(""); setPassword(""); setError(""); }}
-                            className={`flex-1 py-3 px-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${role === "hospital" ? "bg-[#1A3263] text-white shadow-md" : "text-slate-500 hover:text-[#1A3263]"}`}
-                        >
-                            <Activity className="w-4 h-4" /> <span className="hidden sm:inline">Hospital</span>
-                        </button>
-                    </div>
-
                     <div className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 relative overflow-hidden">
 
                         {error && (
@@ -195,117 +126,53 @@ export default function UnifiedSignIn() {
                         )}
 
                         {/* Login Form */}
-                        {role === "patient" && patientStep === 1 ? (
-                            <form onSubmit={handleIdentify} className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Phone Number</label>
-                                    <div className="relative group">
-                                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#1A3263] transition-colors" />
-                                        <input
-                                            type="tel"
-                                            placeholder="+91 00000 00000"
-                                            value={identifier}
-                                            onChange={(e) => setIdentifier(e.target.value)}
-                                            className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#1A3263]/20 outline-none transition-all"
-                                            required
-                                        />
-                                    </div>
+                        <form onSubmit={handleLogin} className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">
+                                    Email
+                                </label>
+                                <div className="relative group">
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#1A3263] transition-colors" />
+                                    <input
+                                        type="email"
+                                        placeholder="name@example.com"
+                                        value={identifier}
+                                        onChange={(e) => setIdentifier(e.target.value)}
+                                        className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                                        required
+                                    />
                                 </div>
-                                <button
-                                    type="submit"
-                                    disabled={isLoading}
-                                    className="w-full bg-[#1A3263] hover:bg-[#2A4273] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-[#1A3263]/20 active:scale-95 transition-all flex items-center justify-center gap-2"
-                                >
-                                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Next <ArrowRight className="w-4 h-4" /></>}
-                                </button>
-                            </form>
-                        ) : (
-                            <form onSubmit={handleLogin} className="space-y-6">
-                                {role === "patient" && patientStep === 2 && (
-                                    <>
-                                        <button
-                                            type="button"
-                                            onClick={() => { setPatientStep(1); setPassword(""); setSelectedPatientId(""); }}
-                                            className="text-[10px] font-black uppercase tracking-widest text-[#1A3263] hover:underline mb-2 flex items-center gap-1"
-                                        >
-                                            <ArrowLeft className="w-3 h-3" /> Change Phone Number
-                                        </button>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Select Patient</label>
-                                            <select
-                                                value={selectedPatientId}
-                                                onChange={(e) => setSelectedPatientId(e.target.value)}
-                                                className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#1A3263]/20 outline-none transition-all appearance-none"
-                                                required
-                                            >
-                                                <option value="" disabled>Choose patient profile...</option>
-                                                {foundPatients.map(p => (
-                                                    <option key={p._id} value={p._id}>{p.name} ({p.age}y, {p.gender})</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </>
-                                )}
+                            </div>
 
-                                {role !== "patient" && (
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">
-                                            {role === "hospital" ? "Email / Username" : "Email"}
-                                        </label>
-                                        <div className="relative group">
-                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#1A3263] transition-colors" />
-                                            <input
-                                                type={role === "hospital" ? "text" : "email"}
-                                                placeholder={role === "hospital" ? "Username or Email" : "name@example.com"}
-                                                value={identifier}
-                                                onChange={(e) => setIdentifier(e.target.value)}
-                                                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-                                )}
+                            <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Password</label>
+                                <div className="relative group">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#1A3263] transition-colors" />
+                                    <input
+                                        type="password"
+                                        placeholder="••••••••"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#1A3263]/20 outline-none transition-all"
+                                        required
+                                    />
+                                </div>
+                            </div>
 
-                                {(!foundPatients.length || selectedPatientId || role !== "patient") && (
-                                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Password</label>
-                                        <div className="relative group">
-                                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#1A3263] transition-colors" />
-                                            <input
-                                                type="password"
-                                                placeholder="••••••••"
-                                                value={password}
-                                                onChange={(e) => setPassword(e.target.value)}
-                                                className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#1A3263]/20 outline-none transition-all"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                <button
-                                    type="submit"
-                                    disabled={isLoading || (role === "patient" && !selectedPatientId)}
-                                    className="w-full bg-[#1A3263] hover:bg-[#2A4273] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-[#1A3263]/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Sign In <ArrowRight className="w-4 h-4" /></>}
-                                </button>
-                            </form>
-                        )}
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full bg-[#1A3263] hover:bg-[#2A4273] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-[#1A3263]/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Sign In <ArrowRight className="w-4 h-4" /></>}
+                            </button>
+                        </form>
                     </div>
 
-                    {/* Only show Sign Up link for Patients */}
                     <div className="text-center h-10">
-                        {role === "patient" ? (
-                            <p className="text-slate-500 font-bold text-sm animate-in fade-in duration-300">
-                                Don't have an account?{" "}
-                                <Link href="/patient/register" className="text-[#1A3263] hover:underline">Create One</Link>
-                            </p>
-                        ) : (
-                            <p className="text-slate-400 font-medium text-xs animate-in fade-in duration-300">
-                                {role === "staff" ? "Staff" : "Admin"} portal is restricted. Contact IT for access.
-                            </p>
-                        )}
+                        <p className="text-slate-400 font-medium text-xs animate-in fade-in duration-300">
+                            Admin portal is restricted. Contact IT for access.
+                        </p>
                     </div>
 
                     <div className="pt-4 border-t border-slate-200 flex items-center justify-center gap-6 opacity-40 grayscale group hover:grayscale-0 hover:opacity-100 transition-all duration-700">

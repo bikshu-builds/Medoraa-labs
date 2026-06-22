@@ -1,8 +1,9 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { X, User, Building2, Phone, Mail, Percent, CheckCircle2, Loader2 } from "lucide-react";
+import { X, User, Building2, Phone, Mail, Calendar, CheckCircle2, Loader2, Users } from "lucide-react";
 import { Doctor } from "../types";
 import { cn } from "@/lib/utils";
+import { getApiUrl } from "@/lib/api";
 
 interface DoctorModalProps {
     isOpen: boolean;
@@ -11,45 +12,107 @@ interface DoctorModalProps {
     doctor?: Doctor | null;
 }
 
+interface FormDataType extends Partial<Doctor> {
+    periodType?: 'WEEKLY' | 'FIFTEEN_DAYS' | 'MONTHLY';
+    periodStartDate?: string;
+    periodEndDate?: string;
+    totalReferralAmount?: number;
+    paidAmount?: number;
+    dueAmount?: number;
+    paymentStatus?: 'PENDING' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED';
+    paymentCompletedDate?: string;
+}
+
 const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doctor }) => {
-    const [formData, setFormData] = useState<Partial<Doctor>>({
-        name: "",
-        hospitalName: "",
-        branch: "",
-        phoneNumber: "",
+    const [formData, setFormData] = useState<FormDataType>({
+        doctorName: "",
+        hospitalId: "",
+        specialization: "",
+        dateOfBirth: "",
+        gender: "Male",
+        mobileNumber: "",
         email: "",
-        commissionPercentage: 10,
-        status: "active",
-        specialty: "",
-        registrationNumber: "",
-        preferredCommunication: "Email",
-        referralCategory: "General",
-        notes: ""
+        reportDeliveryMethod: "MAIL",
+        status: "ACTIVE",
+        periodType: "WEEKLY",
+        periodStartDate: "",
+        periodEndDate: "",
+        totalReferralAmount: 0,
+        paidAmount: 0,
+        dueAmount: 0,
+        paymentStatus: "PENDING",
+        paymentCompletedDate: ""
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [hospitals, setHospitals] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchHospitals = async () => {
+            try {
+                const token = localStorage.getItem("adminToken");
+                const res = await fetch(getApiUrl("/api/admin/hospitals"), {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    setHospitals(data.data);
+                }
+            } catch (err) {
+                console.error("Failed to fetch hospitals", err);
+            }
+        };
+        fetchHospitals();
+    }, []);
 
     useEffect(() => {
         if (doctor) {
-            setFormData(doctor);
+            setFormData({
+                ...doctor,
+                hospitalId: (typeof doctor.hospitalId === 'object' && doctor.hospitalId !== null) ? (doctor.hospitalId as any)._id : (doctor.hospitalId || ""),
+                dateOfBirth: doctor.dateOfBirth ? new Date(doctor.dateOfBirth).toISOString().split('T')[0] : "",
+                periodType: doctor.payment?.periodType || "WEEKLY",
+                periodStartDate: doctor.payment?.periodStartDate ? new Date(doctor.payment.periodStartDate).toISOString().split('T')[0] : "",
+                periodEndDate: doctor.payment?.periodEndDate ? new Date(doctor.payment.periodEndDate).toISOString().split('T')[0] : "",
+                totalReferralAmount: doctor.payment?.totalReferralAmount || 0,
+                paidAmount: doctor.payment?.paidAmount || 0,
+                dueAmount: (doctor.payment?.totalReferralAmount || 0) - (doctor.payment?.paidAmount || 0),
+                paymentStatus: doctor.payment?.paymentStatus || "PENDING",
+                paymentCompletedDate: doctor.payment?.paymentCompletedDate ? new Date(doctor.payment.paymentCompletedDate).toISOString().split('T')[0] : ""
+            });
         } else {
             setFormData({
-                name: "",
-                hospitalName: "",
-                branch: "",
-                phoneNumber: "",
+                doctorName: "",
+                hospitalId: "",
+                specialization: "",
+                dateOfBirth: "",
+                gender: "Male",
+                mobileNumber: "",
                 email: "",
-                commissionPercentage: 10,
-                status: "active",
-                specialty: "",
-                registrationNumber: "",
-                preferredCommunication: "Email",
-                referralCategory: "General",
-                notes: ""
+                reportDeliveryMethod: "MAIL",
+                status: "ACTIVE",
+                periodType: "WEEKLY",
+                periodStartDate: "",
+                periodEndDate: "",
+                totalReferralAmount: 0,
+                paidAmount: 0,
+                dueAmount: 0,
+                paymentStatus: "PENDING",
+                paymentCompletedDate: ""
             });
         }
     }, [doctor, isOpen]);
 
     if (!isOpen) return null;
+
+    const handleNumberChange = (field: 'totalReferralAmount' | 'paidAmount', val: number) => {
+        setFormData(prev => {
+            const nextData = { ...prev, [field]: val };
+            const total = Number(nextData.totalReferralAmount) || 0;
+            const paid = Number(nextData.paidAmount) || 0;
+            nextData.dueAmount = total - paid;
+            return nextData;
+        });
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -76,7 +139,7 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                             {doctor ? "Update Partner Details" : "Onboard Medical Partner"}
                         </h2>
                         <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                            {doctor ? `Ref: ${doctor._id.slice(-8).toUpperCase()}` : "New Doctor Registration"}
+                            {doctor && doctor.doctorCode ? `Ref: ${doctor.doctorCode}` : "New Doctor Registration"}
                         </p>
                     </div>
                     <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
@@ -87,180 +150,244 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="p-6 space-y-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                        {/* Section 1: Identity */}
+                        {/* Section 1: Affiliation */}
                         <div className="md:col-span-2">
-                            <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Professional Identity</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Full Name (*)</label>
-                                    <div className="relative">
-                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input 
-                                            type="text" 
-                                            placeholder="Dr. Rajesh Kumar" 
-                                            required
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({...formData, name: e.target.value})}
-                                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Specialty</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="Cardiology / General Physician" 
-                                        value={formData.specialty}
-                                        onChange={(e) => setFormData({...formData, specialty: e.target.value})}
-                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Registration Number</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="MCI-000000" 
-                                        value={formData.registrationNumber}
-                                        onChange={(e) => setFormData({...formData, registrationNumber: e.target.value})}
-                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Referral Category</label>
-                                    <select 
-                                        value={formData.referralCategory}
-                                        onChange={(e) => setFormData({...formData, referralCategory: e.target.value as any})}
-                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
-                                    >
-                                        <option value="General">General Partner</option>
-                                        <option value="Specialist">Specialist</option>
-                                        <option value="Corporate">Corporate / Hospital</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Section 2: Affiliation */}
-                        <div className="md:col-span-2 pt-2">
                             <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Affiliation & Branch</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hospital Name (*)</label>
                                     <div className="relative">
-                                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input 
-                                            type="text" 
-                                            placeholder="City Hospital" 
+                                        <select
                                             required
-                                            value={formData.hospitalName}
-                                            onChange={(e) => setFormData({...formData, hospitalName: e.target.value})}
-                                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                        />
+                                            value={typeof formData.hospitalId === 'object' && formData.hospitalId !== null ? formData.hospitalId._id : (formData.hospitalId || "")}
+                                            onChange={(e) => setFormData({...formData, hospitalId: e.target.value})}
+                                            className="w-full pl-4 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all appearance-none"
+                                        >
+                                            <option value="" disabled>Select Hospital First</option>
+                                            {hospitals.map(h => (
+                                                <option key={h._id} value={h._id}>{h.hospitalName}</option>
+                                            ))}
+                                        </select>
                                     </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Branch / Locality (*)</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="Main Branch / South Extension" 
-                                        required
-                                        value={formData.branch}
-                                        onChange={(e) => setFormData({...formData, branch: e.target.value})}
-                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                    />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Section 3: Contact */}
-                        <div className="md:col-span-2 pt-2">
-                            <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Contact & Communication</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Phone Number (*)</label>
-                                    <div className="relative">
-                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input 
-                                            type="tel" 
-                                            placeholder="+91 00000 00000" 
-                                            required
-                                            value={formData.phoneNumber}
-                                            onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
-                                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                        />
+                        {formData.hospitalId && (
+                            <>
+                                {/* Section 2: Identity */}
+                                <div className="md:col-span-2 pt-2">
+                                    <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Professional Identity</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Full Name (*)</label>
+                                            <div className="relative">
+                                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Dr. Rajesh Kumar" 
+                                                    required
+                                                    value={formData.doctorName}
+                                                    onChange={(e) => setFormData({...formData, doctorName: e.target.value})}
+                                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Specialization (*)</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="Cardiology / General Physician" 
+                                                required
+                                                value={formData.specialization}
+                                                onChange={(e) => setFormData({...formData, specialization: e.target.value})}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date of Birth</label>
+                                            <div className="relative">
+                                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <input 
+                                                    type="date" 
+                                                    value={formData.dateOfBirth}
+                                                    onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}
+                                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Gender</label>
+                                            <div className="relative">
+                                                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <select 
+                                                    value={formData.gender}
+                                                    onChange={(e) => setFormData({...formData, gender: e.target.value as any})}
+                                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
+                                                >
+                                                    <option value="Male">Male</option>
+                                                    <option value="Female">Female</option>
+                                                    <option value="Other">Other</option>
+                                                    <option value="Prefer not to say">Prefer not to say</option>
+                                                </select>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Email Address (*)</label>
-                                    <div className="relative">
-                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input 
-                                            type="email" 
-                                            placeholder="doctor@medoraa.com" 
-                                            required
-                                            value={formData.email}
-                                            onChange={(e) => setFormData({...formData, email: e.target.value})}
-                                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Report Delivery Method</label>
-                                    <select 
-                                        value={formData.preferredCommunication}
-                                        onChange={(e) => setFormData({...formData, preferredCommunication: e.target.value as any})}
-                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
-                                    >
-                                        <option value="Email">Direct Email</option>
-                                        <option value="WhatsApp">WhatsApp Message</option>
-                                        <option value="SMS">SMS Link</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
 
-                        {/* Section 4: Finance & Status */}
-                        <div className="md:col-span-2 pt-2">
-                            <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Financials & Status</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Commission (%) (*)</label>
-                                    <div className="relative">
-                                        <Percent className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input 
-                                            type="number" 
-                                            min="0" max="100" required
-                                            value={formData.commissionPercentage}
-                                            onChange={(e) => setFormData({...formData, commissionPercentage: Number(e.target.value)})}
-                                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                        />
+                                {/* Section 3: Contact */}
+                                <div className="md:col-span-2 pt-2">
+                                    <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Contact & Communication</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Mobile Number (*)</label>
+                                            <div className="relative">
+                                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <input 
+                                                    type="tel" 
+                                                    placeholder="+91 00000 00000" 
+                                                    required
+                                                    value={formData.mobileNumber}
+                                                    onChange={(e) => setFormData({...formData, mobileNumber: e.target.value})}
+                                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Email Address (*)</label>
+                                            <div className="relative">
+                                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                <input 
+                                                    type="email" 
+                                                    placeholder="doctor@medoraa.com" 
+                                                    required
+                                                    value={formData.email}
+                                                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Report Delivery Method</label>
+                                            <select 
+                                                value={formData.reportDeliveryMethod}
+                                                onChange={(e) => setFormData({...formData, reportDeliveryMethod: e.target.value as any})}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
+                                            >
+                                                <option value="MAIL">Direct Email (MAIL)</option>
+                                                <option value="WHATSAPP">WhatsApp Message</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Account Status</label>
+                                            <select 
+                                                value={formData.status}
+                                                onChange={(e) => setFormData({...formData, status: e.target.value as any})}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
+                                            >
+                                                <option value="ACTIVE">Active</option>
+                                                <option value="INACTIVE">Inactive</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Account Status</label>
-                                    <select 
-                                        value={formData.status}
-                                        onChange={(e) => setFormData({...formData, status: e.target.value as any})}
-                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
-                                    >
-                                        <option value="active">Active Registry</option>
-                                        <option value="inactive">Inactive / Blacklisted</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
 
-                        {/* Section 5: Internal Notes */}
-                        <div className="md:col-span-2 pt-2">
-                            <label className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] block mb-4">Internal Notes / Remarks</label>
-                            <textarea 
-                                placeholder="Add any special instructions or referral history notes here..."
-                                value={formData.notes}
-                                onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                                rows={3}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all resize-none"
-                            />
-                        </div>
+                                {/* Section 4: Payment Details */}
+                                <div className="md:col-span-2 pt-2 border-t border-slate-100 mt-4">
+                                    <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Payment & Referral Details</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Billing Period (*)</label>
+                                            <select 
+                                                value={formData.periodType}
+                                                onChange={(e) => setFormData({...formData, periodType: e.target.value as any})}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
+                                            >
+                                                <option value="WEEKLY">Weekly</option>
+                                                <option value="FIFTEEN_DAYS">15 Days</option>
+                                                <option value="MONTHLY">Monthly</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Payment Status</label>
+                                            <select 
+                                                value={formData.paymentStatus}
+                                                onChange={(e) => setFormData({...formData, paymentStatus: e.target.value as any})}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
+                                            >
+                                                <option value="PENDING">Pending</option>
+                                                <option value="PARTIALLY_PAID">Partially Paid</option>
+                                                <option value="PAID">Paid</option>
+                                                <option value="CANCELLED">Cancelled</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Period Start Date (*)</label>
+                                            <input 
+                                                type="date" 
+                                                required
+                                                value={formData.periodStartDate}
+                                                onChange={(e) => setFormData({...formData, periodStartDate: e.target.value})}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Period End Date (*)</label>
+                                            <input 
+                                                type="date" 
+                                                required
+                                                value={formData.periodEndDate}
+                                                onChange={(e) => setFormData({...formData, periodEndDate: e.target.value})}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Referral Amount (*)</label>
+                                            <input 
+                                                type="number" 
+                                                required
+                                                min="0"
+                                                value={formData.totalReferralAmount}
+                                                onChange={(e) => handleNumberChange('totalReferralAmount', Number(e.target.value))}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Paid Amount (*)</label>
+                                            <input 
+                                                type="number" 
+                                                required
+                                                min="0"
+                                                value={formData.paidAmount}
+                                                onChange={(e) => handleNumberChange('paidAmount', Number(e.target.value))}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Due Amount</label>
+                                            <input 
+                                                type="number" 
+                                                readOnly
+                                                value={formData.dueAmount}
+                                                className="w-full px-4 py-2 bg-slate-100 border border-slate-200 rounded text-sm font-semibold text-slate-600 outline-none"
+                                            />
+                                        </div>
+                                        {(formData.paymentStatus === 'PAID' || formData.paymentStatus === 'PARTIALLY_PAID') && (
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Payment Completed Date (*)</label>
+                                                <input 
+                                                    type="date" 
+                                                    required
+                                                    value={formData.paymentCompletedDate}
+                                                    onChange={(e) => setFormData({...formData, paymentCompletedDate: e.target.value})}
+                                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </form>
 

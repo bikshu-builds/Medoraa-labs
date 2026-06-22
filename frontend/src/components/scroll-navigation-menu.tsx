@@ -186,14 +186,7 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
                     Sign In
                   </Link>
                 </motion.div>
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Link
-                    href="/patient/register"
-                    className="bg-[#1A3263] text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-[#1A3263]/20 hover:bg-[#2A4273] transition-all"
-                  >
-                    Sign Up
-                  </Link>
-                </motion.div>
+
               </div>
             </div>
 
@@ -297,13 +290,7 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
                     >
                       Sign In
                     </Link>
-                    <Link
-                      href="/patient/register"
-                      onClick={toggleMenu}
-                      className="flex items-center justify-center w-full p-3 rounded-xl bg-[#1A3263] text-white font-bold shadow-lg shadow-[#1A3263]/20 transition-all"
-                    >
-                      Sign Up
-                    </Link>
+
                   </motion.div>
                 </div>
 
