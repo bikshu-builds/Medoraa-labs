@@ -48,3 +48,14 @@ export interface DashboardStats {
         createdAt: string;
     }[];
 }
+
+export interface Staff {
+    _id: string;
+    name: string;
+    email: string;
+    mobileNumber?: string;
+    role: "admin" | "registration" | "authorization" | "inventory";
+    status: "active" | "inactive";
+    createdAt: string;
+    updatedAt: string;
+}

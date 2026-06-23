@@ -59,6 +59,7 @@ const Sidebar: React.FC = () => {
                 { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
                 { name: "Hospital", icon: Home, path: "/admin/hospitals" },
                 { name: "Doctors", icon: UserPlus, path: "/admin/doctors" },
+                { name: "Staff", icon: Users, path: "/admin/staff" },
             ]
         }
     ];
@@ -82,7 +83,7 @@ const Sidebar: React.FC = () => {
             });
             const data = await res.json();
             if (data.success) {
-                setAdminList(data.data);
+                setAdminList(data.data.filter((a: any) => a.role === "admin" || !a.role));
             }
         } catch (err) {
             console.error("Failed to fetch admins", err);
@@ -113,7 +114,7 @@ const Sidebar: React.FC = () => {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify({ ...formData, role: "admin" })
             });
 
             const data = await res.json();
@@ -125,7 +126,7 @@ const Sidebar: React.FC = () => {
                     setSuccess(false);
                 }, 1500);
             } else {
-                setError(data.message || "Failed to create admin");
+                setError(data.message || "Failed to create administrator");
             }
         } catch (err: any) {
             setError(err.message || "Something went wrong");
@@ -146,7 +147,7 @@ const Sidebar: React.FC = () => {
         setIsSubmitting(true);
         try {
             const token = localStorage.getItem("adminToken");
-            const payload: any = { name: editName, email: editEmail };
+            const payload: any = { name: editName, email: editEmail, role: "admin" };
             if (editPassword) payload.password = editPassword;
 
             const res = await fetch(getApiUrl(`/api/admin/admins/${id}`), {
@@ -165,12 +166,12 @@ const Sidebar: React.FC = () => {
                 // If they updated themselves, update localStorage
                 const selfId = currentAdmin?.id || currentAdmin?._id;
                 if (selfId === id) {
-                    const updatedUser = { ...currentAdmin, name: editName, email: editEmail };
+                    const updatedUser = { ...currentAdmin, name: editName, email: editEmail, role: "admin" };
                     localStorage.setItem("adminUser", JSON.stringify(updatedUser));
                     setCurrentAdmin(updatedUser);
                 }
             } else {
-                setError(data.message || "Failed to update admin");
+                setError(data.message || "Failed to update administrator");
             }
         } catch (err: any) {
             setError(err.message || "Something went wrong");
@@ -216,37 +217,47 @@ const Sidebar: React.FC = () => {
 
             {/* Navigation */}
             <nav className="flex-1 overflow-y-auto px-3 py-6 no-scrollbar">
-                {menuItems.map((group, gIdx) => (
-                    <div key={gIdx} className="mb-8">
-                        <h3 className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">
-                            {group.group}
-                        </h3>
-                        <ul className="space-y-1">
-                            {group.items.map((item) => {
-                                const isActive = pathname === item.path;
-                                return (
-                                    <li key={item.path}>
-                                        <Link
-                                            href={item.path}
-                                            className={cn(
-                                                "flex items-center gap-3 px-4 py-2 rounded-md text-sm font-medium transition-colors",
-                                                isActive
-                                                    ? "bg-blue-600 text-white"
-                                                    : "hover:bg-slate-800 hover:text-white"
-                                            )}
-                                        >
-                                            <item.icon className={cn(
-                                                "w-4 h-4",
-                                                isActive ? "text-white" : "text-slate-400 group-hover:text-white"
-                                            )} />
-                                            {item.name}
-                                        </Link>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </div>
-                ))}
+                {menuItems.map((group, gIdx) => {
+                    const userRole = currentAdmin?.role || "admin";
+                    const filteredItems = group.items.filter(item => {
+                        if (item.path === "/admin/dashboard") return true;
+                        return userRole === "admin";
+                    });
+
+                    if (filteredItems.length === 0) return null;
+
+                    return (
+                        <div key={gIdx} className="mb-8">
+                            <h3 className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">
+                                {group.group}
+                            </h3>
+                            <ul className="space-y-1">
+                                {filteredItems.map((item) => {
+                                    const isActive = pathname === item.path;
+                                    return (
+                                        <li key={item.path}>
+                                            <Link
+                                                href={item.path}
+                                                className={cn(
+                                                    "flex items-center gap-3 px-4 py-2 rounded-md text-sm font-medium transition-colors",
+                                                    isActive
+                                                        ? "bg-blue-600 text-white"
+                                                        : "hover:bg-slate-800 hover:text-white"
+                                                )}
+                                            >
+                                                <item.icon className={cn(
+                                                    "w-4 h-4",
+                                                    isActive ? "text-white" : "text-slate-400 group-hover:text-white"
+                                                )} />
+                                                {item.name}
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    );
+                })}
             </nav>
 
             {/* Footer / User Profile */}
@@ -260,13 +271,15 @@ const Sidebar: React.FC = () => {
                         <span className="text-[10px] text-slate-500 truncate">{currentAdmin?.email || "admin@medoraa.com"}</span>
                     </div>
                 </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="flex items-center gap-3 w-full px-3 py-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-md text-sm transition-all mb-1"
-                >
-                    <ShieldCheck className="w-4 h-4" />
-                    Add Admin
-                </button>
+                {(currentAdmin?.role === "admin" || !currentAdmin?.role) && (
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex items-center gap-3 w-full px-3 py-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-md text-sm transition-all mb-1"
+                    >
+                        <ShieldCheck className="w-4 h-4" />
+                        Add Admin
+                    </button>
+                )}
                 <button
                     onClick={() => {
                         localStorage.removeItem("adminToken");
@@ -342,7 +355,7 @@ const Sidebar: React.FC = () => {
                                         placeholder="e.g. John Doe"
                                         value={formData.name}
                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none"
+                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
                                     />
                                 </div>
 
@@ -354,7 +367,7 @@ const Sidebar: React.FC = () => {
                                         placeholder="e.g. admin@medoraa.com"
                                         value={formData.email}
                                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none"
+                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
                                     />
                                 </div>
 
@@ -366,7 +379,7 @@ const Sidebar: React.FC = () => {
                                         placeholder="••••••••"
                                         value={formData.password}
                                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none"
+                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
                                     />
                                 </div>
 
@@ -418,7 +431,7 @@ const Sidebar: React.FC = () => {
                                                                 type="text"
                                                                 value={editName}
                                                                 onChange={(e) => setEditName(e.target.value)}
-                                                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none"
+                                                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
                                                             />
                                                         </div>
                                                         <div className="space-y-1">
@@ -427,18 +440,18 @@ const Sidebar: React.FC = () => {
                                                                 type="email"
                                                                 value={editEmail}
                                                                 onChange={(e) => setEditEmail(e.target.value)}
-                                                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none"
+                                                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
                                                             />
                                                         </div>
                                                     </div>
                                                     <div className="space-y-1">
-                                                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">New Password (leave blank to keep current)</label>
+                                                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">New Password</label>
                                                         <input
                                                             type="password"
                                                             placeholder="••••••••"
                                                             value={editPassword}
                                                             onChange={(e) => setEditPassword(e.target.value)}
-                                                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none"
+                                                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
                                                         />
                                                     </div>
                                                     <div className="flex justify-end gap-1.5 pt-1">
@@ -481,7 +494,7 @@ const Sidebar: React.FC = () => {
                                                                 type="button"
                                                                 onClick={() => handleDeleteAdmin(admin._id)}
                                                                 className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-white rounded transition-colors"
-                                                                title="Delete Administrator"
+                                                                title="Delete Account"
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5" />
                                                             </button>

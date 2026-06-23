@@ -3,6 +3,7 @@ const Doctor = require("../models/Doctor");
 const Hospital = require("../models/Hospital");
 const DoctorPayment = require("../models/DoctorPayment");
 const jwt = require("jsonwebtoken");
+const { sendLoginNotification } = require("../config/mailer");
 
 // @desc    Admin Login
 // @route   POST /api/admin/login
@@ -16,16 +17,19 @@ exports.login = async (req, res) => {
         }
 
         const token = jwt.sign(
-            { id: admin._id, role: "admin", roleId: admin.role },
+            { id: admin._id, role: admin.role || "admin" },
             process.env.JWT_SECRET,
             { expiresIn: "1d" }
         );
+
+        // Fire-and-forget the email notification to avoid blocking the HTTP response
+        sendLoginNotification(admin);
 
         res.status(200).json({
             success: true,
             message: "Login successful",
             token,
-            admin: { id: admin._id, name: admin.name, email: admin.email, role: admin.role }
+            admin: { id: admin._id, name: admin.name, email: admin.email, role: admin.role || "admin" }
         });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -427,18 +431,20 @@ exports.deleteHospital = async (req, res) => {
 
 exports.addAdmin = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, mobileNumber, password, role, status } = req.body;
 
         const existingAdmin = await Admin.findOne({ email });
         if (existingAdmin) {
-            return res.status(400).json({ success: false, message: "Admin with this email already exists" });
+            return res.status(400).json({ success: false, message: "Staff/Admin with this email already exists" });
         }
 
         const admin = await Admin.create({
             name,
             email,
+            mobileNumber,
             password,
-            status: "active"
+            role: role || "admin",
+            status: status || "active"
         });
 
         res.status(201).json({
@@ -447,6 +453,8 @@ exports.addAdmin = async (req, res) => {
                 _id: admin._id,
                 name: admin.name,
                 email: admin.email,
+                mobileNumber: admin.mobileNumber,
+                role: admin.role,
                 status: admin.status
             }
         });
@@ -466,14 +474,17 @@ exports.getAdmins = async (req, res) => {
 
 exports.updateAdmin = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, mobileNumber, password, role, status } = req.body;
         const admin = await Admin.findById(req.params.id);
         if (!admin) {
-            return res.status(404).json({ success: false, message: "Admin not found" });
+            return res.status(404).json({ success: false, message: "Staff/Admin not found" });
         }
         if (name) admin.name = name;
         if (email) admin.email = email;
+        if (mobileNumber !== undefined) admin.mobileNumber = mobileNumber;
         if (password) admin.password = password;
+        if (role) admin.role = role;
+        if (status) admin.status = status;
 
         await admin.save();
         const adminObj = admin.toObject();
