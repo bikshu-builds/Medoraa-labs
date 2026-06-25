@@ -16,8 +16,8 @@ interface FormDataType extends Partial<Doctor> {
     periodType?: 'WEEKLY' | 'FIFTEEN_DAYS' | 'MONTHLY';
     periodStartDate?: string;
     periodEndDate?: string;
-    totalReferralAmount?: number;
-    paidAmount?: number;
+    totalReferralAmount?: number | string;
+    paidAmount?: number | string;
     dueAmount?: number;
     paymentStatus?: 'PENDING' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED';
     paymentCompletedDate?: string;
@@ -104,12 +104,41 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
 
     if (!isOpen) return null;
 
-    const handleNumberChange = (field: 'totalReferralAmount' | 'paidAmount', val: number) => {
+    const handleNumberChange = (field: 'totalReferralAmount' | 'paidAmount', valStr: string) => {
         setFormData(prev => {
-            const nextData = { ...prev, [field]: val };
+            const nextData = { ...prev };
+            if (valStr === "") {
+                nextData[field] = "" as any;
+            } else {
+                nextData[field] = Number(valStr);
+            }
             const total = Number(nextData.totalReferralAmount) || 0;
             const paid = Number(nextData.paidAmount) || 0;
             nextData.dueAmount = total - paid;
+            return nextData;
+        });
+    };
+
+    const handlePeriodChange = (field: 'periodType' | 'periodStartDate', value: string) => {
+        setFormData(prev => {
+            const nextData = { ...prev, [field]: value };
+            const type = nextData.periodType || "WEEKLY";
+            const start = nextData.periodStartDate || "";
+            
+            if (start) {
+                const startDate = new Date(start);
+                if (!isNaN(startDate.getTime())) {
+                    const endDate = new Date(startDate);
+                    if (type === 'WEEKLY') {
+                        endDate.setUTCDate(startDate.getUTCDate() + 7);
+                    } else if (type === 'FIFTEEN_DAYS') {
+                        endDate.setUTCDate(startDate.getUTCDate() + 15);
+                    } else if (type === 'MONTHLY') {
+                        endDate.setUTCMonth(startDate.getUTCMonth() + 1);
+                    }
+                    nextData.periodEndDate = endDate.toISOString().split('T')[0];
+                }
+            }
             return nextData;
         });
     };
@@ -118,7 +147,13 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            await onSave(formData);
+            const cleanData = {
+                ...formData,
+                totalReferralAmount: formData.totalReferralAmount === "" ? 0 : Number(formData.totalReferralAmount),
+                paidAmount: formData.paidAmount === "" ? 0 : Number(formData.paidAmount),
+                dueAmount: Number(formData.dueAmount) || 0
+            };
+            await onSave(cleanData);
             onClose();
         } catch (err) {
             console.error(err);
@@ -300,7 +335,7 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Billing Period (*)</label>
                                             <select 
                                                 value={formData.periodType}
-                                                onChange={(e) => setFormData({...formData, periodType: e.target.value as any})}
+                                                onChange={(e) => handlePeriodChange('periodType', e.target.value)}
                                                 className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
                                             >
                                                 <option value="WEEKLY">Weekly</option>
@@ -327,7 +362,7 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                                 type="date" 
                                                 required
                                                 value={formData.periodStartDate}
-                                                onChange={(e) => setFormData({...formData, periodStartDate: e.target.value})}
+                                                onChange={(e) => handlePeriodChange('periodStartDate', e.target.value)}
                                                 className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
                                             />
                                         </div>
@@ -347,8 +382,8 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                                 type="number" 
                                                 required
                                                 min="0"
-                                                value={formData.totalReferralAmount}
-                                                onChange={(e) => handleNumberChange('totalReferralAmount', Number(e.target.value))}
+                                                value={formData.totalReferralAmount ?? ""}
+                                                onChange={(e) => handleNumberChange('totalReferralAmount', e.target.value)}
                                                 className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
                                             />
                                         </div>
@@ -358,8 +393,8 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                                 type="number" 
                                                 required
                                                 min="0"
-                                                value={formData.paidAmount}
-                                                onChange={(e) => handleNumberChange('paidAmount', Number(e.target.value))}
+                                                value={formData.paidAmount ?? ""}
+                                                onChange={(e) => handleNumberChange('paidAmount', e.target.value)}
                                                 className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
                                             />
                                         </div>
@@ -368,7 +403,7 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                             <input 
                                                 type="number" 
                                                 readOnly
-                                                value={formData.dueAmount}
+                                                value={formData.dueAmount ?? ""}
                                                 className="w-full px-4 py-2 bg-slate-100 border border-slate-200 rounded text-sm font-semibold text-slate-600 outline-none"
                                             />
                                         </div>
