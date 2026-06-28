@@ -31,7 +31,11 @@ import {
     CheckCircle2,
     Pencil,
     Trash2,
-    Key
+    Key,
+    ChevronDown,
+    ChevronRight,
+    ChevronLeft,
+    Share2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getApiUrl } from "@/lib/api";
@@ -52,14 +56,29 @@ const Sidebar: React.FC = () => {
     const [editName, setEditName] = useState("");
     const [editEmail, setEditEmail] = useState("");
     const [editPassword, setEditPassword] = useState("");
+    const [isReferralOpen, setIsReferralOpen] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(false);
+
+    useEffect(() => {
+        if (pathname === "/admin/hospitals" || pathname === "/admin/doctors") {
+            setIsReferralOpen(true);
+        }
+    }, [pathname]);
 
     const menuItems = [
         {
             group: "Main", items: [
-                { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
-                { name: "Hospital", icon: Home, path: "/admin/hospitals" },
-                { name: "Doctors", icon: UserPlus, path: "/admin/doctors" },
-                { name: "Staff", icon: Users, path: "/admin/staff" },
+                { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", isDropdown: false },
+                {
+                    name: "Referral Module",
+                    icon: Share2,
+                    isDropdown: true,
+                    subItems: [
+                        { name: "Hospital", icon: Home, path: "/admin/hospitals" },
+                        { name: "Doctors", icon: UserPlus, path: "/admin/doctors" },
+                    ]
+                },
+                { name: "Staff", icon: Users, path: "/admin/staff", isDropdown: false },
             ]
         }
     ];
@@ -206,13 +225,36 @@ const Sidebar: React.FC = () => {
     };
 
     return (
-        <aside className="flex flex-col h-full bg-[#1e293b] text-slate-300 w-64 font-sans shrink-0">
+        <aside className={cn(
+            "relative flex flex-col h-full bg-[#1e293b] text-slate-300 transition-all duration-300 font-sans shrink-0", 
+            isCollapsed ? "w-[72px]" : "w-64"
+        )}>
             {/* Logo Section */}
-            <div className="h-20 flex items-center px-6 border-b border-slate-700/50">
-                <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center mr-3">
-                    <ActivityIcon className="w-5 h-5 text-white" />
+            <div className={cn(
+                "h-20 flex items-center border-b border-slate-700/50 transition-all duration-300 relative", 
+                isCollapsed ? "px-0 justify-center" : "px-6 justify-between"
+            )}>
+                <div className="flex items-center min-w-0">
+                    <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center shrink-0">
+                        <ActivityIcon className="w-5 h-5 text-white" />
+                    </div>
+                    {!isCollapsed && (
+                        <span className="ml-3 text-white font-bold text-lg tracking-tight truncate animate-in fade-in duration-200">
+                            Medoraa Labs
+                        </span>
+                    )}
                 </div>
-                <span className="text-white font-bold text-lg tracking-tight">Medoraa Labs</span>
+                <button
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    className={cn(
+                        "p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded transition-all",
+                        isCollapsed 
+                            ? "absolute left-[54px] top-6 bg-[#1e293b] border border-slate-700 rounded-full p-1 shadow-md z-50 hover:scale-110 active:scale-95" 
+                            : ""
+                    )}
+                >
+                    {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-4 h-4" />}
+                </button>
             </div>
 
             {/* Navigation */}
@@ -220,6 +262,7 @@ const Sidebar: React.FC = () => {
                 {menuItems.map((group, gIdx) => {
                     const userRole = currentAdmin?.role || "admin";
                     const filteredItems = group.items.filter(item => {
+                        if (item.isDropdown) return userRole === "admin";
                         if (item.path === "/admin/dashboard") return true;
                         return userRole === "admin";
                     });
@@ -228,28 +271,94 @@ const Sidebar: React.FC = () => {
 
                     return (
                         <div key={gIdx} className="mb-8">
-                            <h3 className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">
-                                {group.group}
-                            </h3>
+                            {!isCollapsed && (
+                                <h3 className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 animate-in fade-in duration-200">
+                                    {group.group}
+                                </h3>
+                            )}
                             <ul className="space-y-1">
                                 {filteredItems.map((item) => {
+                                    if (item.isDropdown) {
+                                        const isAnySubActive = item.subItems?.some(sub => pathname === sub.path);
+                                        return (
+                                            <li key={item.name} className="space-y-1">
+                                                <button
+                                                    onClick={() => {
+                                                        if (isCollapsed) {
+                                                            setIsCollapsed(false);
+                                                            setIsReferralOpen(true);
+                                                        } else {
+                                                            setIsReferralOpen(!isReferralOpen);
+                                                        }
+                                                    }}
+                                                    className={cn(
+                                                        "w-full flex items-center transition-colors text-slate-300 hover:bg-slate-800 hover:text-white outline-none rounded-md text-sm font-medium py-2",
+                                                        isCollapsed ? "justify-center px-0" : "justify-between px-4",
+                                                        isAnySubActive && "text-white bg-slate-800/40"
+                                                    )}
+                                                    title={isCollapsed ? item.name : undefined}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <item.icon className="w-4 h-4 text-slate-400 shrink-0" />
+                                                        {!isCollapsed && <span className="animate-in fade-in duration-200">{item.name}</span>}
+                                                    </div>
+                                                    {!isCollapsed && (
+                                                        isReferralOpen ? (
+                                                            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                                                        ) : (
+                                                            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                                                        )
+                                                    )}
+                                                </button>
+                                                {isReferralOpen && !isCollapsed && (
+                                                    <ul className="pl-4 mt-1 space-y-1 border-l border-slate-700 ml-6 animate-in slide-in-from-top-1 duration-200">
+                                                        {item.subItems?.map((sub) => {
+                                                            const isSubActive = pathname === sub.path;
+                                                            return (
+                                                                <li key={sub.path}>
+                                                                    <Link
+                                                                        href={sub.path}
+                                                                        className={cn(
+                                                                            "flex items-center gap-3 px-4 py-1.5 rounded-md text-xs font-semibold transition-colors",
+                                                                            isSubActive
+                                                                                ? "bg-blue-600 text-white font-extrabold"
+                                                                                : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                                                                        )}
+                                                                    >
+                                                                        <sub.icon className={cn(
+                                                                            "w-3.5 h-3.5 shrink-0",
+                                                                            isSubActive ? "text-white" : "text-slate-500"
+                                                                        )} />
+                                                                        {sub.name}
+                                                                    </Link>
+                                                                </li>
+                                                            );
+                                                        })}
+                                                    </ul>
+                                                )}
+                                            </li>
+                                        );
+                                    }
+
                                     const isActive = pathname === item.path;
                                     return (
-                                        <li key={item.path}>
+                                        <li key={item.path || item.name}>
                                             <Link
-                                                href={item.path}
+                                                href={item.path || "#"}
                                                 className={cn(
-                                                    "flex items-center gap-3 px-4 py-2 rounded-md text-sm font-medium transition-colors",
+                                                    "flex items-center gap-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
+                                                    isCollapsed ? "justify-center px-0" : "px-4",
                                                     isActive
                                                         ? "bg-blue-600 text-white"
                                                         : "hover:bg-slate-800 hover:text-white"
                                                 )}
+                                                title={isCollapsed ? item.name : undefined}
                                             >
                                                 <item.icon className={cn(
-                                                    "w-4 h-4",
+                                                    "w-4 h-4 shrink-0",
                                                     isActive ? "text-white" : "text-slate-400 group-hover:text-white"
                                                 )} />
-                                                {item.name}
+                                                {!isCollapsed && <span className="animate-in fade-in duration-200">{item.name}</span>}
                                             </Link>
                                         </li>
                                     );
@@ -262,22 +371,31 @@ const Sidebar: React.FC = () => {
 
             {/* Footer / User Profile */}
             <div className="p-4 border-t border-slate-700/50">
-                <div className="flex items-center gap-3 px-2 py-2 mb-2">
-                    <div className="w-8 h-8 rounded bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
+                <div className={cn(
+                    "flex items-center gap-3 mb-2 transition-all duration-300", 
+                    isCollapsed ? "justify-center px-0" : "px-2 py-2"
+                )}>
+                    <div className="w-8 h-8 rounded bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 shrink-0">
                         {currentAdmin?.name ? currentAdmin.name.slice(0, 2).toUpperCase() : "AD"}
                     </div>
-                    <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-bold text-white truncate">{currentAdmin?.name || "Administrator"}</span>
-                        <span className="text-[10px] text-slate-500 truncate">{currentAdmin?.email || "admin@medoraa.com"}</span>
-                    </div>
+                    {!isCollapsed && (
+                        <div className="flex flex-col min-w-0 animate-in fade-in duration-200">
+                            <span className="text-xs font-bold text-white truncate">{currentAdmin?.name || "Administrator"}</span>
+                            <span className="text-[10px] text-slate-500 truncate">{currentAdmin?.email || "admin@medoraa.com"}</span>
+                        </div>
+                    )}
                 </div>
                 {(currentAdmin?.role === "admin" || !currentAdmin?.role) && (
                     <button
                         onClick={() => setIsModalOpen(true)}
-                        className="flex items-center gap-3 w-full px-3 py-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-md text-sm transition-all mb-1"
+                        className={cn(
+                            "flex items-center gap-3 w-full py-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-md text-sm transition-all mb-1",
+                            isCollapsed ? "justify-center px-0" : "px-3"
+                        )}
+                        title={isCollapsed ? "Add Admin" : undefined}
                     >
-                        <ShieldCheck className="w-4 h-4" />
-                        Add Admin
+                        <ShieldCheck className="w-4 h-4 shrink-0" />
+                        {!isCollapsed && <span className="animate-in fade-in duration-200">Add Admin</span>}
                     </button>
                 )}
                 <button
@@ -286,10 +404,14 @@ const Sidebar: React.FC = () => {
                         localStorage.removeItem("adminUser");
                         window.location.href = "/signin";
                     }}
-                    className="flex items-center gap-3 w-full px-3 py-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-md text-sm transition-all"
+                    className={cn(
+                        "flex items-center gap-3 w-full py-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-md text-sm transition-all",
+                        isCollapsed ? "justify-center px-0" : "px-3"
+                    )}
+                    title={isCollapsed ? "Logout" : undefined}
                 >
-                    <LogOut className="w-4 h-4" />
-                    Logout
+                    <LogOut className="w-4 h-4 shrink-0" />
+                    {!isCollapsed && <span className="animate-in fade-in duration-200">Logout</span>}
                 </button>
             </div>
 

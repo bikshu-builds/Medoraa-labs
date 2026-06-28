@@ -86,32 +86,27 @@ const StaffManagement: React.FC = () => {
     };
 
     const handleSave = async (staffData: Partial<Staff>) => {
-        try {
-            const token = localStorage.getItem("adminToken");
-            const url = selectedStaff 
-                ? getApiUrl(`/api/admin/admins/${selectedStaff._id}`)
-                : getApiUrl("/api/admin/admins");
-            
-            const method = selectedStaff ? "PUT" : "POST";
+        const token = localStorage.getItem("adminToken");
+        const url = selectedStaff 
+            ? getApiUrl(`/api/admin/admins/${selectedStaff._id}`)
+            : getApiUrl("/api/admin/admins");
+        
+        const method = selectedStaff ? "PUT" : "POST";
 
-            const res = await fetch(url, {
-                method,
-                headers: { 
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(staffData)
-            });
+        const res = await fetch(url, {
+            method,
+            headers: { 
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(staffData)
+        });
 
-            const data = await res.json();
-            if (data.success) {
-                fetchStaff(); // Refresh list
-                setIsModalOpen(false);
-            } else {
-                alert(data.message || "Operation failed");
-            }
-        } catch (err) {
-            console.error("Save failed", err);
+        const data = await res.json();
+        if (data.success) {
+            fetchStaff(); // Refresh list
+        } else {
+            throw new Error(data.message || "Operation failed");
         }
     };
 

@@ -96,7 +96,7 @@ const StaffModal: React.FC<StaffModalProps> = ({ isOpen, onClose, onSave, staff 
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <form id="staff-modal-form" onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
                     {error && (
                         <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded text-xs font-semibold">
                             {error}
@@ -209,7 +209,8 @@ const StaffModal: React.FC<StaffModalProps> = ({ isOpen, onClose, onSave, staff 
                         Cancel
                     </button>
                     <button 
-                        onClick={handleSubmit}
+                        type="submit"
+                        form="staff-modal-form"
                         disabled={isSubmitting}
                         className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-xs transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-blue-600/20"
                     >

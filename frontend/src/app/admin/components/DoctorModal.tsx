@@ -12,21 +12,16 @@ interface DoctorModalProps {
     doctor?: Doctor | null;
 }
 
-interface FormDataType extends Partial<Doctor> {
-    periodType?: 'WEEKLY' | 'FIFTEEN_DAYS' | 'MONTHLY';
-    periodStartDate?: string;
-    periodEndDate?: string;
-    totalReferralAmount?: number | string;
-    paidAmount?: number | string;
-    dueAmount?: number;
-    paymentStatus?: 'PENDING' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED';
-    paymentCompletedDate?: string;
+interface FormDataType extends Partial<Omit<Doctor, 'referralPercentage'>> {
+    degree?: string;
+    referralPercentage?: number | string;
 }
 
 const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doctor }) => {
     const [formData, setFormData] = useState<FormDataType>({
         doctorName: "",
         hospitalId: "",
+        degree: "",
         specialization: "",
         dateOfBirth: "",
         gender: "Male",
@@ -34,17 +29,14 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
         email: "",
         reportDeliveryMethod: "MAIL",
         status: "ACTIVE",
+        referralPercentage: 0,
         periodType: "WEEKLY",
         periodStartDate: "",
-        periodEndDate: "",
-        totalReferralAmount: 0,
-        paidAmount: 0,
-        dueAmount: 0,
-        paymentStatus: "PENDING",
-        paymentCompletedDate: ""
+        periodEndDate: ""
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hospitals, setHospitals] = useState<any[]>([]);
+    const [error, setError] = useState("");
 
     useEffect(() => {
         const fetchHospitals = async () => {
@@ -70,19 +62,18 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                 ...doctor,
                 hospitalId: (typeof doctor.hospitalId === 'object' && doctor.hospitalId !== null) ? (doctor.hospitalId as any)._id : (doctor.hospitalId || ""),
                 dateOfBirth: doctor.dateOfBirth ? new Date(doctor.dateOfBirth).toISOString().split('T')[0] : "",
-                periodType: doctor.payment?.periodType || "WEEKLY",
-                periodStartDate: doctor.payment?.periodStartDate ? new Date(doctor.payment.periodStartDate).toISOString().split('T')[0] : "",
-                periodEndDate: doctor.payment?.periodEndDate ? new Date(doctor.payment.periodEndDate).toISOString().split('T')[0] : "",
-                totalReferralAmount: doctor.payment?.totalReferralAmount || 0,
-                paidAmount: doctor.payment?.paidAmount || 0,
-                dueAmount: (doctor.payment?.totalReferralAmount || 0) - (doctor.payment?.paidAmount || 0),
-                paymentStatus: doctor.payment?.paymentStatus || "PENDING",
-                paymentCompletedDate: doctor.payment?.paymentCompletedDate ? new Date(doctor.payment.paymentCompletedDate).toISOString().split('T')[0] : ""
+                degree: doctor.degree || "",
+                specialization: doctor.specialization || "",
+                referralPercentage: doctor.referralPercentage || 0,
+                periodType: doctor.periodType || "WEEKLY",
+                periodStartDate: doctor.periodStartDate ? new Date(doctor.periodStartDate).toISOString().split('T')[0] : "",
+                periodEndDate: doctor.periodEndDate ? new Date(doctor.periodEndDate).toISOString().split('T')[0] : ""
             });
         } else {
             setFormData({
                 doctorName: "",
                 hospitalId: "",
+                degree: "",
                 specialization: "",
                 dateOfBirth: "",
                 gender: "Male",
@@ -90,34 +81,16 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                 email: "",
                 reportDeliveryMethod: "MAIL",
                 status: "ACTIVE",
+                referralPercentage: 0,
                 periodType: "WEEKLY",
                 periodStartDate: "",
-                periodEndDate: "",
-                totalReferralAmount: 0,
-                paidAmount: 0,
-                dueAmount: 0,
-                paymentStatus: "PENDING",
-                paymentCompletedDate: ""
+                periodEndDate: ""
             });
         }
+        setError("");
     }, [doctor, isOpen]);
 
     if (!isOpen) return null;
-
-    const handleNumberChange = (field: 'totalReferralAmount' | 'paidAmount', valStr: string) => {
-        setFormData(prev => {
-            const nextData = { ...prev };
-            if (valStr === "") {
-                nextData[field] = "" as any;
-            } else {
-                nextData[field] = Number(valStr);
-            }
-            const total = Number(nextData.totalReferralAmount) || 0;
-            const paid = Number(nextData.paidAmount) || 0;
-            nextData.dueAmount = total - paid;
-            return nextData;
-        });
-    };
 
     const handlePeriodChange = (field: 'periodType' | 'periodStartDate', value: string) => {
         setFormData(prev => {
@@ -146,17 +119,17 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
+        setError("");
         try {
             const cleanData = {
                 ...formData,
-                totalReferralAmount: formData.totalReferralAmount === "" ? 0 : Number(formData.totalReferralAmount),
-                paidAmount: formData.paidAmount === "" ? 0 : Number(formData.paidAmount),
-                dueAmount: Number(formData.dueAmount) || 0
+                referralPercentage: formData.referralPercentage === "" ? 0 : Number(formData.referralPercentage)
             };
             await onSave(cleanData);
             onClose();
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
+            setError(err.message || "Failed to save partner details");
         } finally {
             setIsSubmitting(false);
         }
@@ -183,7 +156,12 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
+                <form id="doctor-modal-form" onSubmit={handleSubmit} className="p-6 space-y-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
+                    {error && (
+                        <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded text-xs font-semibold animate-in fade-in duration-200">
+                            {error}
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         {/* Section 1: Affiliation */}
                         <div className="md:col-span-2">
@@ -227,6 +205,17 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                                     className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
                                                 />
                                             </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Degree (*)</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="MBBS / MD / MS" 
+                                                required
+                                                value={formData.degree}
+                                                onChange={(e) => setFormData({...formData, degree: e.target.value})}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                            />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Specialization (*)</label>
@@ -327,12 +316,25 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                     </div>
                                 </div>
 
-                                {/* Section 4: Payment Details */}
+                                {/* Section 4: Referral Details */}
                                 <div className="md:col-span-2 pt-2 border-t border-slate-100 mt-4">
-                                    <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Payment & Referral Details</h3>
+                                    <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Referral Agreement Details</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Billing Period (*)</label>
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Referral Percentage (%) (*)</label>
+                                            <input 
+                                                type="number" 
+                                                required
+                                                min="0"
+                                                max="100"
+                                                placeholder="e.g. 15"
+                                                value={formData.referralPercentage ?? ""}
+                                                onChange={(e) => setFormData({...formData, referralPercentage: e.target.value})}
+                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Time Period Type (*)</label>
                                             <select 
                                                 value={formData.periodType}
                                                 onChange={(e) => handlePeriodChange('periodType', e.target.value)}
@@ -341,19 +343,6 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                                 <option value="WEEKLY">Weekly</option>
                                                 <option value="FIFTEEN_DAYS">15 Days</option>
                                                 <option value="MONTHLY">Monthly</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Payment Status</label>
-                                            <select 
-                                                value={formData.paymentStatus}
-                                                onChange={(e) => setFormData({...formData, paymentStatus: e.target.value as any})}
-                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
-                                            >
-                                                <option value="PENDING">Pending</option>
-                                                <option value="PARTIALLY_PAID">Partially Paid</option>
-                                                <option value="PAID">Paid</option>
-                                                <option value="CANCELLED">Cancelled</option>
                                             </select>
                                         </div>
                                         <div className="space-y-2">
@@ -376,49 +365,6 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                                 className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
                                             />
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Referral Amount (*)</label>
-                                            <input 
-                                                type="number" 
-                                                required
-                                                min="0"
-                                                value={formData.totalReferralAmount ?? ""}
-                                                onChange={(e) => handleNumberChange('totalReferralAmount', e.target.value)}
-                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Paid Amount (*)</label>
-                                            <input 
-                                                type="number" 
-                                                required
-                                                min="0"
-                                                value={formData.paidAmount ?? ""}
-                                                onChange={(e) => handleNumberChange('paidAmount', e.target.value)}
-                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Due Amount</label>
-                                            <input 
-                                                type="number" 
-                                                readOnly
-                                                value={formData.dueAmount ?? ""}
-                                                className="w-full px-4 py-2 bg-slate-100 border border-slate-200 rounded text-sm font-semibold text-slate-600 outline-none"
-                                            />
-                                        </div>
-                                        {(formData.paymentStatus === 'PAID' || formData.paymentStatus === 'PARTIALLY_PAID') && (
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Payment Completed Date (*)</label>
-                                                <input 
-                                                    type="date" 
-                                                    required
-                                                    value={formData.paymentCompletedDate}
-                                                    onChange={(e) => setFormData({...formData, paymentCompletedDate: e.target.value})}
-                                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                                />
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             </>
@@ -436,7 +382,8 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                         Cancel
                     </button>
                     <button 
-                        onClick={handleSubmit}
+                        type="submit"
+                        form="doctor-modal-form"
                         disabled={isSubmitting}
                         className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-xs transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-blue-600/20"
                     >

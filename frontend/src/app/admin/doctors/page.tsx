@@ -67,32 +67,27 @@ const DoctorManagement: React.FC = () => {
     };
 
     const handleSave = async (doctorData: Partial<Doctor>) => {
-        try {
-            const token = localStorage.getItem("adminToken");
-            const url = selectedDoctor 
-                ? getApiUrl(`/api/admin/doctors/${selectedDoctor._id}`)
-                : getApiUrl("/api/admin/doctors");
-            
-            const method = selectedDoctor ? "PUT" : "POST";
+        const token = localStorage.getItem("adminToken");
+        const url = selectedDoctor 
+            ? getApiUrl(`/api/admin/doctors/${selectedDoctor._id}`)
+            : getApiUrl("/api/admin/doctors");
+        
+        const method = selectedDoctor ? "PUT" : "POST";
 
-            const res = await fetch(url, {
-                method,
-                headers: { 
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(doctorData)
-            });
+        const res = await fetch(url, {
+            method,
+            headers: { 
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(doctorData)
+        });
 
-            const data = await res.json();
-            if (data.success) {
-                fetchDoctors(); // Refresh list
-                setIsModalOpen(false);
-            } else {
-                alert(data.message || "Operation failed");
-            }
-        } catch (err) {
-            console.error("Save failed", err);
+        const data = await res.json();
+        if (data.success) {
+            fetchDoctors(); // Refresh list
+        } else {
+            throw new Error(data.message || "Operation failed");
         }
     };
 
@@ -135,6 +130,13 @@ const DoctorManagement: React.FC = () => {
             }
         },
         {
+            header: "Degree",
+            accessor: "degree" as const,
+            render: (row: Doctor) => (
+                <div className="text-xs font-bold text-slate-700">{row.degree}</div>
+            )
+        },
+        {
             header: "Specialization",
             accessor: "specialization" as const,
             render: (row: Doctor) => (
@@ -158,29 +160,23 @@ const DoctorManagement: React.FC = () => {
             )
         },
         { 
-            header: "Financials (Due)", 
-            accessor: "payment" as const,
+            header: "Referral Share", 
+            accessor: "referralPercentage" as const,
             render: (row: Doctor) => {
-                const total = row.payment?.totalReferralAmount ?? 0;
-                const paid = row.payment?.paidAmount ?? 0;
-                const due = total - paid;
-                const status = row.payment?.paymentStatus ?? "PENDING";
-                
+                const startDateStr = row.periodStartDate ? new Date(row.periodStartDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "";
+                const endDateStr = row.periodEndDate ? new Date(row.periodEndDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "";
+                const periodLabel = row.periodType ? row.periodType.toLowerCase().replace('_', ' ') : "";
+
                 return (
-                    <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-900">₹{due} due</span>
-                            <span className="text-[10px] text-slate-400 font-medium">/ ₹{total}</span>
+                    <div className="flex flex-col gap-1 min-w-[150px]">
+                        <div className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded w-fit uppercase tracking-tight">
+                            {row.referralPercentage}% Share
                         </div>
-                        <span className={cn(
-                            "text-[9px] font-extrabold uppercase tracking-widest mt-0.5 w-fit px-1.5 py-0.5 rounded",
-                            status === "PAID" && "bg-emerald-50 text-emerald-700",
-                            status === "PENDING" && "bg-amber-50 text-amber-700",
-                            status === "PARTIALLY_PAID" && "bg-blue-50 text-blue-700",
-                            status === "CANCELLED" && "bg-slate-100 text-slate-600"
-                        )}>
-                            {status.replace('_', ' ')}
-                        </span>
+                        {startDateStr && endDateStr && (
+                            <span className="text-[10px] text-slate-400 font-bold capitalize">
+                                {periodLabel} ({startDateStr} - {endDateStr})
+                            </span>
+                        )}
                     </div>
                 );
             }

@@ -14,12 +14,16 @@ import {
 interface HospitalItem {
     _id: string;
     hospitalName: string;
+    pocName?: string;
     telephoneNumber: string;
     address: {
         state: string;
         district: string;
         city: string;
         pincode: string;
+        village?: string;
+        doorNo?: string;
+        completeAddress?: string;
     };
     labs?: { _id: string; labName: string; }[];
 }
@@ -33,11 +37,15 @@ export default function AdminHospitalsPage() {
 
     // Form states
     const [hospitalName, setHospitalName] = useState("");
+    const [pocName, setPocName] = useState("");
     const [telephoneNumber, setTelephoneNumber] = useState("");
     const [stateName, setStateName] = useState("");
     const [district, setDistrict] = useState("");
     const [city, setCity] = useState("");
     const [pincode, setPincode] = useState("");
+    const [village, setVillage] = useState("");
+    const [doorNo, setDoorNo] = useState("");
+    const [completeAddress, setCompleteAddress] = useState("");
     const [labs, setLabs] = useState<string[]>([""]);
 
     const loadHospitals = async () => {
@@ -85,12 +93,16 @@ export default function AdminHospitalsPage() {
                 },
                 body: JSON.stringify({
                     hospitalName,
+                    pocName,
                     telephoneNumber,
                     address: {
                         state: stateName,
                         district,
                         city,
-                        pincode
+                        pincode,
+                        village,
+                        doorNo,
+                        completeAddress
                     },
                     labs: labs.filter(l => l.trim() !== "")
                 })
@@ -112,22 +124,30 @@ export default function AdminHospitalsPage() {
     const resetForm = () => {
         setEditingHospital(null);
         setHospitalName("");
+        setPocName("");
         setTelephoneNumber("");
         setStateName("");
         setDistrict("");
         setCity("");
         setPincode("");
+        setVillage("");
+        setDoorNo("");
+        setCompleteAddress("");
         setLabs([""]);
     };
 
     const handleEditClick = (hosp: HospitalItem) => {
         setEditingHospital(hosp);
         setHospitalName(hosp.hospitalName || "");
+        setPocName(hosp.pocName || "");
         setTelephoneNumber(hosp.telephoneNumber || "");
         setStateName(hosp.address?.state || "");
         setDistrict(hosp.address?.district || "");
         setCity(hosp.address?.city || "");
         setPincode(hosp.address?.pincode || "");
+        setVillage(hosp.address?.village || "");
+        setDoorNo(hosp.address?.doorNo || "");
+        setCompleteAddress(hosp.address?.completeAddress || "");
         setLabs(hosp.labs && hosp.labs.length > 0 ? hosp.labs.map(l => l.labName) : [""]);
         setIsAddOpen(true);
     };
@@ -197,7 +217,7 @@ export default function AdminHospitalsPage() {
                             <tr className="bg-slate-50 border-b border-slate-200">
                                 <th className="py-3 px-6 text-xs font-bold text-slate-600 uppercase">Hospital Name</th>
                                 <th className="py-3 px-6 text-xs font-bold text-slate-600 uppercase">Phone Number</th>
-                                <th className="py-3 px-6 text-xs font-bold text-slate-600 uppercase">City</th>
+                                <th className="py-3 px-6 text-xs font-bold text-slate-600 uppercase">City / Village</th>
                                 <th className="py-3 px-6 text-xs font-bold text-slate-600 uppercase">State</th>
                                 <th className="py-3 px-6 text-xs font-bold text-slate-600 uppercase text-center">Action</th>
                             </tr>
@@ -208,7 +228,10 @@ export default function AdminHospitalsPage() {
                                     <tr key={hosp._id} className="hover:bg-slate-50/80 transition-colors">
                                         <td className="py-3 px-6 text-sm font-bold text-slate-900">{hosp.hospitalName}</td>
                                         <td className="py-3 px-6 text-sm text-slate-600">{hosp.telephoneNumber}</td>
-                                        <td className="py-3 px-6 text-sm text-slate-600">{hosp.address?.city}</td>
+                                        <td className="py-3 px-6 text-sm text-slate-600">
+                                            {hosp.address?.city}
+                                            {hosp.address?.village && ` / ${hosp.address.village}`}
+                                        </td>
                                         <td className="py-3 px-6 text-sm text-slate-600">{hosp.address?.state}</td>
                                         <td className="py-3 px-6 text-sm text-center flex items-center justify-center gap-2">
                                             <button
@@ -240,8 +263,8 @@ export default function AdminHospitalsPage() {
 
             {/* Modal Form */}
             {isAddOpen && (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white max-w-2xl w-full rounded-xl shadow-2xl relative border border-slate-200">
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+                    <div className="bg-white max-w-5xl w-full rounded-xl shadow-2xl relative border border-slate-200 my-auto">
                         <div className="flex items-center justify-between p-6 border-b border-slate-100">
                             <h3 className="text-xl font-bold text-slate-900">
                                 {editingHospital ? "Update" : "Register New"} Hospital
@@ -256,121 +279,167 @@ export default function AdminHospitalsPage() {
 
                         <div className="p-6">
                             <form onSubmit={handleCreateOrUpdate} className="space-y-6">
-                                {/* Basic Info */}
-                                <div className="space-y-4">
-                                    <h4 className="text-xs font-bold uppercase text-slate-400">Basic Information</h4>
-                                    
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700">Hospital Name *</label>
-                                        <input
-                                            type="text"
-                                            value={hospitalName}
-                                            onChange={(e) => setHospitalName(capitalizeWords(e.target.value))}
-                                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700">Telephone Number *</label>
-                                        <input
-                                            type="tel"
-                                            value={telephoneNumber}
-                                            onChange={(e) => setTelephoneNumber(e.target.value)}
-                                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Address */}
-                                <div className="space-y-4 pt-4 border-t border-slate-100">
-                                    <h4 className="text-xs font-bold uppercase text-slate-400">Address Details</h4>
-                                    
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-bold text-slate-700">State *</label>
-                                            <input
-                                                type="text"
-                                                value={stateName}
-                                                onChange={(e) => setStateName(capitalizeWords(e.target.value))}
-                                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
-                                                required
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-bold text-slate-700">District *</label>
-                                            <input
-                                                type="text"
-                                                value={district}
-                                                onChange={(e) => setDistrict(capitalizeWords(e.target.value))}
-                                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-bold text-slate-700">City *</label>
-                                            <input
-                                                type="text"
-                                                value={city}
-                                                onChange={(e) => setCity(capitalizeWords(e.target.value))}
-                                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
-                                                required
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-bold text-slate-700">Pincode *</label>
-                                            <input
-                                                type="text"
-                                                value={pincode}
-                                                onChange={(e) => setPincode(e.target.value)}
-                                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Labs */}
-                                <div className="space-y-4 pt-4 border-t border-slate-100">
-                                    <div className="flex items-center justify-between">
-                                        <h4 className="text-xs font-bold uppercase text-slate-400">Lab Facilities</h4>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setLabs([...labs, ""])}
-                                            className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                                        >
-                                            <Plus className="w-3 h-3" /> Add Another Lab
-                                        </button>
-                                    </div>
-                                    <div className="space-y-3">
-                                        {labs.map((lab, index) => (
-                                            <div key={index} className="flex items-center gap-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                                    {/* Left Column: Basic Info & Lab Facilities */}
+                                    <div className="space-y-6">
+                                        {/* Basic Info */}
+                                        <div className="space-y-4">
+                                            <h4 className="text-xs font-bold uppercase text-slate-400">Basic Information</h4>
+                                            
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-bold text-slate-700">Hospital Name *</label>
                                                 <input
                                                     type="text"
-                                                    placeholder={`Lab Name ${index + 1}`}
-                                                    value={lab}
-                                                    onChange={(e) => {
-                                                        const newLabs = [...labs];
-                                                        newLabs[index] = capitalizeWords(e.target.value);
-                                                        setLabs(newLabs);
-                                                    }}
-                                                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
-                                                    required={index === 0}
+                                                    value={hospitalName}
+                                                    onChange={(e) => setHospitalName(capitalizeWords(e.target.value))}
+                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
+                                                    required
                                                 />
-                                                {labs.length > 1 && (
-                                                    <button 
-                                                        type="button" 
-                                                        onClick={() => setLabs(labs.filter((_, i) => i !== index))}
-                                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded transition-colors"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                )}
                                             </div>
-                                        ))}
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-bold text-slate-700">POC Name</label>
+                                                <input
+                                                    type="text"
+                                                    value={pocName}
+                                                    onChange={(e) => setPocName(capitalizeWords(e.target.value))}
+                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-bold text-slate-700">Telephone Number</label>
+                                                <input
+                                                    type="tel"
+                                                    value={telephoneNumber}
+                                                    onChange={(e) => setTelephoneNumber(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Labs */}
+                                        <div className="space-y-4 pt-6 border-t border-slate-100">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-xs font-bold uppercase text-slate-400">Lab Facilities</h4>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setLabs([...labs, ""])}
+                                                    className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                                                >
+                                                    <Plus className="w-3 h-3" /> Add Another Lab
+                                                </button>
+                                            </div>
+                                            <div className="space-y-3 max-h-[180px] overflow-y-auto pr-1 custom-scrollbar">
+                                                {labs.map((lab, index) => (
+                                                    <div key={index} className="flex items-center gap-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder={`Lab Name ${index + 1}`}
+                                                            value={lab}
+                                                            onChange={(e) => {
+                                                                const newLabs = [...labs];
+                                                                newLabs[index] = capitalizeWords(e.target.value);
+                                                                setLabs(newLabs);
+                                                            }}
+                                                            className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
+                                                        />
+                                                        {labs.length > 1 && (
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => setLabs(labs.filter((_, i) => i !== index))}
+                                                                className="p-2 text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Column: Address Details */}
+                                    <div className="space-y-6">
+                                        <div className="space-y-4">
+                                            <h4 className="text-xs font-bold uppercase text-slate-400">Address Details</h4>
+                                            
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-bold text-slate-700">State *</label>
+                                                    <input
+                                                        type="text"
+                                                        value={stateName}
+                                                        onChange={(e) => setStateName(capitalizeWords(e.target.value))}
+                                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-bold text-slate-700">District *</label>
+                                                    <input
+                                                        type="text"
+                                                        value={district}
+                                                        onChange={(e) => setDistrict(capitalizeWords(e.target.value))}
+                                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-bold text-slate-700">City *</label>
+                                                    <input
+                                                        type="text"
+                                                        value={city}
+                                                        onChange={(e) => setCity(capitalizeWords(e.target.value))}
+                                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-bold text-slate-700">Village</label>
+                                                    <input
+                                                        type="text"
+                                                        value={village}
+                                                        onChange={(e) => setVillage(capitalizeWords(e.target.value))}
+                                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-bold text-slate-700">Door Number</label>
+                                                    <input
+                                                        type="text"
+                                                        value={doorNo}
+                                                        onChange={(e) => setDoorNo(e.target.value)}
+                                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-bold text-slate-700">Pincode *</label>
+                                                    <input
+                                                        type="text"
+                                                        value={pincode}
+                                                        onChange={(e) => setPincode(e.target.value)}
+                                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-bold text-slate-700">Complete Address</label>
+                                                <textarea
+                                                    value={completeAddress}
+                                                    onChange={(e) => setCompleteAddress(e.target.value)}
+                                                    rows={3}
+                                                    placeholder="Enter complete address..."
+                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all resize-none"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 

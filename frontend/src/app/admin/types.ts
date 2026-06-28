@@ -6,7 +6,12 @@ export interface Doctor {
         _id: string;
         hospitalName: string;
     } | string;
+    degree: string;
     specialization: string;
+    referralPercentage: number;
+    periodType?: 'WEEKLY' | 'FIFTEEN_DAYS' | 'MONTHLY';
+    periodStartDate?: string;
+    periodEndDate?: string;
     dateOfBirth?: string;
     gender?: "Male" | "Female" | "Other" | "Prefer not to say";
     mobileNumber: string;

@@ -8,9 +8,13 @@ const hospitalSchema = new mongoose.Schema(
       trim: true,
     },
 
+    pocName: {
+      type: String,
+      trim: true,
+    },
+
     telephoneNumber: {
       type: String,
-      required: true,
       trim: true,
     },
 
@@ -36,6 +40,21 @@ const hospitalSchema = new mongoose.Schema(
       pincode: {
         type: String,
         required: true,
+        trim: true,
+      },
+
+      village: {
+        type: String,
+        trim: true,
+      },
+
+      doorNo: {
+        type: String,
+        trim: true,
+      },
+
+      completeAddress: {
+        type: String,
         trim: true,
       },
     },

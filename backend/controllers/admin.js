@@ -177,32 +177,7 @@ const Counter = require("../models/Counter");
 // @desc    Doctor Management
 exports.getDoctors = async (req, res) => {
     try {
-        const doctors = await Doctor.aggregate([
-            { $match: { isActive: { $ne: false } } },
-            {
-                $lookup: {
-                    from: "doctorpayments",
-                    let: { docId: "$_id" },
-                    pipeline: [
-                        { $match: { $expr: { $and: [{ $eq: ["$doctorId", "$$docId"] }, { $eq: ["$isActive", true] }] } } },
-                        { $sort: { createdAt: -1 } },
-                        { $limit: 1 }
-                    ],
-                    as: "payment"
-                }
-            },
-            { $unwind: { path: "$payment", preserveNullAndEmptyArrays: true } },
-            {
-                $lookup: {
-                    from: "hospitals",
-                    localField: "hospitalId",
-                    foreignField: "_id",
-                    as: "hospitalId"
-                }
-            },
-            { $unwind: { path: "$hospitalId", preserveNullAndEmptyArrays: true } }
-        ]);
-
+        const doctors = await Doctor.find({ isActive: { $ne: false } }).populate("hospitalId");
         res.status(200).json({ success: true, data: doctors });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -214,20 +189,18 @@ exports.addDoctor = async (req, res) => {
         const {
             doctorName,
             hospitalId,
+            degree,
             specialization,
+            referralPercentage,
+            periodType,
+            periodStartDate,
+            periodEndDate,
             dateOfBirth,
             gender,
             mobileNumber,
             email,
             reportDeliveryMethod,
-            status,
-            periodType,
-            periodStartDate,
-            periodEndDate,
-            totalReferralAmount,
-            paidAmount,
-            paymentStatus,
-            paymentCompletedDate
+            status
         } = req.body;
 
         const counter = await Counter.findByIdAndUpdate(
@@ -242,7 +215,12 @@ exports.addDoctor = async (req, res) => {
             doctorCode: newDoctorCode,
             doctorName,
             hospitalId,
+            degree,
             specialization,
+            referralPercentage: Number(referralPercentage) || 0,
+            periodType: periodType || "WEEKLY",
+            periodStartDate: periodStartDate || undefined,
+            periodEndDate: periodEndDate || undefined,
             dateOfBirth: dateOfBirth || undefined,
             gender,
             mobileNumber,
@@ -252,33 +230,9 @@ exports.addDoctor = async (req, res) => {
             createdBy: req.user.id
         });
 
-        let payment = null;
-        if (periodType || totalReferralAmount !== undefined || paidAmount !== undefined) {
-            const totalAmt = Number(totalReferralAmount) || 0;
-            const paidAmt = Number(paidAmount) || 0;
-            const dueAmt = totalAmt - paidAmt;
-
-            payment = await DoctorPayment.create({
-                doctorId: doctor._id,
-                hospitalId,
-                periodType,
-                periodStartDate: periodStartDate || new Date(),
-                periodEndDate: periodEndDate || new Date(),
-                totalReferralAmount: totalAmt,
-                paidAmount: paidAmt,
-                dueAmount: dueAmt,
-                paymentStatus: paymentStatus || "PENDING",
-                paymentCompletedDate: paymentCompletedDate || undefined,
-                createdBy: req.user.id
-            });
-        }
-
         res.status(201).json({
             success: true,
-            data: {
-                ...doctor.toObject(),
-                payment: payment ? payment.toObject() : undefined
-            }
+            data: doctor
         });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -290,20 +244,18 @@ exports.updateDoctor = async (req, res) => {
         const {
             doctorName,
             hospitalId,
+            degree,
             specialization,
+            referralPercentage,
+            periodType,
+            periodStartDate,
+            periodEndDate,
             dateOfBirth,
             gender,
             mobileNumber,
             email,
             reportDeliveryMethod,
-            status,
-            periodType,
-            periodStartDate,
-            periodEndDate,
-            totalReferralAmount,
-            paidAmount,
-            paymentStatus,
-            paymentCompletedDate
+            status
         } = req.body;
 
         const doctor = await Doctor.findByIdAndUpdate(
@@ -311,7 +263,12 @@ exports.updateDoctor = async (req, res) => {
             {
                 doctorName,
                 hospitalId,
+                degree,
                 specialization,
+                referralPercentage: Number(referralPercentage) || 0,
+                periodType: periodType || "WEEKLY",
+                periodStartDate: periodStartDate || undefined,
+                periodEndDate: periodEndDate || undefined,
                 dateOfBirth: dateOfBirth || undefined,
                 gender,
                 mobileNumber,
@@ -323,36 +280,9 @@ exports.updateDoctor = async (req, res) => {
             { returnDocument: 'after' }
         );
 
-        let payment = null;
-        if (periodType || totalReferralAmount !== undefined || paidAmount !== undefined) {
-            const totalAmt = Number(totalReferralAmount) || 0;
-            const paidAmt = Number(paidAmount) || 0;
-            const dueAmt = totalAmt - paidAmt;
-
-            payment = await DoctorPayment.findOneAndUpdate(
-                { doctorId: req.params.id, isActive: true },
-                {
-                    hospitalId,
-                    periodType,
-                    periodStartDate: periodStartDate || new Date(),
-                    periodEndDate: periodEndDate || new Date(),
-                    totalReferralAmount: totalAmt,
-                    paidAmount: paidAmt,
-                    dueAmount: dueAmt,
-                    paymentStatus: paymentStatus || "PENDING",
-                    paymentCompletedDate: paymentCompletedDate || undefined,
-                    updatedBy: req.user.id
-                },
-                { returnDocument: 'after', upsert: true }
-            );
-        }
-
         res.status(200).json({
             success: true,
-            data: {
-                ...doctor.toObject(),
-                payment: payment ? payment.toObject() : undefined
-            }
+            data: doctor
         });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

@@ -19,10 +19,31 @@ const doctorSchema = new mongoose.Schema(
             required: true,
             trim: true
         },
+        degree: {
+            type: String,
+            required: true,
+            trim: true
+        },
         specialization: {
             type: String,
             required: true,
             trim: true
+        },
+        referralPercentage: {
+            type: Number,
+            required: true,
+            default: 0
+        },
+        periodType: {
+            type: String,
+            enum: ["WEEKLY", "FIFTEEN_DAYS", "MONTHLY"],
+            default: "WEEKLY"
+        },
+        periodStartDate: {
+            type: Date
+        },
+        periodEndDate: {
+            type: Date
         },
         dateOfBirth: {
             type: Date
