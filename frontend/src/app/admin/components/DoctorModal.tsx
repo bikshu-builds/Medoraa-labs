@@ -38,6 +38,24 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
     const [hospitals, setHospitals] = useState<any[]>([]);
     const [error, setError] = useState("");
 
+    // Local select states for cascaded dropdowns
+    const [selectedHospitalName, setSelectedHospitalName] = useState("");
+    const [selectedBranchId, setSelectedBranchId] = useState("");
+
+    const uniqueHospitalNames = Array.from(new Set(hospitals.map(h => h.hospitalName))).sort();
+    const branchesForSelectedHospital = hospitals.filter(h => h.hospitalName === selectedHospitalName);
+
+    const handleHospitalNameChange = (name: string) => {
+        setSelectedHospitalName(name);
+        setSelectedBranchId("");
+        setFormData(prev => ({ ...prev, hospitalId: "" }));
+    };
+
+    const handleBranchChange = (branchId: string) => {
+        setSelectedBranchId(branchId);
+        setFormData(prev => ({ ...prev, hospitalId: branchId }));
+    };
+
     useEffect(() => {
         const fetchHospitals = async () => {
             try {
@@ -58,9 +76,10 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
 
     useEffect(() => {
         if (doctor) {
+            const hospId = (typeof doctor.hospitalId === 'object' && doctor.hospitalId !== null) ? (doctor.hospitalId as any)._id : (doctor.hospitalId || "");
             setFormData({
                 ...doctor,
-                hospitalId: (typeof doctor.hospitalId === 'object' && doctor.hospitalId !== null) ? (doctor.hospitalId as any)._id : (doctor.hospitalId || ""),
+                hospitalId: hospId,
                 dateOfBirth: doctor.dateOfBirth ? new Date(doctor.dateOfBirth).toISOString().split('T')[0] : "",
                 degree: doctor.degree || "",
                 specialization: doctor.specialization || "",
@@ -69,6 +88,16 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                 periodStartDate: doctor.periodStartDate ? new Date(doctor.periodStartDate).toISOString().split('T')[0] : "",
                 periodEndDate: doctor.periodEndDate ? new Date(doctor.periodEndDate).toISOString().split('T')[0] : ""
             });
+
+            if (hospitals.length > 0 && hospId) {
+                const foundHosp = hospitals.find(h => h._id === hospId);
+                if (foundHosp) {
+                    setSelectedHospitalName(foundHosp.hospitalName || "");
+                    setSelectedBranchId(hospId);
+                }
+            } else {
+                setSelectedBranchId(hospId);
+            }
         } else {
             setFormData({
                 doctorName: "",
@@ -86,35 +115,15 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                 periodStartDate: "",
                 periodEndDate: ""
             });
+            setSelectedHospitalName("");
+            setSelectedBranchId("");
         }
         setError("");
-    }, [doctor, isOpen]);
+    }, [doctor, isOpen, hospitals]);
 
     if (!isOpen) return null;
 
-    const handlePeriodChange = (field: 'periodType' | 'periodStartDate', value: string) => {
-        setFormData(prev => {
-            const nextData = { ...prev, [field]: value };
-            const type = nextData.periodType || "WEEKLY";
-            const start = nextData.periodStartDate || "";
-            
-            if (start) {
-                const startDate = new Date(start);
-                if (!isNaN(startDate.getTime())) {
-                    const endDate = new Date(startDate);
-                    if (type === 'WEEKLY') {
-                        endDate.setUTCDate(startDate.getUTCDate() + 7);
-                    } else if (type === 'FIFTEEN_DAYS') {
-                        endDate.setUTCDate(startDate.getUTCDate() + 15);
-                    } else if (type === 'MONTHLY') {
-                        endDate.setUTCMonth(startDate.getUTCMonth() + 1);
-                    }
-                    nextData.periodEndDate = endDate.toISOString().split('T')[0];
-                }
-            }
-            return nextData;
-        });
-    };
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -172,13 +181,37 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                     <div className="relative">
                                         <select
                                             required
-                                            value={typeof formData.hospitalId === 'object' && formData.hospitalId !== null ? formData.hospitalId._id : (formData.hospitalId || "")}
-                                            onChange={(e) => setFormData({...formData, hospitalId: e.target.value})}
-                                            className="w-full pl-4 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all appearance-none"
+                                            value={selectedHospitalName}
+                                            onChange={(e) => handleHospitalNameChange(e.target.value)}
+                                            className="w-full pl-4 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all appearance-none text-slate-800"
                                         >
-                                            <option value="" disabled>Select Hospital First</option>
-                                            {hospitals.map(h => (
-                                                <option key={h._id} value={h._id}>{h.hospitalName}</option>
+                                            <option value="" disabled>Select Hospital</option>
+                                            {uniqueHospitalNames.map(name => (
+                                                <option key={name} value={name}>{name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Branch (*)</label>
+                                    <div className="relative">
+                                        <select
+                                            required
+                                            value={selectedBranchId}
+                                            onChange={(e) => handleBranchChange(e.target.value)}
+                                            disabled={!selectedHospitalName}
+                                            className={cn(
+                                                "w-full pl-4 pr-4 py-2 border rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all appearance-none text-slate-800",
+                                                selectedHospitalName ? "bg-slate-50 border-slate-200" : "bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed"
+                                            )}
+                                        >
+                                            <option value="" disabled>
+                                                {selectedHospitalName ? "Select Branch" : "Select Hospital First"}
+                                            </option>
+                                            {branchesForSelectedHospital.map(h => (
+                                                <option key={h._id} value={h._id}>
+                                                    {h.branch || "Main Branch"}
+                                                </option>
                                             ))}
                                         </select>
                                     </div>
@@ -186,7 +219,7 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                             </div>
                         </div>
 
-                        {formData.hospitalId && (
+                        {selectedBranchId && (
                             <>
                                 {/* Section 2: Identity */}
                                 <div className="md:col-span-2 pt-2">
@@ -337,33 +370,13 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Time Period Type (*)</label>
                                             <select 
                                                 value={formData.periodType}
-                                                onChange={(e) => handlePeriodChange('periodType', e.target.value)}
+                                                onChange={(e) => setFormData({...formData, periodType: e.target.value as any})}
                                                 className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
                                             >
                                                 <option value="WEEKLY">Weekly</option>
                                                 <option value="FIFTEEN_DAYS">15 Days</option>
                                                 <option value="MONTHLY">Monthly</option>
                                             </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Period Start Date (*)</label>
-                                            <input 
-                                                type="date" 
-                                                required
-                                                value={formData.periodStartDate}
-                                                onChange={(e) => handlePeriodChange('periodStartDate', e.target.value)}
-                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Period End Date (*)</label>
-                                            <input 
-                                                type="date" 
-                                                required
-                                                value={formData.periodEndDate}
-                                                onChange={(e) => setFormData({...formData, periodEndDate: e.target.value})}
-                                                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                            />
                                         </div>
                                     </div>
                                 </div>

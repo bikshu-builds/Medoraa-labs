@@ -79,7 +79,13 @@ exports.getDashboardData = async (req, res) => {
             { $unwind: { path: "$hospital", preserveNullAndEmptyArrays: true } },
             {
                 $project: {
-                    name: { $ifNull: ["$hospital.hospitalName", "Not Associated"] },
+                    name: {
+                        $cond: {
+                            if: { $and: [ { $ne: [ "$hospital.branch", null ] }, { $ne: [ "$hospital.branch", "" ] } ] },
+                            then: { $concat: [ "$hospital.hospitalName", " (", "$hospital.branch", ")" ] },
+                            else: { $ifNull: [ "$hospital.hospitalName", "Not Associated" ] }
+                        }
+                    },
                     count: 1
                 }
             }
@@ -143,7 +149,13 @@ exports.getDashboardData = async (req, res) => {
             {
                 $project: {
                     doctorName: { $ifNull: ["$doctor.doctorName", "Unknown Doctor"] },
-                    hospitalName: { $ifNull: ["$hospital.hospitalName", "Not Associated"] },
+                    hospitalName: {
+                        $cond: {
+                            if: { $and: [ { $ne: [ "$hospital.branch", null ] }, { $ne: [ "$hospital.branch", "" ] } ] },
+                            then: { $concat: [ "$hospital.hospitalName", " (", "$hospital.branch", ")" ] },
+                            else: { $ifNull: [ "$hospital.hospitalName", "Not Associated" ] }
+                        }
+                    },
                     totalReferralAmount: 1,
                     paidAmount: 1,
                     dueAmount: 1,

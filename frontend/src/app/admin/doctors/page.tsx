@@ -117,7 +117,7 @@ const DoctorManagement: React.FC = () => {
             accessor: "hospitalId" as const,
             render: (row: Doctor) => {
                 const hospitalName = (typeof row.hospitalId === 'object' && row.hospitalId !== null)
-                    ? row.hospitalId?.hospitalName
+                    ? (row.hospitalId.branch ? `${row.hospitalId.hospitalName} (${row.hospitalId.branch})` : row.hospitalId.hospitalName)
                     : (row.hospitalId || "Not Associated");
                 return (
                     <div className="flex flex-col max-w-[180px]">
@@ -163,8 +163,6 @@ const DoctorManagement: React.FC = () => {
             header: "Referral Share", 
             accessor: "referralPercentage" as const,
             render: (row: Doctor) => {
-                const startDateStr = row.periodStartDate ? new Date(row.periodStartDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "";
-                const endDateStr = row.periodEndDate ? new Date(row.periodEndDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "";
                 const periodLabel = row.periodType ? row.periodType.toLowerCase().replace('_', ' ') : "";
 
                 return (
@@ -172,9 +170,9 @@ const DoctorManagement: React.FC = () => {
                         <div className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded w-fit uppercase tracking-tight">
                             {row.referralPercentage}% Share
                         </div>
-                        {startDateStr && endDateStr && (
+                        {periodLabel && (
                             <span className="text-[10px] text-slate-400 font-bold capitalize">
-                                {periodLabel} ({startDateStr} - {endDateStr})
+                                {periodLabel}
                             </span>
                         )}
                     </div>

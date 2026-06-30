@@ -8,6 +8,11 @@ const hospitalSchema = new mongoose.Schema(
       trim: true,
     },
 
+    branch: {
+      type: String,
+      trim: true,
+    },
+
     pocName: {
       type: String,
       trim: true,

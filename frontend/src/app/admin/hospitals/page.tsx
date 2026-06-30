@@ -14,6 +14,7 @@ import {
 interface HospitalItem {
     _id: string;
     hospitalName: string;
+    branch?: string;
     pocName?: string;
     telephoneNumber: string;
     address: {
@@ -37,6 +38,7 @@ export default function AdminHospitalsPage() {
 
     // Form states
     const [hospitalName, setHospitalName] = useState("");
+    const [branch, setBranch] = useState("");
     const [pocName, setPocName] = useState("");
     const [telephoneNumber, setTelephoneNumber] = useState("");
     const [stateName, setStateName] = useState("");
@@ -93,6 +95,7 @@ export default function AdminHospitalsPage() {
                 },
                 body: JSON.stringify({
                     hospitalName,
+                    branch,
                     pocName,
                     telephoneNumber,
                     address: {
@@ -124,6 +127,7 @@ export default function AdminHospitalsPage() {
     const resetForm = () => {
         setEditingHospital(null);
         setHospitalName("");
+        setBranch("");
         setPocName("");
         setTelephoneNumber("");
         setStateName("");
@@ -139,6 +143,7 @@ export default function AdminHospitalsPage() {
     const handleEditClick = (hosp: HospitalItem) => {
         setEditingHospital(hosp);
         setHospitalName(hosp.hospitalName || "");
+        setBranch(hosp.branch || "");
         setPocName(hosp.pocName || "");
         setTelephoneNumber(hosp.telephoneNumber || "");
         setStateName(hosp.address?.state || "");
@@ -226,7 +231,14 @@ export default function AdminHospitalsPage() {
                             {filteredHospitals.length > 0 ? (
                                 filteredHospitals.map(hosp => (
                                     <tr key={hosp._id} className="hover:bg-slate-50/80 transition-colors">
-                                        <td className="py-3 px-6 text-sm font-bold text-slate-900">{hosp.hospitalName}</td>
+                                        <td className="py-3 px-6 text-sm font-bold text-slate-900">
+                                            <div>{hosp.hospitalName}</div>
+                                            {hosp.branch && (
+                                                <div className="text-[11px] font-medium text-slate-500 mt-0.5">
+                                                    Branch: {hosp.branch}
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="py-3 px-6 text-sm text-slate-600">{hosp.telephoneNumber}</td>
                                         <td className="py-3 px-6 text-sm text-slate-600">
                                             {hosp.address?.city}
@@ -294,6 +306,16 @@ export default function AdminHospitalsPage() {
                                                     onChange={(e) => setHospitalName(capitalizeWords(e.target.value))}
                                                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
                                                     required
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-bold text-slate-700">Branch</label>
+                                                <input
+                                                    type="text"
+                                                    value={branch}
+                                                    onChange={(e) => setBranch(capitalizeWords(e.target.value))}
+                                                    placeholder="e.g. City Center, Jubilee Hills"
+                                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all"
                                                 />
                                             </div>
                                             <div className="space-y-2">

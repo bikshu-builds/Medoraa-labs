@@ -5,6 +5,7 @@ export interface Doctor {
     hospitalId?: {
         _id: string;
         hospitalName: string;
+        branch?: string;
     } | string;
     degree: string;
     specialization: string;
