@@ -74,7 +74,7 @@ const patientRegistrationSchema = new mongoose.Schema(
       receivedThrough: {
         type: String,
         required: true,
-        enum: ["Employee", "Person", "Courier", "Bus"],
+        enum: ["Employee", "Person", "Courier", "Bus", "None"],
       },
       // If "Employee" selected
       employee: {
