@@ -127,6 +127,9 @@ const Dashboard: React.FC = () => {
     const [authSearch, setAuthSearch] = useState("");
     const [invSearch, setInvSearch] = useState("");
 
+    // Real DB Registrations state
+    const [dbRegistrations, setDbRegistrations] = useState<any[]>([]);
+
     // Demo Data State for non-admin workflows
     const [patientsQueue, setPatientsQueue] = useState([
         { id: "P-8802", name: "Aria Montgomery", age: 28, gender: "F", tests: "CBC, Thyroid Panel", time: "09:15 AM", status: "Sample Collected" },
@@ -181,6 +184,15 @@ const Dashboard: React.FC = () => {
             if (data.success) {
                 setStats(data.data);
             }
+
+            // Fetch patient registrations from DB
+            const regRes = await fetch(getApiUrl("/api/admin/registrations"), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const regData = await regRes.json();
+            if (regData.success) {
+                setDbRegistrations(regData.data);
+            }
         } catch (err) {
             console.error("Failed to fetch dashboard data", err);
         } finally {
@@ -206,7 +218,21 @@ const Dashboard: React.FC = () => {
     // 1. REGISTRATION DASHBOARD
     // -------------------------------------------------------------
     if (userRole === "registration") {
-        const filteredReg = patientsQueue.filter(p => 
+        const mappedDb = dbRegistrations.map((r: any) => ({
+            id: r.registrationNumber,
+            name: r.patientName,
+            age: `${r.age?.value || ""} ${r.age?.type || ""}`,
+            gender: r.gender === "Male" ? "M" : r.gender === "Female" ? "F" : "O",
+            tests: r.tests && r.tests.length > 0 
+                ? r.tests.map((t: any) => t.testName).join(", ") 
+                : (r.referredBy ? `Ref: ${r.referredBy}` : "Self"),
+            time: r.registrationTime || "",
+            status: "Registered"
+        }));
+
+        const fullQueue = [...mappedDb, ...patientsQueue];
+
+        const filteredReg = fullQueue.filter(p => 
             p.name.toLowerCase().includes(regSearch.toLowerCase()) || 
             p.id.toLowerCase().includes(regSearch.toLowerCase()) || 
             p.tests.toLowerCase().includes(regSearch.toLowerCase())
@@ -228,7 +254,7 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                         <button 
-                            onClick={() => alert("Redirecting to Patient Registration Form...")}
+                            onClick={() => window.location.href = "/admin/registration"}
                             className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-slate-800 shadow-lg shadow-slate-900/10 transition-all active:scale-95"
                         >
                             <Plus className="w-4 h-4" />

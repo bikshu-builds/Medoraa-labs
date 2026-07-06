@@ -65,3 +65,79 @@ export interface Staff {
     createdAt: string;
     updatedAt: string;
 }
+
+export interface PatientRegistration {
+    _id?: string;
+    location: {
+        state: string;
+        district: string;
+        city: string;
+    };
+    patientName: string;
+    age: {
+        value: number;
+        type: "Years" | "Months" | "Days";
+    };
+    gender: "Male" | "Female" | "Other";
+    mobileNumber: string;
+    address: string;
+    referredBy: string;
+    sampleDrawnBy?: string;
+    sampleReceived: {
+        receivedThrough: "Employee" | "Person" | "Courier" | "Bus";
+        employee?: {
+            name: string;
+            id: string;
+            mobileNumber: string;
+            department: string;
+            designation: string;
+            dateReceived: string;
+            timeReceived: string;
+            remarks: string;
+        };
+        person?: {
+            name: string;
+            mobileNumber: string;
+            relationship: string;
+            address: string;
+            idProofType: string;
+            idProofNumber: string;
+            dateReceived: string;
+            timeReceived: string;
+            remarks: string;
+        };
+        courier?: {
+            companyName: string;
+            trackingNumber: string;
+            orderNumber: string;
+            contactNumber: string;
+            pickupLocation: string;
+            arrivalDate: string;
+            arrivalTime: string;
+            receivedByEmployee: string;
+            packageCondition: "Good" | "Damaged" | "Opened" | "";
+            remarks: string;
+        };
+        bus?: {
+            busNumber: string;
+            busServiceName: string;
+            driverName: string;
+            driverMobileNumber: string;
+            conductorName: string;
+            conductorMobileNumber: string;
+            originLocation: string;
+            destinationLocation: string;
+            arrivalDate: string;
+            arrivalTime: string;
+            receivedByEmployee: string;
+            packageCondition: string;
+            remarks: string;
+        };
+    };
+    registrationDate: string;
+    registrationTime: string;
+    registrationNumber: string;
+    tests?: any[];
+    createdAt?: string;
+}
+

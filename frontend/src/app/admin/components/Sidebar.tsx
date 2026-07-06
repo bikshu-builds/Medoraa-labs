@@ -56,29 +56,46 @@ const Sidebar: React.FC = () => {
     const [editName, setEditName] = useState("");
     const [editEmail, setEditEmail] = useState("");
     const [editPassword, setEditPassword] = useState("");
-    const [isReferralOpen, setIsReferralOpen] = useState(false);
+    const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({
+        "Referral Module": false,
+        "Registrations": false
+    });
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     useEffect(() => {
         if (pathname === "/admin/hospitals" || pathname === "/admin/doctors") {
-            setIsReferralOpen(true);
+            setOpenDropdowns(prev => ({ ...prev, "Referral Module": true }));
+        }
+        if (pathname === "/admin/registration" || pathname === "/admin/registration/samples") {
+            setOpenDropdowns(prev => ({ ...prev, "Registrations": true }));
         }
     }, [pathname]);
 
     const menuItems = [
         {
             group: "Main", items: [
-                { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", isDropdown: false },
+                { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", isDropdown: false, roles: ["admin", "registration", "authorization", "inventory"] },
+                {
+                    name: "Registrations",
+                    icon: FileText,
+                    isDropdown: true,
+                    roles: ["admin", "registration"],
+                    subItems: [
+                        { name: "Patient Registration", icon: UserPlus, path: "/admin/registration" },
+                        { name: "Samples", icon: Database, path: "/admin/registration/samples" }
+                    ]
+                },
                 {
                     name: "Referral Module",
                     icon: Share2,
                     isDropdown: true,
+                    roles: ["admin"],
                     subItems: [
                         { name: "Hospital", icon: Home, path: "/admin/hospitals" },
                         { name: "Doctors", icon: UserPlus, path: "/admin/doctors" },
                     ]
                 },
-                { name: "Staff", icon: Users, path: "/admin/staff", isDropdown: false },
+                { name: "Staff", icon: Users, path: "/admin/staff", isDropdown: false, roles: ["admin"] },
             ]
         }
     ];
@@ -262,8 +279,9 @@ const Sidebar: React.FC = () => {
                 {menuItems.map((group, gIdx) => {
                     const userRole = currentAdmin?.role || "admin";
                     const filteredItems = group.items.filter(item => {
-                        if (item.isDropdown) return userRole === "admin";
-                        if (item.path === "/admin/dashboard") return true;
+                        if (item.roles) {
+                            return item.roles.includes(userRole);
+                        }
                         return userRole === "admin";
                     });
 
@@ -280,15 +298,16 @@ const Sidebar: React.FC = () => {
                                 {filteredItems.map((item) => {
                                     if (item.isDropdown) {
                                         const isAnySubActive = item.subItems?.some(sub => pathname === sub.path);
+                                        const isOpen = openDropdowns[item.name];
                                         return (
                                             <li key={item.name} className="space-y-1">
                                                 <button
                                                     onClick={() => {
                                                         if (isCollapsed) {
                                                             setIsCollapsed(false);
-                                                            setIsReferralOpen(true);
+                                                            setOpenDropdowns(prev => ({ ...prev, [item.name]: true }));
                                                         } else {
-                                                            setIsReferralOpen(!isReferralOpen);
+                                                            setOpenDropdowns(prev => ({ ...prev, [item.name]: !prev[item.name] }));
                                                         }
                                                     }}
                                                     className={cn(
@@ -303,14 +322,14 @@ const Sidebar: React.FC = () => {
                                                         {!isCollapsed && <span className="animate-in fade-in duration-200">{item.name}</span>}
                                                     </div>
                                                     {!isCollapsed && (
-                                                        isReferralOpen ? (
+                                                        isOpen ? (
                                                             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                                                         ) : (
                                                             <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                                                         )
                                                     )}
                                                 </button>
-                                                {isReferralOpen && !isCollapsed && (
+                                                {isOpen && !isCollapsed && (
                                                     <ul className="pl-4 mt-1 space-y-1 border-l border-slate-700 ml-6 animate-in slide-in-from-top-1 duration-200">
                                                         {item.subItems?.map((sub) => {
                                                             const isSubActive = pathname === sub.path;

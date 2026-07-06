@@ -5,7 +5,8 @@ const cors = require("cors");
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Routes
 const adminRoutes = require("./routes/admin");
@@ -42,6 +43,22 @@ mongoose.connect(process.env.MONGO_URI)
             }
         } catch (migrationErr) {
             console.error("[Migration] Error migrating legacy doctor records:", migrationErr);
+        }
+
+        // Drop legacy unique index on samples collection if it exists
+        try {
+            const db = mongoose.connection.db;
+            const collections = await db.listCollections({ name: "samples" }).toArray();
+            if (collections.length > 0) {
+                const indexes = await db.collection("samples").indexes();
+                const hasSampleIdIndex = indexes.some(idx => idx.name === "sampleId_1");
+                if (hasSampleIdIndex) {
+                    await db.collection("samples").dropIndex("sampleId_1");
+                    console.log("[Migration] Successfully dropped legacy unique 'sampleId_1' index from samples collection.");
+                }
+            }
+        } catch (indexErr) {
+            console.error("[Migration] Error dropping legacy sample index:", indexErr);
         }
     })
     .catch(err => console.error("MongoDB connection error:", err));
