@@ -9,6 +9,43 @@ import {
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import JsBarcode from "jsbarcode";
+
+interface BarcodeProps {
+    value: string;
+    width?: number;
+    height?: number;
+    displayValue?: boolean;
+}
+
+const Barcode: React.FC<BarcodeProps> = ({ 
+    value, 
+    width = 1.2, 
+    height = 25, 
+    displayValue = false 
+}) => {
+    const svgRef = useRef<SVGSVGElement>(null);
+
+    useEffect(() => {
+        if (svgRef.current && value) {
+            try {
+                JsBarcode(svgRef.current, value, {
+                    format: "CODE128",
+                    width,
+                    height,
+                    displayValue,
+                    margin: 0,
+                    background: "transparent",
+                    lineColor: "#000"
+                });
+            } catch (e) {
+                console.error("JsBarcode error:", e);
+            }
+        }
+    }, [value, width, height, displayValue]);
+
+    return <svg ref={svgRef}></svg>;
+};
 
 // Cascading Locations Data
 const locationsData: Record<string, Record<string, string[]>> = {
@@ -345,6 +382,49 @@ const PatientRegistrationForm: React.FC = () => {
         return () => clearInterval(timer);
     }, []);
 
+    // Global barcode scanner listener
+    useEffect(() => {
+        let buffer = "";
+        let lastKeyTime = Date.now();
+
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
+                if (target.id === "patient-search-input") {
+                    return;
+                }
+            }
+
+            const currentTime = Date.now();
+            if (currentTime - lastKeyTime > 50) {
+                buffer = "";
+            }
+            lastKeyTime = currentTime;
+
+            if (e.key === "Enter") {
+                if (buffer.length >= 6) {
+                    const cleaned = buffer.trim();
+                    if (cleaned.toUpperCase().startsWith("REG-") || cleaned.toUpperCase().startsWith("S0")) {
+                        e.preventDefault();
+                        setPatientSearchQuery(cleaned);
+                        setShowForm(false);
+                        const searchInput = document.getElementById("patient-search-input");
+                        if (searchInput) {
+                            searchInput.focus();
+                        }
+                        buffer = "";
+                    }
+                }
+                buffer = "";
+            } else if (e.key.length === 1) {
+                buffer += e.key;
+            }
+        };
+
+        window.addEventListener("keydown", handleGlobalKeyDown);
+        return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+    }, []);
+
     // Auto-save draft check
     useEffect(() => {
         const draft = localStorage.getItem("medoraa_registration_draft");
@@ -506,6 +586,7 @@ const PatientRegistrationForm: React.FC = () => {
                                 <Search className="w-4 h-4" />
                             </span>
                             <input 
+                                id="patient-search-input"
                                 type="text"
                                 placeholder="Search by name, registration no, phone..."
                                 value={patientSearchQuery}
@@ -551,12 +632,21 @@ const PatientRegistrationForm: React.FC = () => {
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
                                         {registrations
                                             .filter(reg => {
-                                                const query = patientSearchQuery.toLowerCase();
+                                                const query = patientSearchQuery.toLowerCase().trim();
+                                                let isSampleMatch = false;
+                                                if (query.startsWith("s") && query.length >= 10) {
+                                                    const sampleBody = query.substring(1, query.length - 1);
+                                                    const regDigitsClean = reg.registrationNumber ? reg.registrationNumber.replace(/[^0-9]/g, "") : "";
+                                                    if (regDigitsClean.includes(sampleBody)) {
+                                                        isSampleMatch = true;
+                                                    }
+                                                }
                                                 return (
                                                     reg.patientName?.toLowerCase().includes(query) ||
                                                     reg.registrationNumber?.toLowerCase().includes(query) ||
                                                     reg.mobileNumber?.includes(query) ||
-                                                    reg.referredBy?.toLowerCase().includes(query)
+                                                    reg.referredBy?.toLowerCase().includes(query) ||
+                                                    isSampleMatch
                                                 );
                                             })
                                             .map((reg) => (
@@ -1579,11 +1669,8 @@ const PatientRegistrationForm: React.FC = () => {
                             {/* Footer barcode and signoff */}
                             <div className="border-t border-dashed border-slate-300 pt-6 text-center space-y-4">
                                 <div className="flex flex-col items-center justify-center gap-1 bg-slate-50 py-3 rounded-lg border border-slate-100">
-                                    {/* Clean CSS barcode mock */}
-                                    <div className="flex items-center gap-[2px] h-8 bg-slate-900 px-4 py-1.5 rounded mb-1">
-                                        {[1,2,4,1,3,1,2,3,1,4,1,2,3,2,1,3,1,4,1,2,1].map((w, idx) => (
-                                            <div key={idx} className="bg-white h-full" style={{ width: `${w}px` }} />
-                                        ))}
+                                    <div className="mb-1">
+                                        <Barcode value={savedRecord.registrationNumber} width={1.5} height={40} displayValue={false} />
                                     </div>
                                     <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-600">{savedRecord.registrationNumber}</span>
                                 </div>
@@ -1711,7 +1798,7 @@ const PatientRegistrationForm: React.FC = () => {
                                 {/* Barcode Column */}
                                 <div className="label-barcode-col">
                                     <div className="label-barcode-wrapper">
-                                        <span className="label-barcode-text">*{sampleId}*</span>
+                                        <Barcode value={sampleId} width={1.1} height={24} displayValue={false} />
                                     </div>
                                     <div className="label-timestamp-wrapper">
                                         {formattedDateTime}
@@ -1726,7 +1813,6 @@ const PatientRegistrationForm: React.FC = () => {
             {/* Conditional Page Print Setup */}
             {printType === "label" ? (
                 <style jsx global>{`
-                    @import url('https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap');
                     @media print {
                         @page {
                             size: 100mm 35mm;
@@ -1914,12 +2000,7 @@ const PatientRegistrationForm: React.FC = () => {
                             top: 50%;
                             margin-top: -15px;
                         }
-                        .label-barcode-text {
-                            font-family: 'Libre Barcode 128', cursive;
-                            font-size: 38px;
-                            line-height: 1;
-                            color: black !important;
-                        }
+
                         .label-timestamp-wrapper {
                             transform: rotate(90deg);
                             transform-origin: center;
