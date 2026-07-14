@@ -5,11 +5,12 @@ import {
     MapPin, User, FileText, Share2, Clipboard, ShieldAlert, Check, 
     RefreshCw, X, Printer, Calendar, Clock, Truck, Bus, UserCheck, 
     Search, ChevronDown, CheckCircle2, ChevronRight, UserPlus, Info,
-    Activity, ShoppingCart
+    Activity, ShoppingCart, Download, FileSpreadsheet
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import JsBarcode from "jsbarcode";
+import * as XLSX from "xlsx";
 
 interface BarcodeProps {
     value: string;
@@ -137,7 +138,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
                             type="text"
                             placeholder="Type to filter..."
                             value={search}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => setSearch(e.target.value)}
                             onClick={(e) => e.stopPropagation()}
                             className="w-full bg-transparent border-0 outline-none text-xs text-slate-900 dark:text-white placeholder:text-slate-400"
                         />
@@ -247,6 +248,7 @@ const PatientRegistrationForm: React.FC = () => {
     const [registrations, setRegistrations] = useState<any[]>([]);
     const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(false);
     const [patientSearchQuery, setPatientSearchQuery] = useState("");
+    const [userRole, setUserRole] = useState<string>("registration");
 
     const fetchRegistrations = async () => {
         setIsLoadingRegistrations(true);
@@ -340,6 +342,62 @@ const PatientRegistrationForm: React.FC = () => {
         );
     };
 
+    const handleExportRegistrations = () => {
+        const filtered = registrations.filter(reg => {
+            const query = patientSearchQuery.toLowerCase().trim();
+            if (!query) return true;
+            let isSampleMatch = false;
+            if (query.startsWith("s") && query.length >= 10) {
+                const sampleBody = query.substring(1, query.length - 1);
+                const regDigitsClean = reg.registrationNumber ? reg.registrationNumber.replace(/[^0-9]/g, "") : "";
+                if (regDigitsClean.includes(sampleBody)) {
+                    isSampleMatch = true;
+                }
+            }
+            return (
+                reg.patientName?.toLowerCase().includes(query) ||
+                reg.registrationNumber?.toLowerCase().includes(query) ||
+                reg.mobileNumber?.includes(query) ||
+                reg.referredBy?.toLowerCase().includes(query) ||
+                isSampleMatch
+            );
+        });
+
+        if (filtered.length === 0) {
+            alert("No registration records match the search query to export");
+            return;
+        }
+
+        const exportData = filtered.map(reg => {
+            const testNames = reg.tests && reg.tests.length > 0
+                ? reg.tests.map((t: any) => typeof t === "string" ? t : t.testName || t.name).join(", ")
+                : "No tests";
+            
+            return {
+                "Registration No": reg.registrationNumber || "",
+                "Date": reg.registrationDate || "",
+                "Time": reg.registrationTime || "",
+                "Patient Name": reg.patientName || "",
+                "Age": reg.age ? `${reg.age.value} ${reg.age.type}` : "",
+                "Gender": reg.gender || "",
+                "Mobile Number": reg.mobileNumber || "",
+                "Address": reg.address || "",
+                "Referred By": reg.referredBy || "",
+                "Sample Drawn By": reg.sampleDrawnBy || "",
+                "Referral Mode": reg.referralMode || "",
+                "Selected Lab": reg.selectedLab || "",
+                "Tests Prescribed": testNames
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Registrations");
+
+        // Write to browser
+        XLSX.writeFile(workbook, "patient_registrations.xlsx");
+    };
+
     // Fetch doctors and staff
     useEffect(() => {
         const fetchMaster = async () => {
@@ -370,6 +428,17 @@ const PatientRegistrationForm: React.FC = () => {
         };
         fetchMaster();
         fetchRegistrations();
+
+        // Fetch user role
+        const storedUser = localStorage.getItem("adminUser");
+        if (storedUser) {
+            try {
+                const parsed = JSON.parse(storedUser);
+                setUserRole(parsed.role || "admin");
+            } catch (e) {
+                console.error(e);
+            }
+        }
     }, []);
 
     // Live date-time updates
@@ -715,6 +784,15 @@ const PatientRegistrationForm: React.FC = () => {
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
+                            {userRole === "admin" && (
+                                <button
+                                    onClick={handleExportRegistrations}
+                                    className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-lg text-xs text-slate-700 dark:text-slate-350 transition-all active:scale-95 cursor-pointer shadow-sm"
+                                >
+                                    <FileSpreadsheet className="w-4 h-4" />
+                                    <span>Export Excel</span>
+                                </button>
+                            )}
                             <button 
                                 onClick={() => {
                                     setFormData({

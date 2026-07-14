@@ -313,6 +313,37 @@ export default function SamplesDirectoryPage() {
         showToast("success", "Template download initiated");
     };
 
+    // Export Samples to Excel
+    const handleExportExcel = () => {
+        if (filteredSamples.length === 0) {
+            showToast("error", "No sample records match the search query to export");
+            return;
+        }
+
+        // Map samples to match the headers nicely
+        const exportData = filteredSamples.map(sample => ({
+            "Sl No": sample.slno || "",
+            "Organ": sample.organ || "",
+            "Category": sample.category || "",
+            "Test Name": sample.testName || "",
+            "Method": sample.method || "",
+            "Container": sample.container || "",
+            "Sample Used for test": sample.sampleUsedForTest || "",
+            "Report Time": sample.reportTime || "",
+            "Reference Range": sample.referenceRange || "",
+            "Lab Price": sample.labPrice || "",
+            "Patient Price": sample.patientPrice || ""
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "SamplesCatalog");
+        
+        // Write to browser
+        XLSX.writeFile(workbook, "samples_catalog.xlsx");
+        showToast("success", "Samples catalog export initiated");
+    };
+
     // Handle Upload Excel
     const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -841,6 +872,13 @@ export default function SamplesDirectoryPage() {
                             >
                                 <Upload className="w-3.5 h-3.5" />
                                 Import Excel
+                            </button>
+                            <button
+                                onClick={handleExportExcel}
+                                className="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-xl text-xs text-slate-650 dark:text-slate-350 transition-all active:scale-95 cursor-pointer shadow-sm"
+                            >
+                                <FileSpreadsheet className="w-3.5 h-3.5" />
+                                Export Excel
                             </button>
                             <input 
                                 type="file" 
