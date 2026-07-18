@@ -382,6 +382,9 @@ const PatientRegistrationForm: React.FC = () => {
                 "Gender": reg.gender || "",
                 "Mobile Number": reg.mobileNumber || "",
                 "Address": reg.address || "",
+                "State": reg.location?.state || "",
+                "District": reg.location?.district || "",
+                "City/Area": reg.location?.city || "",
                 "Referred By": reg.referredBy || "",
                 "Sample Drawn By": reg.sampleDrawnBy || "",
                 "Referral Mode": reg.referralMode || "",
@@ -529,12 +532,7 @@ const PatientRegistrationForm: React.FC = () => {
         localStorage.setItem("medoraa_registration_draft", JSON.stringify(formData));
     }, [formData]);
 
-    // Derived states for locations
-    const statesList = Object.keys(locationsData);
-    const districtsList = formData.location.state ? Object.keys(locationsData[formData.location.state]) : [];
-    const citiesList = (formData.location.state && formData.location.district) 
-        ? locationsData[formData.location.state][formData.location.district] 
-        : [];
+
 
     // Validation checks
     const isMobileValid = /^\d{10}$/.test(formData.mobileNumber);
@@ -913,7 +911,12 @@ const PatientRegistrationForm: React.FC = () => {
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <span className="font-semibold text-slate-700 dark:text-slate-300 block">{reg.mobileNumber}</span>
-                                                        <span className="text-[10px] text-slate-400 truncate max-w-[150px] block" title={reg.address}>{reg.address}</span>
+                                                        <span className="text-[10px] text-slate-400 truncate max-w-[150px] block" title={`${reg.address}${reg.location?.city ? `, ${reg.location.city}, ${reg.location.district}, ${reg.location.state}` : ""}`}>{reg.address}</span>
+                                                        {reg.location?.state && (
+                                                            <span className="text-[9px] text-slate-500 font-medium block mt-0.5">
+                                                                {[reg.location.city, reg.location.district, reg.location.state].filter(Boolean).join(", ")}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <span className="font-bold text-slate-750 dark:text-slate-250">{reg.referredBy}</span>
@@ -1144,6 +1147,55 @@ const PatientRegistrationForm: React.FC = () => {
                                         placeholder="Enter patient complete street address details"
                                         className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold resize-none"
                                     />
+                                </div>
+
+                                {/* State, District, City text inputs */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> State
+                                        </label>
+                                        <input 
+                                            type="text"
+                                            value={formData.location.state}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                location: { ...prev.location, state: e.target.value }
+                                            }))}
+                                            placeholder="Enter State"
+                                            className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> District
+                                        </label>
+                                        <input 
+                                            type="text"
+                                            value={formData.location.district}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                location: { ...prev.location, district: e.target.value }
+                                            }))}
+                                            placeholder="Enter District"
+                                            className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> City / Area
+                                        </label>
+                                        <input 
+                                            type="text"
+                                            value={formData.location.city}
+                                            onChange={(e) => setFormData(prev => ({
+                                                ...prev,
+                                                location: { ...prev.location, city: e.target.value }
+                                            }))}
+                                            placeholder="Enter City / Area"
+                                            className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
@@ -2135,6 +2187,14 @@ const PatientRegistrationForm: React.FC = () => {
                                         <span className="text-slate-400 font-medium">Address:</span>
                                         <span className="font-bold text-slate-950 max-w-[320px] text-right break-words">{savedRecord.address}</span>
                                     </div>
+                                    {savedRecord.location?.state && (
+                                        <div className="flex justify-between py-1 border-b border-slate-100/50 md:col-span-2">
+                                            <span className="text-slate-400 font-medium">Location:</span>
+                                            <span className="font-bold text-slate-950 text-right">
+                                                {[savedRecord.location.city, savedRecord.location.district, savedRecord.location.state].filter(Boolean).join(", ")}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
