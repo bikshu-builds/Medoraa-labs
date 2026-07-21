@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { 
-    MapPin, User, FileText, Share2, Clipboard, ShieldAlert, Check, 
-    RefreshCw, X, Printer, Calendar, Clock, Truck, Bus, UserCheck, 
+import {
+    MapPin, User, FileText, Share2, Clipboard, ShieldAlert, Check,
+    RefreshCw, X, Printer, Calendar, Clock, Truck, Bus, UserCheck,
     Search, ChevronDown, CheckCircle2, ChevronRight, UserPlus, Info,
-    Activity, ShoppingCart, Download, FileSpreadsheet
+    Activity, ShoppingCart, Download, FileSpreadsheet, Plus, ArrowLeft
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -19,11 +19,11 @@ interface BarcodeProps {
     displayValue?: boolean;
 }
 
-const Barcode: React.FC<BarcodeProps> = ({ 
-    value, 
-    width = 1.2, 
-    height = 25, 
-    displayValue = false 
+const Barcode: React.FC<BarcodeProps> = ({
+    value,
+    width = 1.2,
+    height = 25,
+    displayValue = false
 }) => {
     const svgRef = useRef<SVGSVGElement>(null);
 
@@ -240,6 +240,8 @@ const PatientRegistrationForm: React.FC = () => {
     const [isLoadingSamples, setIsLoadingSamples] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
+    const [selectedOrgan, setSelectedOrgan] = useState("All");
+    const [sidebarView, setSidebarView] = useState<"category" | "organ">("category");
     const [triggerPrintOnComplete, setTriggerPrintOnComplete] = useState(false);
     const [isSavingTests, setIsSavingTests] = useState(false);
 
@@ -304,7 +306,7 @@ const PatientRegistrationForm: React.FC = () => {
                 setSavedRecord(data.data);
                 setShowTestSelection(false);
                 setShowReceipt(true);
-                
+
                 if (triggerPrintOnComplete) {
                     setPrintType("receipt");
                     setTimeout(() => {
@@ -337,7 +339,7 @@ const PatientRegistrationForm: React.FC = () => {
     };
 
     const toggleTestSelection = (id: string) => {
-        setSelectedTestIds(prev => 
+        setSelectedTestIds(prev =>
             prev.includes(id) ? prev.filter(tId => tId !== id) : [...prev, id]
         );
     };
@@ -372,7 +374,7 @@ const PatientRegistrationForm: React.FC = () => {
             const testNames = reg.tests && reg.tests.length > 0
                 ? reg.tests.map((t: any) => typeof t === "string" ? t : t.testName || t.name).join(", ")
                 : "No tests";
-            
+
             return {
                 "Registration No": reg.registrationNumber || "",
                 "Date": reg.registrationDate || "",
@@ -539,7 +541,7 @@ const PatientRegistrationForm: React.FC = () => {
     const isAgeValid = formData.age.value !== "" && Number(formData.age.value) > 0;
     const isNameValid = formData.patientName.trim() !== "";
     const isAddressValid = formData.address.trim() !== "";
-    
+
     const isReferralValid = (formData.referralMode || "Self") === "Self"
         ? true
         : ((formData.selectedHospital || "").trim() !== "" && (formData.selectedDoctor || "").trim() !== "");
@@ -554,9 +556,9 @@ const PatientRegistrationForm: React.FC = () => {
         }
         if (transport.receivedThrough === "Person") {
             const per = transport.person || {};
-            return (per.name || "").trim() !== "" && 
-                   /^\d{10}$/.test(per.mobileNumber || "") && 
-                   (per.relationship || "").trim() !== "";
+            return (per.name || "").trim() !== "" &&
+                /^\d{10}$/.test(per.mobileNumber || "") &&
+                (per.relationship || "").trim() !== "";
         }
         if (transport.receivedThrough === "Courier") {
             const cour = transport.courier || {};
@@ -564,14 +566,73 @@ const PatientRegistrationForm: React.FC = () => {
         }
         if (transport.receivedThrough === "Bus") {
             const b = transport.bus || {};
-            return (b.busNumber || "").trim() !== "" && 
-                   (b.busServiceName || "").trim() !== "" && 
-                   /^\d{10}$/.test(b.driverMobileNumber || "");
+            return (b.busNumber || "").trim() !== "" &&
+                (b.busServiceName || "").trim() !== "" &&
+                /^\d{10}$/.test(b.driverMobileNumber || "");
         }
         return false;
     })();
 
     const isFormValid = isNameValid && isAgeValid && isMobileValid && isAddressValid && isReferralValid && isTransportValid;
+
+    // Populate form fields from a saved registration record
+    const populateFormFromRecord = (record: any) => {
+        if (!record) return;
+
+        const refVal = record.referredBy || "Self";
+        let referralMode: "Self" | "Hospital" = "Self";
+        let selectedLab = "Medoraa Labs (Our Lab)";
+        let selectedHospital = "";
+        let selectedDoctor = "";
+
+        if (refVal.startsWith("Self")) {
+            referralMode = "Self";
+            const startIndex = refVal.indexOf("(");
+            const endIndex = refVal.lastIndexOf(")");
+            if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+                selectedLab = refVal.slice(startIndex + 1, endIndex);
+
+                // Parse hospital name if present in the lab name, e.g. "Apollo Lab (Apollo Hospital)"
+                const labOpenParen = selectedLab.lastIndexOf(" (");
+                const labCloseParen = selectedLab.lastIndexOf(")");
+                if (labOpenParen !== -1 && labCloseParen !== -1 && labCloseParen > labOpenParen) {
+                    selectedHospital = selectedLab.slice(labOpenParen + 2, labCloseParen).trim();
+                }
+            }
+        } else {
+            referralMode = "Hospital";
+            const lastOpenParen = refVal.lastIndexOf(" (");
+            const lastCloseParen = refVal.lastIndexOf(")");
+            if (lastOpenParen !== -1 && lastCloseParen !== -1 && lastCloseParen > lastOpenParen) {
+                selectedDoctor = refVal.slice(0, lastOpenParen).trim();
+                selectedHospital = refVal.slice(lastOpenParen + 2, lastCloseParen).trim();
+            } else {
+                selectedDoctor = refVal;
+            }
+        }
+
+        setFormData({
+            location: record.location || { state: "", district: "", city: "" },
+            patientName: record.patientName || "",
+            age: record.age || { value: "", type: "Years" },
+            gender: record.gender || "Male",
+            mobileNumber: record.mobileNumber || "",
+            address: record.address || "",
+            referredBy: record.referredBy || "Self",
+            sampleDrawnBy: record.sampleDrawnBy || "",
+            referralMode: referralMode,
+            selectedLab: selectedLab,
+            selectedHospital: selectedHospital,
+            selectedDoctor: selectedDoctor,
+            sampleReceived: record.sampleReceived || {
+                receivedThrough: "None",
+                employee: { name: "", id: "", mobileNumber: "", department: "", designation: "", dateReceived: "", timeReceived: "", remarks: "" },
+                person: { name: "", mobileNumber: "", relationship: "", address: "", idProofType: "Aadhaar", idProofNumber: "", dateReceived: "", timeReceived: "", remarks: "" },
+                courier: { companyName: "", trackingNumber: "", orderNumber: "", contactNumber: "", pickupLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good", remarks: "" },
+                bus: { busNumber: "", busServiceName: "", driverName: "", driverMobileNumber: "", conductorName: "", conductorMobileNumber: "", originLocation: "", destinationLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good", remarks: "" }
+            }
+        });
+    };
 
     // Reset handler
     const handleReset = () => {
@@ -599,6 +660,7 @@ const PatientRegistrationForm: React.FC = () => {
             });
             localStorage.removeItem("medoraa_registration_draft");
             setIsDraftRestored(false);
+            setSavedRecord(null);
         }
     };
 
@@ -610,7 +672,7 @@ const PatientRegistrationForm: React.FC = () => {
         setSelectedTestIds([]);
         try {
             const token = localStorage.getItem("adminToken");
-            
+
             const referredByValue = (formData.referralMode || "Self") === "Hospital"
                 ? `${formData.selectedDoctor || ""} (${formData.selectedHospital || ""})`
                 : `Self (${formData.selectedLab || "Medoraa Labs (Our Lab)"})`;
@@ -634,7 +696,7 @@ const PatientRegistrationForm: React.FC = () => {
                 localStorage.removeItem("medoraa_registration_draft");
                 setIsDraftRestored(false);
                 setSavedRecord(data.data);
-                
+
                 // Fetch samples and open test selection step
                 await fetchSamples();
                 setShowTestSelection(true);
@@ -669,13 +731,13 @@ const PatientRegistrationForm: React.FC = () => {
                 ...doctors
                     .filter(d => d.hospitalId?.hospitalName === formData.selectedHospital)
                     .map(d => `${d.doctorName} (Ref: ${d.doctorCode || d._id.slice(-4).toUpperCase()})`)
-              ]
+            ]
             : [
                 // All labs (with hospital name)
                 ...hospitals.flatMap(h => (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`)),
                 // All doctors (with hospital name)
                 ...doctors.map(d => `${d.doctorName} (Ref: ${d.doctorCode || d._id.slice(-4).toUpperCase()}) (${d.hospitalId?.hospitalName || "Independent"})`)
-              ]
+            ]
         )
     ];
 
@@ -720,10 +782,9 @@ const PatientRegistrationForm: React.FC = () => {
                 if (isLab) {
                     setFormData(prev => ({
                         ...prev,
-                        selectedHospital: "",
                         selectedDoctor: "Self",
                         referralMode: "Self",
-                        selectedLab: `${val} (${formData.selectedHospital})`
+                        selectedLab: `${val} (${prev.selectedHospital})`
                     }));
                 } else {
                     setFormData(prev => ({
@@ -735,19 +796,25 @@ const PatientRegistrationForm: React.FC = () => {
                 }
             } else {
                 if (val.includes("(") && val.endsWith(")") && !val.includes("(Ref:")) {
+                    const startIndex = val.indexOf("(");
+                    const endIndex = val.lastIndexOf(")");
+                    let hospitalName = "";
+                    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+                        hospitalName = val.slice(startIndex + 1, endIndex).trim();
+                    }
                     setFormData(prev => ({
                         ...prev,
-                        selectedHospital: "",
+                        selectedHospital: hospitalName,
                         selectedDoctor: "Self",
                         referralMode: "Self",
                         selectedLab: val
                     }));
                 } else {
-                    const doc = doctors.find(d => 
+                    const doc = doctors.find(d =>
                         `${d.doctorName} (Ref: ${d.doctorCode || d._id.slice(-4).toUpperCase()}) (${d.hospitalId?.hospitalName || "Independent"})` === val
                     );
-                    const docFormatted = doc 
-                        ? `${doc.doctorName} (Ref: ${doc.doctorCode || doc._id.slice(-4).toUpperCase()})` 
+                    const docFormatted = doc
+                        ? `${doc.doctorName} (Ref: ${doc.doctorCode || doc._id.slice(-4).toUpperCase()})`
                         : val;
                     const hospitalName = doc?.hospitalId?.hospitalName || "";
                     setFormData(prev => ({
@@ -764,7 +831,325 @@ const PatientRegistrationForm: React.FC = () => {
 
     return (
         <div className="font-sans pb-6 dark:text-slate-100">
-            {!showForm ? (
+            {showTestSelection && savedRecord ? (
+                <div className="-mx-8 -my-8 print:hidden animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 w-full overflow-hidden flex flex-col h-screen">
+
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                            <div>
+                                <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                                    <Activity className="w-5 h-5 text-blue-600" />
+                                    Select Tests / Samples for {savedRecord.patientName}
+                                </h3>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                    Registration No: {savedRecord.registrationNumber} | Referrer: {savedRecord.referredBy}
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => {
+                                    populateFormFromRecord(savedRecord);
+                                    setShowTestSelection(false);
+                                    setShowForm(true);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-655 dark:text-slate-355 cursor-pointer text-xs font-bold shadow-sm"
+                            >
+                                <ArrowLeft className="w-3.5 h-3.5" />
+                                Back to Form
+                            </button>
+                        </div>
+
+                        {/* Content Area */}
+                        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+
+                            {/* Left Sidebar: Categories / Organs */}
+                            <div className="w-full lg:w-52 bg-slate-50 dark:bg-slate-950/40 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800 flex flex-col shrink-0">
+                                <div className="p-3 border-b border-slate-100 dark:border-slate-800 space-y-2">
+                                    <div className="flex bg-slate-200/60 dark:bg-slate-800/80 p-0.5 rounded-lg border border-slate-200/40 dark:border-slate-700/50">
+                                        <button
+                                            onClick={() => {
+                                                setSidebarView("category");
+                                                setSelectedCategory("All");
+                                                setSelectedOrgan("All");
+                                            }}
+                                            className={cn(
+                                                "flex-1 py-1.5 text-[9px] font-black uppercase rounded-md transition-all cursor-pointer",
+                                                sidebarView === "category"
+                                                    ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-sm font-bold"
+                                                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-350"
+                                            )}
+                                        >
+                                            Categories
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setSidebarView("organ");
+                                                setSelectedCategory("All");
+                                                setSelectedOrgan("All");
+                                            }}
+                                            className={cn(
+                                                "flex-1 py-1.5 text-[9px] font-black uppercase rounded-md transition-all cursor-pointer",
+                                                sidebarView === "organ"
+                                                    ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-sm font-bold"
+                                                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-350"
+                                            )}
+                                        >
+                                            Organs
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex-1 overflow-x-auto lg:overflow-y-auto p-2 flex flex-row lg:flex-col gap-1.5 lg:space-y-1 no-scrollbar shrink-0 lg:shrink">
+                                    {sidebarView === "category" ? (
+                                        ["All", ...Array.from(new Set(availableSamples.map(s => s.category || "General").filter(c => c && c !== "-")))].map((cat) => {
+                                            const catCount = availableSamples.filter(s => (s.category || "General") === cat && cat !== "All").length;
+                                            const isSelected = selectedCategory === cat;
+                                            return (
+                                                <button
+                                                    key={cat}
+                                                    onClick={() => setSelectedCategory(cat)}
+                                                    className={cn(
+                                                        "w-auto lg:w-full shrink-0 text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer whitespace-nowrap gap-1.5",
+                                                        isSelected
+                                                            ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
+                                                            : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400"
+                                                    )}
+                                                >
+                                                    <span className="truncate text-left">{cat}</span>
+                                                    {cat !== "All" && (
+                                                        <span className={cn(
+                                                            "text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ml-1.5",
+                                                            isSelected ? "bg-blue-700 text-white" : "bg-slate-200 dark:bg-slate-850 text-slate-500"
+                                                        )}>
+                                                            {catCount}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            );
+                                        })
+                                    ) : (
+                                        ["All", ...Array.from(new Set(availableSamples.map(s => s.organ).filter(Boolean).filter(o => o && o !== "-")))].map((org) => {
+                                            const orgCount = availableSamples.filter(s => s.organ === org && org !== "All").length;
+                                            const isSelected = selectedOrgan === org;
+                                            return (
+                                                <button
+                                                    key={org}
+                                                    onClick={() => setSelectedOrgan(org)}
+                                                    className={cn(
+                                                        "w-auto lg:w-full shrink-0 text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer whitespace-nowrap gap-1.5",
+                                                        isSelected
+                                                            ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
+                                                            : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400"
+                                                    )}
+                                                >
+                                                    <span className="truncate text-left">{org}</span>
+                                                    {org !== "All" && (
+                                                        <span className={cn(
+                                                            "text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ml-1.5",
+                                                            isSelected ? "bg-blue-700 text-white" : "bg-slate-200 dark:bg-slate-850 text-slate-500"
+                                                        )}>
+                                                            {orgCount}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Middle Content: Test Catalog Grid */}
+                            <div className="flex-1 flex flex-col min-w-0">
+                                {/* Search Bar */}
+                                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3 bg-white dark:bg-slate-900 shrink-0">
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search test names, organ, method or container..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-all font-medium text-slate-800 dark:text-slate-100"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Tests Grid list */}
+                                <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 dark:bg-slate-900/30">
+                                    {isLoadingSamples ? (
+                                        <div className="flex flex-col items-center justify-center h-full gap-2">
+                                            <div className="w-6 h-6 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loading Catalog...</span>
+                                        </div>
+                                    ) : availableSamples.filter(sample => {
+                                        const matchesSearch = (sample.testName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                            (sample.organ || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                            (sample.category || "").toLowerCase().includes(searchQuery.toLowerCase());
+                                        const matchesCategory = selectedCategory === "All" || (sample.category || "General") === selectedCategory;
+                                        const matchesOrgan = selectedOrgan === "All" || sample.organ === selectedOrgan;
+                                        return matchesSearch && matchesCategory && matchesOrgan;
+                                    }).length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                                            <Activity className="w-10 h-10 text-slate-300 mb-2" />
+                                            <p className="text-xs font-bold text-slate-500">No tests found matching search criteria.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {availableSamples.filter(sample => {
+                                                const matchesSearch = (sample.testName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                    (sample.organ || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                    (sample.category || "").toLowerCase().includes(searchQuery.toLowerCase());
+                                                const matchesCategory = selectedCategory === "All" || (sample.category || "General") === selectedCategory;
+                                                const matchesOrgan = selectedOrgan === "All" || sample.organ === selectedOrgan;
+                                                return matchesSearch && matchesCategory && matchesOrgan;
+                                            }).map((sample) => {
+                                                const isSelected = selectedTestIds.includes(sample._id);
+                                                return (
+                                                    <div
+                                                        key={sample._id}
+                                                        onClick={() => toggleTestSelection(sample._id)}
+                                                        className={cn(
+                                                            "p-4 bg-white dark:bg-slate-900 border rounded-2xl cursor-pointer hover:shadow-md transition-all flex justify-between items-start gap-4 select-none group relative overflow-hidden",
+                                                            isSelected
+                                                                ? "border-blue-500 ring-2 ring-blue-500/10 dark:bg-slate-900"
+                                                                : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                                                        )}
+                                                    >
+                                                        <div className="space-y-1.5 flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-black uppercase tracking-wider rounded border border-blue-100/50 dark:border-blue-900/50">
+                                                                    {sample.category || "General"}
+                                                                </span>
+                                                                {sample.organ && sample.organ !== "-" && (
+                                                                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[8px] font-bold uppercase tracking-wide rounded">
+                                                                        {sample.organ}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight truncate font-bold">
+                                                                {sample.testName}
+                                                            </h4>
+                                                            <div className="flex items-center gap-3 text-[9px] text-slate-400 font-bold uppercase tracking-wide">
+                                                                <span>Method: {sample.method || "-"}</span>
+                                                                <span>•</span>
+                                                                <span>Specimen: {sample.sampleUsedForTest || "-"}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="text-right shrink-0 flex flex-col items-end justify-between h-full min-h-[50px]">
+                                                            <span className="text-xs font-black text-slate-900 dark:text-white">
+                                                                ₹{parseFloat(sample.patientPrice) || 0}
+                                                            </span>
+                                                            <div className={cn(
+                                                                "w-4 h-4 rounded-full border flex items-center justify-center transition-all",
+                                                                isSelected
+                                                                    ? "bg-blue-600 border-blue-600 text-white"
+                                                                    : "border-slate-300 dark:border-slate-600 group-hover:border-blue-400"
+                                                            )}>
+                                                                {isSelected && <Check className="w-2.5 h-2.5" />}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Right Sidebar: Selected Tests Summary */}
+                            <div className="w-full lg:w-72 h-48 lg:h-auto bg-white dark:bg-slate-950/20 border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-slate-800 flex flex-col shrink-0 overflow-hidden">
+                                <div className="p-4 border-b border-slate-100 dark:border-slate-800">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Selected Investigations</span>
+                                    <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mt-1 uppercase truncate">
+                                        {availableSamples.filter(s => selectedTestIds.includes(s._id)).length} tests added
+                                    </p>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+                                    {availableSamples.filter(s => selectedTestIds.includes(s._id)).length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 py-12">
+                                            <ShoppingCart className="w-8 h-8 text-slate-300 mb-2" />
+                                            <p className="text-[10px] font-bold uppercase tracking-wider">No tests selected yet</p>
+                                        </div>
+                                    ) : (
+                                        availableSamples.filter(s => selectedTestIds.includes(s._id)).map((t) => (
+                                            <div key={t._id} className="p-2.5 bg-slate-50 dark:bg-slate-850/50 border border-slate-100 dark:border-slate-800 rounded-xl flex items-center justify-between gap-3 text-xs">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-bold text-slate-800 dark:text-slate-200 truncate uppercase tracking-tight">{t.testName}</p>
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{t.category}</p>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    <span className="font-extrabold text-slate-900 dark:text-white">₹{t.patientPrice}</span>
+                                                    <button
+                                                        onClick={() => toggleTestSelection(t._id)}
+                                                        className="text-slate-400 hover:text-rose-600 transition-colors p-0.5 cursor-pointer"
+                                                    >
+                                                        <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 space-y-3 shrink-0">
+                                    <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                                        <span>Subtotal</span>
+                                        <span className="text-slate-800 dark:text-slate-200">
+                                            ₹{availableSamples.filter(s => selectedTestIds.includes(s._id)).reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm font-black border-t border-dashed border-slate-200 dark:border-slate-800 pt-2">
+                                        <span className="text-slate-900 dark:text-white uppercase tracking-wider">Total Payable</span>
+                                        <span className="text-blue-600 dark:text-blue-400 text-lg">
+                                            ₹{availableSamples.filter(s => selectedTestIds.includes(s._id)).reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
+                            <button
+                                onClick={() => {
+                                    if (confirm("Skip test selection? You can print receipt without tests.")) {
+                                        setShowTestSelection(false);
+                                        setShowReceipt(true);
+                                    }
+                                }}
+                                className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold rounded-xl text-xs transition-all active:scale-95 cursor-pointer"
+                            >
+                                Skip & Print Receipt
+                            </button>
+                            <button
+                                onClick={handleSaveTests}
+                                disabled={selectedTestIds.length === 0 || isSavingTests}
+                                className={cn(
+                                    "px-6 py-2 font-bold rounded-xl text-xs transition-all active:scale-95 flex items-center gap-1.5 border shadow-md",
+                                    selectedTestIds.length > 0 && !isSavingTests
+                                        ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 border-transparent cursor-pointer"
+                                        : "bg-transparent text-slate-300 dark:text-slate-700 border-slate-200 dark:border-slate-800 cursor-not-allowed"
+                                )}
+                            >
+                                {isSavingTests ? (
+                                    <>
+                                        <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-white rounded-full animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Printer className="w-4 h-4" />
+                                        Confirm & Save Tests
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            ) : !showForm ? (
                 <div className="space-y-5 print:hidden">
                     {/* Header */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -791,8 +1176,9 @@ const PatientRegistrationForm: React.FC = () => {
                                     <span>Export Excel</span>
                                 </button>
                             )}
-                            <button 
+                            <button
                                 onClick={() => {
+                                    setSavedRecord(null);
                                     setFormData({
                                         location: { state: "", district: "", city: "" },
                                         patientName: "",
@@ -830,7 +1216,7 @@ const PatientRegistrationForm: React.FC = () => {
                             <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                 <Search className="w-4 h-4" />
                             </span>
-                            <input 
+                            <input
                                 id="patient-search-input"
                                 type="text"
                                 placeholder="Search by name, registration no, phone..."
@@ -937,19 +1323,6 @@ const PatientRegistrationForm: React.FC = () => {
                                                     <td className="px-6 py-4 text-right">
                                                         <div className="flex items-center justify-end gap-1.5">
                                                             <button
-                                                                onClick={async () => {
-                                                                    setSavedRecord(reg);
-                                                                    const testIds = reg.tests ? reg.tests.map((t: any) => typeof t === "string" ? t : t._id) : [];
-                                                                    setSelectedTestIds(testIds);
-                                                                    await fetchSamples();
-                                                                    setShowTestSelection(true);
-                                                                }}
-                                                                className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                                                                title="Add/Edit Tests"
-                                                            >
-                                                                <Clipboard className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            <button
                                                                 onClick={() => {
                                                                     setSavedRecord(reg);
                                                                     setPrintType("receipt");
@@ -1003,7 +1376,7 @@ const PatientRegistrationForm: React.FC = () => {
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
-                            <button 
+                            <button
                                 onClick={() => setShowForm(false)}
                                 className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-lg text-xs text-slate-700 dark:text-slate-300 transition-all active:scale-95 shadow-sm cursor-pointer"
                             >
@@ -1021,7 +1394,7 @@ const PatientRegistrationForm: React.FC = () => {
                                     We found and restored a pending patient registration draft.
                                 </p>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => {
                                     localStorage.removeItem("medoraa_registration_draft");
                                     setIsDraftRestored(false);
@@ -1054,7 +1427,7 @@ const PatientRegistrationForm: React.FC = () => {
                                         <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
                                             Patient Name <span className="text-rose-500 font-bold">*</span>
                                         </label>
-                                        <input 
+                                        <input
                                             type="text"
                                             value={formData.patientName}
                                             onChange={(e) => setFormData(prev => ({ ...prev, patientName: e.target.value }))}
@@ -1068,7 +1441,7 @@ const PatientRegistrationForm: React.FC = () => {
                                         <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
                                             Mobile Number <span className="text-rose-500 font-bold">*</span>
                                         </label>
-                                        <input 
+                                        <input
                                             type="text"
                                             maxLength={10}
                                             value={formData.mobileNumber}
@@ -1092,7 +1465,7 @@ const PatientRegistrationForm: React.FC = () => {
                                             Age <span className="text-rose-500 font-bold">*</span>
                                         </label>
                                         <div className="flex gap-2">
-                                            <input 
+                                            <input
                                                 type="number"
                                                 min={1}
                                                 value={formData.age.value}
@@ -1100,7 +1473,7 @@ const PatientRegistrationForm: React.FC = () => {
                                                 placeholder="Value"
                                                 className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
                                             />
-                                            <select 
+                                            <select
                                                 value={formData.age.type}
                                                 onChange={(e) => setFormData(prev => ({ ...prev, age: { ...prev.age, type: e.target.value as any } }))}
                                                 className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none font-bold"
@@ -1120,7 +1493,7 @@ const PatientRegistrationForm: React.FC = () => {
                                         <div className="flex gap-4 items-center h-[34px]">
                                             {["Male", "Female", "Other"].map(g => (
                                                 <label key={g} className="flex items-center gap-1.5 cursor-pointer font-semibold text-xs text-slate-700 dark:text-slate-300">
-                                                    <input 
+                                                    <input
                                                         type="radio"
                                                         name="gender"
                                                         value={g}
@@ -1140,7 +1513,7 @@ const PatientRegistrationForm: React.FC = () => {
                                     <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
                                         Complete Address <span className="text-rose-500 font-bold">*</span>
                                     </label>
-                                    <textarea 
+                                    <textarea
                                         rows={1}
                                         value={formData.address}
                                         onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
@@ -1155,7 +1528,7 @@ const PatientRegistrationForm: React.FC = () => {
                                         <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
                                             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> State
                                         </label>
-                                        <input 
+                                        <input
                                             type="text"
                                             value={formData.location.state}
                                             onChange={(e) => setFormData(prev => ({
@@ -1170,7 +1543,7 @@ const PatientRegistrationForm: React.FC = () => {
                                         <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
                                             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> District
                                         </label>
-                                        <input 
+                                        <input
                                             type="text"
                                             value={formData.location.district}
                                             onChange={(e) => setFormData(prev => ({
@@ -1185,7 +1558,7 @@ const PatientRegistrationForm: React.FC = () => {
                                         <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
                                             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> City / Area
                                         </label>
-                                        <input 
+                                        <input
                                             type="text"
                                             value={formData.location.city}
                                             onChange={(e) => setFormData(prev => ({
@@ -1212,47 +1585,47 @@ const PatientRegistrationForm: React.FC = () => {
                                         </h2>
                                     </div>
 
-                                     <div className="space-y-3 text-left">
-                                         <SearchableSelect 
-                                             label="Select Hospital (Optional)"
-                                             options={hospitals.map(h => h.hospitalName)}
-                                             value={formData.selectedHospital === "Self" ? "" : (formData.selectedHospital || "")}
-                                             onChange={(val) => setFormData(prev => ({ ...prev, selectedHospital: val, selectedDoctor: "" }))}
-                                             placeholder="Search hospital to filter doctors..."
-                                         />
+                                    <div className="space-y-3 text-left">
+                                        <SearchableSelect
+                                            label="Select Hospital (Optional)"
+                                            options={hospitals.map(h => h.hospitalName)}
+                                            value={formData.selectedHospital === "Self" ? "" : (formData.selectedHospital || "")}
+                                            onChange={(val) => setFormData(prev => ({ ...prev, selectedHospital: val, selectedDoctor: "" }))}
+                                            placeholder="Search hospital to filter doctors..."
+                                        />
 
-                                         <SearchableSelect 
-                                             label="Referred By (Doctor / Referral Source)"
-                                             options={referredByOptions}
-                                             value={currentReferredBy}
-                                             onChange={handleReferredByChange}
-                                             mandatory
-                                             placeholder="Search Self, Lab or Doctor..."
-                                         />
+                                        <SearchableSelect
+                                            label="Referred By (Doctor / Referral Source)"
+                                            options={referredByOptions}
+                                            value={currentReferredBy}
+                                            onChange={handleReferredByChange}
+                                            mandatory
+                                            placeholder="Search Self, Lab or Doctor..."
+                                        />
 
-                                         {(formData.referralMode || "Self") === "Self" && (formData.selectedLab || "Medoraa Labs (Our Lab)") !== "Medoraa Labs (Our Lab)" ? (
-                                             <div className="flex flex-col gap-1">
-                                                 <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                                     Sample Drawn By (Phlebotomist)
-                                                 </label>
-                                                 <input
-                                                     type="text"
-                                                     value={formData.sampleDrawnBy}
-                                                     onChange={(e) => setFormData(prev => ({ ...prev, sampleDrawnBy: e.target.value }))}
-                                                     placeholder="Enter phlebotomist name"
-                                                     className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
-                                                 />
-                                             </div>
-                                         ) : (
-                                             <SearchableSelect 
-                                                 label="Sample Drawn By"
-                                                 options={staffOptions}
-                                                 value={formData.sampleDrawnBy}
-                                                 onChange={(val) => setFormData(prev => ({ ...prev, sampleDrawnBy: val }))}
-                                                 placeholder="Select employee"
-                                             />
-                                         )}
-                                     </div>
+                                        {(formData.referralMode || "Self") === "Self" && (formData.selectedLab || "Medoraa Labs (Our Lab)") !== "Medoraa Labs (Our Lab)" ? (
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                                    Sample Drawn By (Phlebotomist)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.sampleDrawnBy}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleDrawnBy: e.target.value }))}
+                                                    placeholder="Enter phlebotomist name"
+                                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <SearchableSelect
+                                                label="Sample Drawn By"
+                                                options={staffOptions}
+                                                value={formData.sampleDrawnBy}
+                                                onChange={(val) => setFormData(prev => ({ ...prev, sampleDrawnBy: val }))}
+                                                placeholder="Select employee"
+                                            />
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* SECTION 4: Sample Received By / Transport */}
@@ -1271,7 +1644,7 @@ const PatientRegistrationForm: React.FC = () => {
                                             <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
                                                 Received Through <span className="text-rose-500 font-bold">*</span>
                                             </label>
-                                            <select 
+                                            <select
                                                 value={formData.sampleReceived.receivedThrough}
                                                 onChange={(e) => {
                                                     const type = e.target.value;
@@ -1293,433 +1666,433 @@ const PatientRegistrationForm: React.FC = () => {
                                         {/* DYNAMIC FIELDS */}
                                         {formData.sampleReceived.receivedThrough !== "None" && (
                                             <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-slate-100 dark:border-slate-800 space-y-2">
-                                            {/* Option A: Employee */}
-                                            {formData.sampleReceived.receivedThrough === "Employee" && (
-                                                <div className="grid grid-cols-2 gap-2 text-left">
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Name <span className="text-rose-500 font-bold">*</span></label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.employee.name}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, name: e.target.value } } }))}
-                                                            placeholder="Name"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold animate-fadeIn"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Employee ID <span className="text-rose-500 font-bold">*</span></label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.employee.id}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, id: e.target.value } } }))}
-                                                            placeholder="EMP-ID"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold animate-fadeIn"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Mobile</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.employee.mobileNumber}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, mobileNumber: e.target.value } } }))}
-                                                            placeholder="Mobile (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Department</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.employee.department}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, department: e.target.value } } }))}
-                                                            placeholder="Dept (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Designation</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.employee.designation}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, designation: e.target.value } } }))}
-                                                            placeholder="Desig (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Date/Time Received</label>
-                                                        <div className="flex gap-1">
-                                                            <input 
-                                                                type="text" 
-                                                                value={formData.sampleReceived.employee.dateReceived}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, dateReceived: e.target.value } } }))}
-                                                                placeholder="Date (Optional)"
-                                                                className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                {/* Option A: Employee */}
+                                                {formData.sampleReceived.receivedThrough === "Employee" && (
+                                                    <div className="grid grid-cols-2 gap-2 text-left">
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Name <span className="text-rose-500 font-bold">*</span></label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.employee.name}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, name: e.target.value } } }))}
+                                                                placeholder="Name"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold animate-fadeIn"
                                                             />
-                                                            <input 
-                                                                type="text" 
-                                                                value={formData.sampleReceived.employee.timeReceived}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, timeReceived: e.target.value } } }))}
-                                                                placeholder="Time (Optional)"
-                                                                className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Employee ID <span className="text-rose-500 font-bold">*</span></label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.employee.id}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, id: e.target.value } } }))}
+                                                                placeholder="EMP-ID"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold animate-fadeIn"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Mobile</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.employee.mobileNumber}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, mobileNumber: e.target.value } } }))}
+                                                                placeholder="Mobile (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Department</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.employee.department}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, department: e.target.value } } }))}
+                                                                placeholder="Dept (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Designation</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.employee.designation}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, designation: e.target.value } } }))}
+                                                                placeholder="Desig (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Date/Time Received</label>
+                                                            <div className="flex gap-1">
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.sampleReceived.employee.dateReceived}
+                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, dateReceived: e.target.value } } }))}
+                                                                    placeholder="Date (Optional)"
+                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.sampleReceived.employee.timeReceived}
+                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, timeReceived: e.target.value } } }))}
+                                                                    placeholder="Time (Optional)"
+                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 col-span-2">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Remarks</label>
+                                                            <textarea
+                                                                rows={1}
+                                                                value={formData.sampleReceived.employee.remarks}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, remarks: e.target.value } } }))}
+                                                                placeholder="Remarks (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold resize-none"
                                                             />
                                                         </div>
                                                     </div>
-                                                    <div className="flex flex-col gap-0.5 col-span-2">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Remarks</label>
-                                                        <textarea 
-                                                            rows={1}
-                                                            value={formData.sampleReceived.employee.remarks}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, remarks: e.target.value } } }))}
-                                                            placeholder="Remarks (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold resize-none"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {/* Option B: Person */}
-                                            {formData.sampleReceived.receivedThrough === "Person" && (
-                                                <div className="grid grid-cols-2 gap-2 text-left">
-                                                    <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Name <span className="text-rose-500 font-bold">*</span></label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.person.name}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, name: e.target.value } } }))}
-                                                            placeholder="Name"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Mobile <span className="text-rose-500 font-bold">*</span></label>
-                                                        <input 
-                                                            type="text" 
-                                                            maxLength={10}
-                                                            value={formData.sampleReceived.person.mobileNumber}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, mobileNumber: e.target.value.replace(/\D/g, "") } } }))}
-                                                            placeholder="10-digit mobile"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Relationship <span className="text-rose-500 font-bold">*</span></label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.person.relationship}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, relationship: e.target.value } } }))}
-                                                            placeholder="e.g. Brother, Staff"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Address</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.person.address}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, address: e.target.value } } }))}
-                                                            placeholder="Address (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">ID Proof Type</label>
-                                                        <select 
-                                                            value={formData.sampleReceived.person.idProofType}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, idProofType: e.target.value } } }))}
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold"
-                                                        >
-                                                            <option value="Aadhaar">Aadhaar</option>
-                                                            <option value="PAN">PAN</option>
-                                                            <option value="Voter ID">Voter ID</option>
-                                                            <option value="Driving License">Driving License</option>
-                                                            <option value="Other">Other</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">ID Proof Number</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.person.idProofNumber}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, idProofNumber: e.target.value } } }))}
-                                                            placeholder="ID Number (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5 col-span-2">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Date/Time Received</label>
-                                                        <div className="flex gap-1">
-                                                            <input 
-                                                                type="text" 
-                                                                value={formData.sampleReceived.person.dateReceived}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, dateReceived: e.target.value } } }))}
-                                                                placeholder="Date (Optional)"
-                                                                className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                )}
+                                                {/* Option B: Person */}
+                                                {formData.sampleReceived.receivedThrough === "Person" && (
+                                                    <div className="grid grid-cols-2 gap-2 text-left">
+                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Name <span className="text-rose-500 font-bold">*</span></label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.person.name}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, name: e.target.value } } }))}
+                                                                placeholder="Name"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
                                                             />
-                                                            <input 
-                                                                type="text" 
-                                                                value={formData.sampleReceived.person.timeReceived}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, timeReceived: e.target.value } } }))}
-                                                                placeholder="Time (Optional)"
-                                                                className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Mobile <span className="text-rose-500 font-bold">*</span></label>
+                                                            <input
+                                                                type="text"
+                                                                maxLength={10}
+                                                                value={formData.sampleReceived.person.mobileNumber}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, mobileNumber: e.target.value.replace(/\D/g, "") } } }))}
+                                                                placeholder="10-digit mobile"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Relationship <span className="text-rose-500 font-bold">*</span></label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.person.relationship}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, relationship: e.target.value } } }))}
+                                                                placeholder="e.g. Brother, Staff"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Address</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.person.address}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, address: e.target.value } } }))}
+                                                                placeholder="Address (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">ID Proof Type</label>
+                                                            <select
+                                                                value={formData.sampleReceived.person.idProofType}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, idProofType: e.target.value } } }))}
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold"
+                                                            >
+                                                                <option value="Aadhaar">Aadhaar</option>
+                                                                <option value="PAN">PAN</option>
+                                                                <option value="Voter ID">Voter ID</option>
+                                                                <option value="Driving License">Driving License</option>
+                                                                <option value="Other">Other</option>
+                                                            </select>
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">ID Proof Number</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.person.idProofNumber}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, idProofNumber: e.target.value } } }))}
+                                                                placeholder="ID Number (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 col-span-2">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Date/Time Received</label>
+                                                            <div className="flex gap-1">
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.sampleReceived.person.dateReceived}
+                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, dateReceived: e.target.value } } }))}
+                                                                    placeholder="Date (Optional)"
+                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.sampleReceived.person.timeReceived}
+                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, timeReceived: e.target.value } } }))}
+                                                                    placeholder="Time (Optional)"
+                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 col-span-2">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Remarks</label>
+                                                            <textarea
+                                                                rows={1}
+                                                                value={formData.sampleReceived.person.remarks}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, remarks: e.target.value } } }))}
+                                                                placeholder="Remarks (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold resize-none"
                                                             />
                                                         </div>
                                                     </div>
-                                                    <div className="flex flex-col gap-0.5 col-span-2">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Remarks</label>
-                                                        <textarea 
-                                                            rows={1}
-                                                            value={formData.sampleReceived.person.remarks}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, remarks: e.target.value } } }))}
-                                                            placeholder="Remarks (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold resize-none"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {/* Option C: Courier */}
-                                            {formData.sampleReceived.receivedThrough === "Courier" && (
-                                                <div className="grid grid-cols-2 gap-2 text-left">
-                                                    <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Company <span className="text-rose-500 font-bold">*</span></label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.courier.companyName}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, companyName: e.target.value } } }))}
-                                                            placeholder="e.g. DHL"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Tracking # <span className="text-rose-500 font-bold">*</span></label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.courier.trackingNumber}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, trackingNumber: e.target.value } } }))}
-                                                            placeholder="Tracking ID"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Order #</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.courier.orderNumber}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, orderNumber: e.target.value } } }))}
-                                                            placeholder="Order # (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Contact Number</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.courier.contactNumber}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, contactNumber: e.target.value } } }))}
-                                                            placeholder="Contact (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Pickup Location</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.courier.pickupLocation}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, pickupLocation: e.target.value } } }))}
-                                                            placeholder="Pickup (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Received By (Employee)</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.courier.receivedByEmployee}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, receivedByEmployee: e.target.value } } }))}
-                                                            placeholder="Employee (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Condition</label>
-                                                        <select 
-                                                            value={formData.sampleReceived.courier.packageCondition}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, packageCondition: e.target.value as any } } }))}
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold"
-                                                        >
-                                                            <option value="Good">Good</option>
-                                                            <option value="Damaged">Damaged</option>
-                                                            <option value="Opened">Opened</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Arrival Date/Time</label>
-                                                        <div className="flex gap-1">
-                                                            <input 
-                                                                type="text" 
-                                                                value={formData.sampleReceived.courier.arrivalDate}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, arrivalDate: e.target.value } } }))}
-                                                                placeholder="Date"
-                                                                className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                )}
+                                                {/* Option C: Courier */}
+                                                {formData.sampleReceived.receivedThrough === "Courier" && (
+                                                    <div className="grid grid-cols-2 gap-2 text-left">
+                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Company <span className="text-rose-500 font-bold">*</span></label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.courier.companyName}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, companyName: e.target.value } } }))}
+                                                                placeholder="e.g. DHL"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
                                                             />
-                                                            <input 
-                                                                type="text" 
-                                                                value={formData.sampleReceived.courier.arrivalTime}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, arrivalTime: e.target.value } } }))}
-                                                                placeholder="Time"
-                                                                className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Tracking # <span className="text-rose-500 font-bold">*</span></label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.courier.trackingNumber}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, trackingNumber: e.target.value } } }))}
+                                                                placeholder="Tracking ID"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Order #</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.courier.orderNumber}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, orderNumber: e.target.value } } }))}
+                                                                placeholder="Order # (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Contact Number</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.courier.contactNumber}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, contactNumber: e.target.value } } }))}
+                                                                placeholder="Contact (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Pickup Location</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.courier.pickupLocation}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, pickupLocation: e.target.value } } }))}
+                                                                placeholder="Pickup (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Received By (Employee)</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.courier.receivedByEmployee}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, receivedByEmployee: e.target.value } } }))}
+                                                                placeholder="Employee (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Condition</label>
+                                                            <select
+                                                                value={formData.sampleReceived.courier.packageCondition}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, packageCondition: e.target.value as any } } }))}
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold"
+                                                            >
+                                                                <option value="Good">Good</option>
+                                                                <option value="Damaged">Damaged</option>
+                                                                <option value="Opened">Opened</option>
+                                                            </select>
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Arrival Date/Time</label>
+                                                            <div className="flex gap-1">
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.sampleReceived.courier.arrivalDate}
+                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, arrivalDate: e.target.value } } }))}
+                                                                    placeholder="Date"
+                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.sampleReceived.courier.arrivalTime}
+                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, arrivalTime: e.target.value } } }))}
+                                                                    placeholder="Time"
+                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 col-span-2">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Remarks</label>
+                                                            <textarea
+                                                                rows={1}
+                                                                value={formData.sampleReceived.courier.remarks}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, remarks: e.target.value } } }))}
+                                                                placeholder="Remarks (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold resize-none"
                                                             />
                                                         </div>
                                                     </div>
-                                                    <div className="flex flex-col gap-0.5 col-span-2">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Remarks</label>
-                                                        <textarea 
-                                                            rows={1}
-                                                            value={formData.sampleReceived.courier.remarks}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, remarks: e.target.value } } }))}
-                                                            placeholder="Remarks (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold resize-none"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {/* Option D: Bus */}
-                                            {formData.sampleReceived.receivedThrough === "Bus" && (
-                                                <div className="grid grid-cols-2 gap-2 text-left">
-                                                    <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Bus Number <span className="text-rose-500 font-bold">*</span></label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.bus.busNumber}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, busNumber: e.target.value } } }))}
-                                                            placeholder="Bus Number"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Service Name <span className="text-rose-500 font-bold">*</span></label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.bus.busServiceName}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, busServiceName: e.target.value } } }))}
-                                                            placeholder="Bus Service"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Driver Mobile <span className="text-rose-500 font-bold">*</span></label>
-                                                        <input 
-                                                            type="text" 
-                                                            maxLength={10}
-                                                            value={formData.sampleReceived.bus.driverMobileNumber}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, driverMobileNumber: e.target.value.replace(/\D/g, "") } } }))}
-                                                            placeholder="Mobile"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Driver Name</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.bus.driverName}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, driverName: e.target.value } } }))}
-                                                            placeholder="Driver Name"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Conductor Name</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.bus.conductorName}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, conductorName: e.target.value } } }))}
-                                                            placeholder="Conductor Name"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Conductor Mobile</label>
-                                                        <input 
-                                                            type="text" 
-                                                            maxLength={10}
-                                                            value={formData.sampleReceived.bus.conductorMobileNumber}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, conductorMobileNumber: e.target.value.replace(/\D/g, "") } } }))}
-                                                            placeholder="Conductor Mobile"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Origin</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.bus.originLocation}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, originLocation: e.target.value } } }))}
-                                                            placeholder="Origin"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Destination</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.bus.destinationLocation}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, destinationLocation: e.target.value } } }))}
-                                                            placeholder="Destination"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Received By</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.bus.receivedByEmployee}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, receivedByEmployee: e.target.value } } }))}
-                                                            placeholder="Employee Name"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Condition</label>
-                                                        <input 
-                                                            type="text" 
-                                                            value={formData.sampleReceived.bus.packageCondition}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, packageCondition: e.target.value } } }))}
-                                                            placeholder="e.g. Good"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-0.5 col-span-2">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Arrival Date/Time</label>
-                                                        <div className="flex gap-1">
-                                                            <input 
-                                                                type="text" 
-                                                                value={formData.sampleReceived.bus.arrivalDate}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, arrivalDate: e.target.value } } }))}
-                                                                placeholder="Date"
-                                                                className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                )}
+                                                {/* Option D: Bus */}
+                                                {formData.sampleReceived.receivedThrough === "Bus" && (
+                                                    <div className="grid grid-cols-2 gap-2 text-left">
+                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Bus Number <span className="text-rose-500 font-bold">*</span></label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.bus.busNumber}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, busNumber: e.target.value } } }))}
+                                                                placeholder="Bus Number"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
                                                             />
-                                                            <input 
-                                                                type="text" 
-                                                                value={formData.sampleReceived.bus.arrivalTime}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, arrivalTime: e.target.value } } }))}
-                                                                placeholder="Time"
-                                                                className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Service Name <span className="text-rose-500 font-bold">*</span></label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.bus.busServiceName}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, busServiceName: e.target.value } } }))}
+                                                                placeholder="Bus Service"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Driver Mobile <span className="text-rose-500 font-bold">*</span></label>
+                                                            <input
+                                                                type="text"
+                                                                maxLength={10}
+                                                                value={formData.sampleReceived.bus.driverMobileNumber}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, driverMobileNumber: e.target.value.replace(/\D/g, "") } } }))}
+                                                                placeholder="Mobile"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Driver Name</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.bus.driverName}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, driverName: e.target.value } } }))}
+                                                                placeholder="Driver Name"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Conductor Name</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.bus.conductorName}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, conductorName: e.target.value } } }))}
+                                                                placeholder="Conductor Name"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Conductor Mobile</label>
+                                                            <input
+                                                                type="text"
+                                                                maxLength={10}
+                                                                value={formData.sampleReceived.bus.conductorMobileNumber}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, conductorMobileNumber: e.target.value.replace(/\D/g, "") } } }))}
+                                                                placeholder="Conductor Mobile"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Origin</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.bus.originLocation}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, originLocation: e.target.value } } }))}
+                                                                placeholder="Origin"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Destination</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.bus.destinationLocation}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, destinationLocation: e.target.value } } }))}
+                                                                placeholder="Destination"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Received By</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.bus.receivedByEmployee}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, receivedByEmployee: e.target.value } } }))}
+                                                                placeholder="Employee Name"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Condition</label>
+                                                            <input
+                                                                type="text"
+                                                                value={formData.sampleReceived.bus.packageCondition}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, packageCondition: e.target.value } } }))}
+                                                                placeholder="e.g. Good"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 col-span-2">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Arrival Date/Time</label>
+                                                            <div className="flex gap-1">
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.sampleReceived.bus.arrivalDate}
+                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, arrivalDate: e.target.value } } }))}
+                                                                    placeholder="Date"
+                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.sampleReceived.bus.arrivalTime}
+                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, arrivalTime: e.target.value } } }))}
+                                                                    placeholder="Time"
+                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col gap-0.5 col-span-2">
+                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Remarks</label>
+                                                            <textarea
+                                                                rows={1}
+                                                                value={formData.sampleReceived.bus.remarks}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, remarks: e.target.value } } }))}
+                                                                placeholder="Remarks (Optional)"
+                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold resize-none"
                                                             />
                                                         </div>
                                                     </div>
-                                                    <div className="flex flex-col gap-0.5 col-span-2">
-                                                        <label className="text-[9px] font-bold text-slate-500 uppercase">Remarks</label>
-                                                        <textarea 
-                                                            rows={1}
-                                                            value={formData.sampleReceived.bus.remarks}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, remarks: e.target.value } } }))}
-                                                            placeholder="Remarks (Optional)"
-                                                            className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold resize-none"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1793,7 +2166,7 @@ const PatientRegistrationForm: React.FC = () => {
 
                             {/* Actions Panel */}
                             <div className="space-y-2.5">
-                                <button 
+                                <button
                                     disabled={!isFormValid || isSaving}
                                     onClick={() => handleSave(false)}
                                     className={cn(
@@ -1808,37 +2181,24 @@ const PatientRegistrationForm: React.FC = () => {
                                         </>
                                     ) : (
                                         <>
-                                            <Check className="w-3.5 h-3.5" />
-                                            Save Patient Registration
+                                            <Plus className="w-3.5 h-3.5" />
+                                            Add Test
                                         </>
                                     )}
                                 </button>
 
-                                <button 
-                                    disabled={!isFormValid || isSaving}
-                                    onClick={() => handleSave(true)}
-                                    className={cn(
-                                        "w-full py-2.5 font-bold rounded-xl text-xs transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 border",
-                                        isFormValid && !isSaving 
-                                            ? "bg-slate-900 hover:bg-slate-800 text-white border-transparent cursor-pointer" 
-                                            : "bg-transparent text-slate-300 dark:text-slate-700 border-slate-200 dark:border-slate-800 cursor-not-allowed"
-                                    )}
-                                >
-                                    <Printer className="w-3.5 h-3.5" />
-                                    Save &amp; Print Receipt
-                                </button>
-
                                 <div className="grid grid-cols-2 gap-2.5 pt-1.5">
-                                    <button 
+                                    <button
                                         onClick={handleReset}
                                         className="py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-xl text-xs text-slate-600 dark:text-slate-400 transition-all active:scale-95 cursor-pointer"
                                     >
                                         Reset Form
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             if (confirm("Discard draft changes and cancel?")) {
                                                 setShowForm(false);
+                                                setSavedRecord(null);
                                             }
                                         }}
                                         className="py-2 border border-rose-200 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-bold rounded-xl text-xs text-rose-600 dark:text-rose-400 transition-all active:scale-95 cursor-pointer"
@@ -1851,266 +2211,7 @@ const PatientRegistrationForm: React.FC = () => {
                     </div>
                 </div>
             )}
-
-            {/* TEST SELECTION OVERLAY */}
-
-            {showTestSelection && savedRecord && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col h-[85vh] max-h-[800px]">
-                        
-                        {/* Header */}
-                        <div className="flex items-center justify-between px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 shrink-0">
-                            <div>
-                                <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                                    <Activity className="w-5 h-5 text-blue-600" />
-                                    Select Tests / Samples for {savedRecord.patientName}
-                                </h3>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                                    Registration No: {savedRecord.registrationNumber} | Referrer: {savedRecord.referredBy}
-                                </p>
-                            </div>
-                            <button 
-                                onClick={() => {
-                                    if (confirm("Skip test selection? You can print receipt without tests.")) {
-                                        setShowTestSelection(false);
-                                        setShowReceipt(true);
-                                    }
-                                }}
-                                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {/* Content Area */}
-                        <div className="flex-1 flex overflow-hidden min-h-0">
-                            
-                            {/* Left Sidebar: Categories */}
-                            <div className="w-48 bg-slate-50 dark:bg-slate-950/40 border-r border-slate-100 dark:border-slate-800 flex flex-col shrink-0">
-                                <div className="p-3 border-b border-slate-100 dark:border-slate-800">
-                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Categories</span>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                                    {["All", ...Array.from(new Set(availableSamples.map(s => s.category || "General").filter(c => c && c !== "-")))].map((cat) => {
-                                        const catCount = availableSamples.filter(s => (s.category || "General") === cat && cat !== "All").length;
-                                        const isSelected = selectedCategory === cat;
-                                        return (
-                                            <button
-                                                key={cat}
-                                                onClick={() => setSelectedCategory(cat)}
-                                                className={cn(
-                                                    "w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between",
-                                                    isSelected 
-                                                        ? "bg-blue-600 text-white shadow-md shadow-blue-600/15" 
-                                                        : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400"
-                                                )}
-                                            >
-                                                <span className="truncate">{cat}</span>
-                                                {cat !== "All" && (
-                                                    <span className={cn(
-                                                        "text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ml-1.5",
-                                                        isSelected ? "bg-blue-700 text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-500"
-                                                    )}>
-                                                        {catCount}
-                                                    </span>
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Middle Content: Test Catalog Grid */}
-                            <div className="flex-1 flex flex-col min-w-0">
-                                {/* Search Bar */}
-                                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3 bg-white dark:bg-slate-900 shrink-0">
-                                    <div className="relative flex-1">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search test names, organ, method or container..."
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-all font-medium text-slate-800 dark:text-slate-100"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Tests Grid list */}
-                                <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                                    {isLoadingSamples ? (
-                                        <div className="flex flex-col items-center justify-center h-full gap-2">
-                                            <div className="w-6 h-6 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loading Catalog...</span>
-                                        </div>
-                                    ) : availableSamples.filter(sample => {
-                                        const matchesSearch = (sample.testName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                            (sample.organ || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                            (sample.category || "").toLowerCase().includes(searchQuery.toLowerCase());
-                                        const matchesCategory = selectedCategory === "All" || (sample.category || "General") === selectedCategory;
-                                        return matchesSearch && matchesCategory;
-                                    }).length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center h-full text-center p-6">
-                                            <Activity className="w-10 h-10 text-slate-300 mb-2" />
-                                            <p className="text-xs font-bold text-slate-500">No tests found matching search criteria.</p>
-                                        </div>
-                                    ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            {availableSamples.filter(sample => {
-                                                const matchesSearch = (sample.testName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                    (sample.organ || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                    (sample.category || "").toLowerCase().includes(searchQuery.toLowerCase());
-                                                const matchesCategory = selectedCategory === "All" || (sample.category || "General") === selectedCategory;
-                                                return matchesSearch && matchesCategory;
-                                            }).map((sample) => {
-                                                const isSelected = selectedTestIds.includes(sample._id);
-                                                return (
-                                                    <div
-                                                        key={sample._id}
-                                                        onClick={() => toggleTestSelection(sample._id)}
-                                                        className={cn(
-                                                            "p-4 bg-white dark:bg-slate-900 border rounded-2xl cursor-pointer hover:shadow-md transition-all flex justify-between items-start gap-4 select-none group relative overflow-hidden",
-                                                            isSelected 
-                                                                ? "border-blue-500 ring-2 ring-blue-500/10 dark:bg-slate-900" 
-                                                                : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
-                                                        )}
-                                                    >
-                                                        <div className="space-y-1.5 flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-black uppercase tracking-wider rounded border border-blue-100/50 dark:border-blue-900/50">
-                                                                    {sample.category || "General"}
-                                                                </span>
-                                                                {sample.organ && sample.organ !== "-" && (
-                                                                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[8px] font-bold uppercase tracking-wide rounded">
-                                                                        {sample.organ}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight truncate font-bold">
-                                                                {sample.testName}
-                                                            </h4>
-                                                            <div className="flex items-center gap-3 text-[9px] text-slate-400 font-bold uppercase tracking-wide">
-                                                                <span>Method: {sample.method || "-"}</span>
-                                                                <span>•</span>
-                                                                <span>Specimen: {sample.sampleUsedForTest || "-"}</span>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="text-right shrink-0 flex flex-col items-end justify-between h-full min-h-[50px]">
-                                                            <span className="text-xs font-black text-slate-900 dark:text-white">
-                                                                ₹{parseFloat(sample.patientPrice) || 0}
-                                                            </span>
-                                                            <div className={cn(
-                                                                "w-4 h-4 rounded-full border flex items-center justify-center transition-all",
-                                                                isSelected 
-                                                                    ? "bg-blue-600 border-blue-600 text-white" 
-                                                                    : "border-slate-300 dark:border-slate-600 group-hover:border-blue-400"
-                                                            )}>
-                                                                {isSelected && <Check className="w-2.5 h-2.5" />}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Right Sidebar: Selected Tests Summary */}
-                            <div className="w-72 bg-white dark:bg-slate-950/20 border-l border-slate-100 dark:border-slate-800 flex flex-col shrink-0 overflow-hidden">
-                                <div className="p-4 border-b border-slate-100 dark:border-slate-800">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Selected Investigations</span>
-                                    <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mt-1 uppercase truncate">
-                                        {availableSamples.filter(s => selectedTestIds.includes(s._id)).length} tests added
-                                    </p>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-                                    {availableSamples.filter(s => selectedTestIds.includes(s._id)).length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 py-12">
-                                            <ShoppingCart className="w-8 h-8 text-slate-300 mb-2" />
-                                            <p className="text-[10px] font-bold uppercase tracking-wider">No tests selected yet</p>
-                                        </div>
-                                    ) : (
-                                        availableSamples.filter(s => selectedTestIds.includes(s._id)).map((t) => (
-                                            <div key={t._id} className="p-2.5 bg-slate-50 dark:bg-slate-850/50 border border-slate-100 dark:border-slate-800 rounded-xl flex items-center justify-between gap-3 text-xs">
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="font-bold text-slate-800 dark:text-slate-200 truncate uppercase tracking-tight">{t.testName}</p>
-                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{t.category}</p>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                    <span className="font-extrabold text-slate-900 dark:text-white">₹{t.patientPrice}</span>
-                                                    <button 
-                                                        onClick={() => toggleTestSelection(t._id)}
-                                                        className="text-slate-400 hover:text-rose-600 transition-colors p-0.5"
-                                                    >
-                                                        <X className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-
-                                <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 space-y-3 shrink-0">
-                                    <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-                                        <span>Subtotal</span>
-                                        <span className="text-slate-800 dark:text-slate-200">
-                                            ₹{availableSamples.filter(s => selectedTestIds.includes(s._id)).reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0)}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-sm font-black border-t border-dashed border-slate-200 dark:border-slate-800 pt-2">
-                                        <span className="text-slate-900 dark:text-white uppercase tracking-wider">Total Payable</span>
-                                        <span className="text-blue-600 dark:text-blue-400 text-lg">
-                                            ₹{availableSamples.filter(s => selectedTestIds.includes(s._id)).reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0)}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-
-                        {/* Footer */}
-                        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
-                            <button
-                                onClick={() => {
-                                    if (confirm("Skip test selection? You can print receipt without tests.")) {
-                                        setShowTestSelection(false);
-                                        setShowReceipt(true);
-                                    }
-                                }}
-                                className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold rounded-xl text-xs transition-all active:scale-95 cursor-pointer"
-                            >
-                                Skip & Print Receipt
-                            </button>
-                            <button
-                                onClick={handleSaveTests}
-                                disabled={selectedTestIds.length === 0 || isSavingTests}
-                                className={cn(
-                                    "px-6 py-2 font-bold rounded-xl text-xs transition-all active:scale-95 flex items-center gap-1.5 border shadow-md",
-                                    selectedTestIds.length > 0 && !isSavingTests
-                                        ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 border-transparent cursor-pointer"
-                                        : "bg-transparent text-slate-300 dark:text-slate-700 border-slate-200 dark:border-slate-800 cursor-not-allowed"
-                                )}
-                            >
-                                {isSavingTests ? (
-                                    <>
-                                        <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-white rounded-full animate-spin" />
-                                        Saving...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Printer className="w-4 h-4" />
-                                        Confirm & Save Tests
-                                    </>
-                                )}
-                            </button>
-                        </div>
-
-                    </div>
-                </div>
-            )}
+            {/* Legacy absolute overlay removed - integrated as full page view */}
 
             {/* RECEIPT MODAL OVERLAY (Printable Acknowledgement Receipt) */}
             {showReceipt && savedRecord && (
@@ -2119,14 +2220,14 @@ const PatientRegistrationForm: React.FC = () => {
                     printType === "receipt" ? "print:p-0 print:bg-white print:relative print:z-0 print:flex" : "print:hidden"
                 )}>
                     <div className="bg-white text-slate-800 rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden print:shadow-none print:w-full print:max-w-none flex flex-col max-h-[90vh] print:max-h-none">
-                        
+
                         {/* Modal controls - hidden in print */}
                         <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-100 print:hidden shrink-0">
                             <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
                                 <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                                 Patient Registered Successfully!
                             </h3>
-                            <button 
+                            <button
                                 onClick={() => {
                                     setShowReceipt(false);
                                     window.location.href = "/admin/dashboard";
@@ -2139,7 +2240,7 @@ const PatientRegistrationForm: React.FC = () => {
 
                         {/* Printable Area */}
                         <div id={printType === "receipt" ? "print-active-section" : "print-receipt-section"} className="p-8 print:p-0 flex-1 overflow-y-auto print:overflow-visible font-mono text-sm leading-relaxed space-y-6">
-                            
+
                             {/* Receipt Header */}
                             <div className="text-center space-y-1.5 border-b border-dashed border-slate-300 pb-5">
                                 <h2 className="text-xl font-black uppercase tracking-wider text-slate-900">MEDORAA LABS</h2>
@@ -2357,21 +2458,21 @@ const PatientRegistrationForm: React.FC = () => {
 
                         {/* Modal Action Buttons - hidden in print */}
                         <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 print:hidden shrink-0">
-                            <button 
+                            <button
                                 onClick={handlePrintReceipt}
                                 className="px-4 py-2 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 text-slate-700 font-bold rounded-lg text-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
                             >
                                 <Printer className="w-4 h-4" />
                                 Print Receipt
                             </button>
-                            <button 
+                            <button
                                 onClick={handlePrintLabels}
                                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-all active:scale-95 shadow-md flex items-center gap-1.5 cursor-pointer"
                             >
                                 <Printer className="w-4 h-4" />
                                 Print Bottle Labels
                             </button>
-                            <button 
+                            <button
                                 onClick={() => {
                                     setShowReceipt(false);
                                     window.location.href = "/admin/dashboard";
@@ -2395,7 +2496,7 @@ const PatientRegistrationForm: React.FC = () => {
                         const currentDate = savedRecord.registrationDate || "";
                         const currentTime = savedRecord.registrationTime || "";
                         const formattedDateTime = `${currentDate} ${currentTime}`;
-                        
+
                         const regDigits = savedRecord.registrationNumber ? savedRecord.registrationNumber.replace(/[^0-9]/g, "") : "";
                         const sampleDigits = regDigits.slice(-8);
                         const sampleId = `S${sampleDigits}${index + 1}`;
@@ -2447,10 +2548,10 @@ const PatientRegistrationForm: React.FC = () => {
                                         <span className="label-field-value-md">{sampleId}</span>
                                     </div>
                                     <div className="label-qr-wrapper">
-                                        <img 
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`Patient:${savedRecord.patientName}|ID:${savedRecord.registrationNumber}|Sample:${sampleId}|Test:${test.testName}`)}`} 
-                                            alt="QR Code" 
-                                            className="label-qr-img" 
+                                        <img
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`Patient:${savedRecord.patientName}|ID:${savedRecord.registrationNumber}|Sample:${sampleId}|Test:${test.testName}`)}`}
+                                            alt="QR Code"
+                                            className="label-qr-img"
                                         />
                                     </div>
                                     <div className="label-test-badge">
