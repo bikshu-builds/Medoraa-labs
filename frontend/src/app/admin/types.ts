@@ -2,11 +2,20 @@ export interface Doctor {
     _id: string;
     doctorCode?: string;
     doctorName: string;
+    affiliationType?: 'HOSPITAL' | 'LAB';
     hospitalId?: {
         _id: string;
         hospitalName: string;
         branch?: string;
     } | string;
+    labId?: {
+        _id: string;
+        labName: string;
+        hospital?: any;
+    } | string;
+    labName?: string;
+    branch?: string;
+    completeAddress?: string;
     degree: string;
     specialization: string;
     referralPercentage: number;

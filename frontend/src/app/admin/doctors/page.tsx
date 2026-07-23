@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from "react";
 import Table from "../components/Table";
 import DoctorModal from "../components/DoctorModal";
-import { UserPlus, Search, Edit2, Trash2, Phone, Mail, Building2, UserCircle2 } from "lucide-react";
+import LabPartnerModal from "../components/LabPartnerModal";
+import { UserPlus, Search, Edit2, Trash2, Phone, Mail, Building2, UserCircle2, Activity, X } from "lucide-react";
 import { Doctor } from "../types";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -13,7 +14,9 @@ const DoctorManagement: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState("");
     
     // Modal State
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
+    const [isDoctorModalOpen, setIsDoctorModalOpen] = useState(false);
+    const [isLabModalOpen, setIsLabModalOpen] = useState(false);
     const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
 
     const fetchDoctors = async () => {
@@ -38,14 +41,13 @@ const DoctorManagement: React.FC = () => {
         fetchDoctors();
     }, []);
 
-    const handleAdd = () => {
-        setSelectedDoctor(null);
-        setIsModalOpen(true);
-    };
-
     const handleEdit = (doctor: Doctor) => {
         setSelectedDoctor(doctor);
-        setIsModalOpen(true);
+        if (doctor.affiliationType === "LAB") {
+            setIsLabModalOpen(true);
+        } else {
+            setIsDoctorModalOpen(true);
+        }
     };
 
     const handleDelete = async (id: string) => {
@@ -91,10 +93,15 @@ const DoctorManagement: React.FC = () => {
         }
     };
 
-    const filteredDoctors = doctors.filter(doctor => 
-        doctor.doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (typeof doctor.hospitalId === 'object' ? doctor.hospitalId?.hospitalName : doctor.hospitalId)?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredDoctors = doctors.filter(doctor => {
+        const nameMatch = doctor.doctorName.toLowerCase().includes(searchTerm.toLowerCase());
+        const hospName = (typeof doctor.hospitalId === 'object' ? doctor.hospitalId?.hospitalName : doctor.hospitalId) || "";
+        const hospMatch = hospName.toLowerCase().includes(searchTerm.toLowerCase());
+        const dbLabName = (typeof doctor.labId === 'object' ? doctor.labId?.labName : doctor.labId) || "";
+        const textLabName = doctor.labName || "";
+        const labMatch = dbLabName.toLowerCase().includes(searchTerm.toLowerCase()) || textLabName.toLowerCase().includes(searchTerm.toLowerCase());
+        return nameMatch || hospMatch || labMatch;
+    });
 
     const columns = [
         { 
@@ -113,9 +120,24 @@ const DoctorManagement: React.FC = () => {
             )
         },
         { 
-            header: "Hospital Name", 
+            header: "Affiliation", 
             accessor: "hospitalId" as const,
             render: (row: Doctor) => {
+                if (row.affiliationType === "LAB") {
+                    const labName = row.labName || (row.labId && typeof row.labId === 'object' ? row.labId.labName : "Lab Partner");
+                    const branch = row.branch || "";
+                    const displayName = branch ? `${labName} (${branch})` : labName;
+                    return (
+                        <div className="flex flex-col max-w-[180px]">
+                            <div className="flex items-start gap-1.5 text-slate-700 font-bold text-xs">
+                                <Building2 className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
+                                <span className="line-clamp-2 break-words text-blue-700">{displayName}</span>
+                            </div>
+                            <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest mt-0.5">Lab Partner</span>
+                        </div>
+                    );
+                }
+
                 const hospitalName = (typeof row.hospitalId === 'object' && row.hospitalId !== null)
                     ? (row.hospitalId.branch ? `${row.hospitalId.hospitalName} (${row.hospitalId.branch})` : row.hospitalId.hospitalName)
                     : (row.hospitalId || "Not Associated");
@@ -125,6 +147,7 @@ const DoctorManagement: React.FC = () => {
                             <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                             <span className="line-clamp-2 break-words">{hospitalName}</span>
                         </div>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Hospital Partner</span>
                     </div>
                 );
             }
@@ -133,14 +156,14 @@ const DoctorManagement: React.FC = () => {
             header: "Degree",
             accessor: "degree" as const,
             render: (row: Doctor) => (
-                <div className="text-xs font-bold text-slate-700">{row.degree}</div>
+                <div className="text-xs font-bold text-slate-700">{row.affiliationType === "LAB" ? "—" : (row.degree || "—")}</div>
             )
         },
         {
             header: "Specialization",
             accessor: "specialization" as const,
             render: (row: Doctor) => (
-                <div className="text-xs font-bold text-slate-700">{row.specialization}</div>
+                <div className="text-xs font-bold text-slate-700">{row.affiliationType === "LAB" ? "—" : (row.specialization || "—")}</div>
             )
         },
         { 
@@ -227,11 +250,11 @@ const DoctorManagement: React.FC = () => {
                     <p className="text-slate-500 text-sm mt-1 font-medium">External referring physicians and hospital branch management.</p>
                 </div>
                 <button 
-                    onClick={handleAdd}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded text-xs transition-all active:scale-95"
+                    onClick={() => setIsSelectionModalOpen(true)}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded text-xs transition-all active:scale-95 shadow-md shadow-slate-900/10"
                 >
                     <UserPlus className="w-4 h-4" />
-                    Onboard New Partner
+                    Onboard Partner
                 </button>
             </div>
 
@@ -258,11 +281,71 @@ const DoctorManagement: React.FC = () => {
             />
 
             <DoctorModal 
-                isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
+                isOpen={isDoctorModalOpen} 
+                onClose={() => setIsDoctorModalOpen(false)} 
                 onSave={handleSave} 
                 doctor={selectedDoctor} 
             />
+
+            <LabPartnerModal 
+                isOpen={isLabModalOpen} 
+                onClose={() => setIsLabModalOpen(false)} 
+                onSave={handleSave} 
+                doctor={selectedDoctor} 
+            />
+
+            {/* Partner Selection Popup */}
+            {isSelectionModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsSelectionModalOpen(false)} />
+                    
+                    <div className="relative bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden font-sans border border-slate-200 animate-in fade-in zoom-in duration-200">
+                        {/* Header */}
+                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-900 tracking-tight">Onboard Medical Partner</h2>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Select partner type to continue</p>
+                            </div>
+                            <button onClick={() => setIsSelectionModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsSelectionModalOpen(false);
+                                        setSelectedDoctor(null);
+                                        setIsDoctorModalOpen(true);
+                                    }}
+                                    className="flex flex-col items-center justify-center p-6 rounded-xl border-2 border-slate-100 bg-slate-50 hover:bg-blue-50/35 hover:border-blue-500 hover:shadow-md hover:shadow-blue-500/5 text-center transition-all duration-200 group relative overflow-hidden"
+                                >
+                                    <Building2 className="w-8 h-8 mb-3 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                                    <span className="text-sm font-bold text-slate-800 group-hover:text-blue-900 transition-colors">Hospital Partner</span>
+                                    <span className="text-[10px] font-medium text-slate-400 mt-1">Physician linked to a hospital branch</span>
+                                </button>
+                                
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsSelectionModalOpen(false);
+                                        setSelectedDoctor(null);
+                                        setIsLabModalOpen(true);
+                                    }}
+                                    className="flex flex-col items-center justify-center p-6 rounded-xl border-2 border-slate-100 bg-slate-50 hover:bg-blue-50/35 hover:border-blue-500 hover:shadow-md hover:shadow-blue-500/5 text-center transition-all duration-200 group relative overflow-hidden"
+                                >
+                                    <Activity className="w-8 h-8 mb-3 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                                    <span className="text-sm font-bold text-slate-800 group-hover:text-blue-900 transition-colors">Lab Partner</span>
+                                    <span className="text-[10px] font-medium text-slate-400 mt-1">Partner representing a diagnostic lab</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

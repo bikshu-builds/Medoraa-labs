@@ -189,7 +189,9 @@ const Counter = require("../models/Counter");
 // @desc    Doctor Management
 exports.getDoctors = async (req, res) => {
     try {
-        const doctors = await Doctor.find({ isActive: { $ne: false } }).populate("hospitalId");
+        const doctors = await Doctor.find({ isActive: { $ne: false } })
+            .populate("hospitalId")
+            .populate("labId");
         res.status(200).json({ success: true, data: doctors });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -201,6 +203,11 @@ exports.addDoctor = async (req, res) => {
         const {
             doctorName,
             hospitalId,
+            labId,
+            affiliationType,
+            labName,
+            branch,
+            completeAddress,
             degree,
             specialization,
             referralPercentage,
@@ -223,12 +230,27 @@ exports.addDoctor = async (req, res) => {
 
         const newDoctorCode = `DOC${String(counter.seq).padStart(6, '0')}`;
 
+        // Resolve hospitalId for lab affiliation
+        let resolvedHospitalId = hospitalId;
+        if (affiliationType === "LAB" && labId) {
+            const Lab = require("../models/Lab");
+            const labObj = await Lab.findById(labId);
+            if (labObj) {
+                resolvedHospitalId = labObj.hospital;
+            }
+        }
+
         const doctor = await Doctor.create({
             doctorCode: newDoctorCode,
             doctorName,
-            hospitalId,
-            degree,
-            specialization,
+            affiliationType: affiliationType || "HOSPITAL",
+            hospitalId: resolvedHospitalId || undefined,
+            labId: affiliationType === "LAB" ? (labId || undefined) : undefined,
+            labName: affiliationType === "LAB" ? labName : undefined,
+            branch: affiliationType === "LAB" ? branch : undefined,
+            completeAddress: affiliationType === "LAB" ? completeAddress : undefined,
+            degree: affiliationType === "LAB" ? undefined : degree,
+            specialization: affiliationType === "LAB" ? undefined : specialization,
             referralPercentage: Number(referralPercentage) || 0,
             periodType: periodType || "WEEKLY",
             periodStartDate: periodStartDate || undefined,
@@ -256,6 +278,11 @@ exports.updateDoctor = async (req, res) => {
         const {
             doctorName,
             hospitalId,
+            labId,
+            affiliationType,
+            labName,
+            branch,
+            completeAddress,
             degree,
             specialization,
             referralPercentage,
@@ -270,13 +297,28 @@ exports.updateDoctor = async (req, res) => {
             status
         } = req.body;
 
+        // Resolve hospitalId for lab affiliation
+        let resolvedHospitalId = hospitalId;
+        if (affiliationType === "LAB" && labId) {
+            const Lab = require("../models/Lab");
+            const labObj = await Lab.findById(labId);
+            if (labObj) {
+                resolvedHospitalId = labObj.hospital;
+            }
+        }
+
         const doctor = await Doctor.findByIdAndUpdate(
             req.params.id,
             {
                 doctorName,
-                hospitalId,
-                degree,
-                specialization,
+                affiliationType: affiliationType || "HOSPITAL",
+                hospitalId: resolvedHospitalId || undefined,
+                labId: affiliationType === "LAB" ? (labId || undefined) : undefined,
+                labName: affiliationType === "LAB" ? labName : undefined,
+                branch: affiliationType === "LAB" ? branch : undefined,
+                completeAddress: affiliationType === "LAB" ? completeAddress : undefined,
+                degree: affiliationType === "LAB" ? undefined : degree,
+                specialization: affiliationType === "LAB" ? undefined : specialization,
                 referralPercentage: Number(referralPercentage) || 0,
                 periodType: periodType || "WEEKLY",
                 periodStartDate: periodStartDate || undefined,

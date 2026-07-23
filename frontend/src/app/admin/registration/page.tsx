@@ -729,14 +729,30 @@ const PatientRegistrationForm: React.FC = () => {
                     .flatMap(h => (h.labs || []).map((l: any) => l.labName)),
                 // Filtered doctors (without hospital name)
                 ...doctors
-                    .filter(d => d.hospitalId?.hospitalName === formData.selectedHospital)
-                    .map(d => `${d.doctorName} (Ref: ${d.doctorCode || d._id.slice(-4).toUpperCase()})`)
+                    .filter(d => {
+                        const docHosp = typeof d.hospitalId === 'object' ? d.hospitalId?.hospitalName : d.hospitalId;
+                        return docHosp === formData.selectedHospital;
+                    })
+                    .map(d => {
+                        const refCode = d.doctorCode || d._id.slice(-4).toUpperCase();
+                        if (d.affiliationType === "LAB" && d.labId && typeof d.labId === 'object') {
+                            return `${d.doctorName} (Ref: ${refCode}) (Lab: ${d.labId.labName})`;
+                        }
+                        return `${d.doctorName} (Ref: ${refCode})`;
+                    })
             ]
             : [
                 // All labs (with hospital name)
                 ...hospitals.flatMap(h => (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`)),
-                // All doctors (with hospital name)
-                ...doctors.map(d => `${d.doctorName} (Ref: ${d.doctorCode || d._id.slice(-4).toUpperCase()}) (${d.hospitalId?.hospitalName || "Independent"})`)
+                // All doctors (with hospital/lab name)
+                ...doctors.map(d => {
+                    const refCode = d.doctorCode || d._id.slice(-4).toUpperCase();
+                    const hospName = (typeof d.hospitalId === 'object' ? d.hospitalId?.hospitalName : d.hospitalId) || "Independent";
+                    if (d.affiliationType === "LAB" && d.labId && typeof d.labId === 'object') {
+                        return `${d.doctorName} (Ref: ${refCode}) (${d.labId.labName})`;
+                    }
+                    return `${d.doctorName} (Ref: ${refCode}) (${hospName})`;
+                })
             ]
         )
     ];

@@ -8,11 +8,34 @@ const doctorSchema = new mongoose.Schema(
             unique: true,
             index: true
         },
+        affiliationType: {
+            type: String,
+            enum: ["HOSPITAL", "LAB"],
+            default: "HOSPITAL"
+        },
         hospitalId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Hospital",
-            required: true,
+            required: false,
             index: true
+        },
+        labId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Lab",
+            required: false,
+            index: true
+        },
+        labName: {
+            type: String,
+            trim: true
+        },
+        branch: {
+            type: String,
+            trim: true
+        },
+        completeAddress: {
+            type: String,
+            trim: true
         },
         doctorName: {
             type: String,
@@ -21,12 +44,12 @@ const doctorSchema = new mongoose.Schema(
         },
         degree: {
             type: String,
-            required: true,
+            required: false,
             trim: true
         },
         specialization: {
             type: String,
-            required: true,
+            required: false,
             trim: true
         },
         referralPercentage: {

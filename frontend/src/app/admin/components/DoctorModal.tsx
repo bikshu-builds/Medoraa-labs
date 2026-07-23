@@ -20,7 +20,9 @@ interface FormDataType extends Partial<Omit<Doctor, 'referralPercentage'>> {
 const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doctor }) => {
     const [formData, setFormData] = useState<FormDataType>({
         doctorName: "",
+        affiliationType: "HOSPITAL",
         hospitalId: "",
+        labId: "",
         degree: "",
         specialization: "",
         dateOfBirth: "",
@@ -77,9 +79,14 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
     useEffect(() => {
         if (doctor) {
             const hospId = (typeof doctor.hospitalId === 'object' && doctor.hospitalId !== null) ? (doctor.hospitalId as any)._id : (doctor.hospitalId || "");
+            const labIdVal = (typeof doctor.labId === 'object' && doctor.labId !== null) ? (doctor.labId as any)._id : (doctor.labId || "");
+            const affType = doctor.affiliationType || "HOSPITAL";
+
             setFormData({
                 ...doctor,
+                affiliationType: affType,
                 hospitalId: hospId,
+                labId: labIdVal,
                 dateOfBirth: doctor.dateOfBirth ? new Date(doctor.dateOfBirth).toISOString().split('T')[0] : "",
                 degree: doctor.degree || "",
                 specialization: doctor.specialization || "",
@@ -89,19 +96,26 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                 periodEndDate: doctor.periodEndDate ? new Date(doctor.periodEndDate).toISOString().split('T')[0] : ""
             });
 
-            if (hospitals.length > 0 && hospId) {
-                const foundHosp = hospitals.find(h => h._id === hospId);
-                if (foundHosp) {
-                    setSelectedHospitalName(foundHosp.hospitalName || "");
+            if (affType === "HOSPITAL") {
+                if (hospitals.length > 0 && hospId) {
+                    const foundHosp = hospitals.find(h => h._id === hospId);
+                    if (foundHosp) {
+                        setSelectedHospitalName(foundHosp.hospitalName || "");
+                        setSelectedBranchId(hospId);
+                    }
+                } else {
                     setSelectedBranchId(hospId);
                 }
             } else {
-                setSelectedBranchId(hospId);
+                setSelectedHospitalName("");
+                setSelectedBranchId("");
             }
         } else {
             setFormData({
                 doctorName: "",
+                affiliationType: "HOSPITAL",
                 hospitalId: "",
+                labId: "",
                 degree: "",
                 specialization: "",
                 dateOfBirth: "",
@@ -132,6 +146,7 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
         try {
             const cleanData = {
                 ...formData,
+                affiliationType: "HOSPITAL" as const,
                 referralPercentage: formData.referralPercentage === "" ? 0 : Number(formData.referralPercentage)
             };
             await onSave(cleanData);
@@ -219,8 +234,7 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                             </div>
                         </div>
 
-                        {selectedBranchId && (
-                            <>
+
                                 {/* Section 2: Identity */}
                                 <div className="md:col-span-2 pt-2">
                                     <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Professional Identity</h3>
@@ -380,8 +394,6 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                         </div>
                                     </div>
                                 </div>
-                            </>
-                        )}
                     </div>
                 </form>
 
