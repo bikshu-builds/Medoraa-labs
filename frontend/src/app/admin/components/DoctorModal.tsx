@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { X, User, Building2, Phone, Mail, Calendar, CheckCircle2, Loader2, Users } from "lucide-react";
+import { X, User, Building2, Phone, Mail, Calendar, CheckCircle2, Loader2, Users, Trash2 } from "lucide-react";
 import { Doctor } from "../types";
 import { cn } from "@/lib/utils";
 import { getApiUrl } from "@/lib/api";
@@ -43,6 +43,21 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
     // Local select states for cascaded dropdowns
     const [selectedHospitalName, setSelectedHospitalName] = useState("");
     const [selectedBranchId, setSelectedBranchId] = useState("");
+    const [isAddingHospital, setIsAddingHospital] = useState(false);
+    const [newHospitalData, setNewHospitalData] = useState({
+        hospitalName: "",
+        branch: "",
+        pocName: "",
+        telephoneNumber: "",
+        stateName: "",
+        district: "",
+        city: "",
+        pincode: "",
+        village: "",
+        doorNo: "",
+        completeAddress: ""
+    });
+    const [newHospitalLabs, setNewHospitalLabs] = useState<string[]>([""]);
 
     const uniqueHospitalNames = Array.from(new Set(hospitals.map(h => h.hospitalName))).sort();
     const branchesForSelectedHospital = hospitals.filter(h => h.hospitalName === selectedHospitalName);
@@ -132,6 +147,21 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
             setSelectedHospitalName("");
             setSelectedBranchId("");
         }
+        setIsAddingHospital(false);
+        setNewHospitalData({
+            hospitalName: "",
+            branch: "",
+            pocName: "",
+            telephoneNumber: "",
+            stateName: "",
+            district: "",
+            city: "",
+            pincode: "",
+            village: "",
+            doorNo: "",
+            completeAddress: ""
+        });
+        setNewHospitalLabs([""]);
         setError("");
     }, [doctor, isOpen, hospitals]);
 
@@ -144,9 +174,51 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
         setIsSubmitting(true);
         setError("");
         try {
+            let finalHospitalId = selectedBranchId;
+
+            if (isAddingHospital) {
+                if (!newHospitalData.hospitalName.trim()) {
+                    throw new Error("Hospital Name is required to add a new hospital");
+                }
+                const token = localStorage.getItem("adminToken");
+                const res = await fetch(getApiUrl("/api/admin/hospitals"), {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        hospitalName: newHospitalData.hospitalName,
+                        branch: newHospitalData.branch,
+                        pocName: newHospitalData.pocName,
+                        telephoneNumber: newHospitalData.telephoneNumber,
+                        address: {
+                            state: newHospitalData.stateName,
+                            district: newHospitalData.district,
+                            city: newHospitalData.city,
+                            pincode: newHospitalData.pincode,
+                            village: newHospitalData.village,
+                            doorNo: newHospitalData.doorNo,
+                            completeAddress: newHospitalData.completeAddress
+                        },
+                        labs: newHospitalLabs.filter(l => l.trim() !== "")
+                    })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    throw new Error(data.message || "Failed to create new hospital");
+                }
+                finalHospitalId = data.data._id;
+            }
+
+            if (!finalHospitalId) {
+                throw new Error("Please select a hospital branch or add a new one");
+            }
+
             const cleanData = {
                 ...formData,
                 affiliationType: "HOSPITAL" as const,
+                hospitalId: finalHospitalId,
                 referralPercentage: formData.referralPercentage === "" ? 0 : Number(formData.referralPercentage)
             };
             await onSave(cleanData);
@@ -189,49 +261,242 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         {/* Section 1: Affiliation */}
                         <div className="md:col-span-2">
-                            <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Affiliation & Branch</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hospital Name (*)</label>
-                                    <div className="relative">
-                                        <select
-                                            required
-                                            value={selectedHospitalName}
-                                            onChange={(e) => handleHospitalNameChange(e.target.value)}
-                                            className="w-full pl-4 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all appearance-none text-slate-800"
-                                        >
-                                            <option value="" disabled>Select Hospital</option>
-                                            {uniqueHospitalNames.map(name => (
-                                                <option key={name} value={name}>{name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Branch (*)</label>
-                                    <div className="relative">
-                                        <select
-                                            required
-                                            value={selectedBranchId}
-                                            onChange={(e) => handleBranchChange(e.target.value)}
-                                            disabled={!selectedHospitalName}
-                                            className={cn(
-                                                "w-full pl-4 pr-4 py-2 border rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all appearance-none text-slate-800",
-                                                selectedHospitalName ? "bg-slate-50 border-slate-200" : "bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed"
-                                            )}
-                                        >
-                                            <option value="" disabled>
-                                                {selectedHospitalName ? "Select Branch" : "Select Hospital First"}
-                                            </option>
-                                            {branchesForSelectedHospital.map(h => (
-                                                <option key={h._id} value={h._id}>
-                                                    {h.branch || "Main Branch"}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">Affiliation & Branch</h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAddingHospital(prev => !prev)}
+                                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 uppercase tracking-wider flex items-center gap-1 transition-all"
+                                >
+                                    {isAddingHospital ? "× Cancel Add" : "+ Add Hospital"}
+                                </button>
                             </div>
+
+                            {isAddingHospital ? (
+                                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-6 animate-in fade-in duration-200">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                                        {/* Left Column: Basic Info & Lab Facilities */}
+                                        <div className="space-y-4">
+                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Basic Information</h4>
+                                            
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-slate-700">Hospital Name *</label>
+                                                <input
+                                                    type="text"
+                                                    required={isAddingHospital}
+                                                    placeholder="Hospital Name"
+                                                    value={newHospitalData.hospitalName}
+                                                    onChange={(e) => setNewHospitalData(prev => ({ ...prev, hospitalName: e.target.value }))}
+                                                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-slate-700">Branch</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. City Center, Jubilee Hills"
+                                                    value={newHospitalData.branch}
+                                                    onChange={(e) => setNewHospitalData(prev => ({ ...prev, branch: e.target.value }))}
+                                                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-slate-700">Point of Contact Name</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="POC Name"
+                                                    value={newHospitalData.pocName}
+                                                    onChange={(e) => setNewHospitalData(prev => ({ ...prev, pocName: e.target.value }))}
+                                                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-slate-700">Telephone Number</label>
+                                                <input
+                                                    type="tel"
+                                                    placeholder="Telephone Number"
+                                                    value={newHospitalData.telephoneNumber}
+                                                    onChange={(e) => setNewHospitalData(prev => ({ ...prev, telephoneNumber: e.target.value }))}
+                                                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
+                                                />
+                                            </div>
+
+                                            {/* Lab Facilities */}
+                                            <div className="space-y-2 pt-2 border-t border-slate-100">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Lab Facilities</h4>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setNewHospitalLabs([...newHospitalLabs, ""])}
+                                                        className="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                                                    >
+                                                        + Add Another Lab
+                                                    </button>
+                                                </div>
+                                                <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1 custom-scrollbar">
+                                                    {newHospitalLabs.map((lab, index) => (
+                                                        <div key={index} className="flex items-center gap-2">
+                                                            <input
+                                                                type="text"
+                                                                placeholder={`Lab Name ${index + 1}`}
+                                                                value={lab}
+                                                                onChange={(e) => {
+                                                                    const newLabs = [...newHospitalLabs];
+                                                                    newLabs[index] = e.target.value;
+                                                                    setNewHospitalLabs(newLabs);
+                                                                }}
+                                                                className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
+                                                            />
+                                                            {newHospitalLabs.length > 1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setNewHospitalLabs(newHospitalLabs.filter((_, i) => i !== index))}
+                                                                    className="p-1.5 text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Right Column: Address Details */}
+                                        <div className="space-y-4">
+                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Address Details</h4>
+                                            
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-[11px] font-bold text-slate-700">State *</label>
+                                                    <input
+                                                        type="text"
+                                                        required={isAddingHospital}
+                                                        placeholder="State"
+                                                        value={newHospitalData.stateName}
+                                                        onChange={(e) => setNewHospitalData(prev => ({ ...prev, stateName: e.target.value }))}
+                                                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[11px] font-bold text-slate-700">District *</label>
+                                                    <input
+                                                        type="text"
+                                                        required={isAddingHospital}
+                                                        placeholder="District"
+                                                        value={newHospitalData.district}
+                                                        onChange={(e) => setNewHospitalData(prev => ({ ...prev, district: e.target.value }))}
+                                                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-[11px] font-bold text-slate-700">City</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="City"
+                                                        value={newHospitalData.city}
+                                                        onChange={(e) => setNewHospitalData(prev => ({ ...prev, city: e.target.value }))}
+                                                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[11px] font-bold text-slate-700">Village</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Village"
+                                                        value={newHospitalData.village}
+                                                        onChange={(e) => setNewHospitalData(prev => ({ ...prev, village: e.target.value }))}
+                                                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-[11px] font-bold text-slate-700">Door Number</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Door Number"
+                                                        value={newHospitalData.doorNo}
+                                                        onChange={(e) => setNewHospitalData(prev => ({ ...prev, doorNo: e.target.value }))}
+                                                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[11px] font-bold text-slate-700">Pincode</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Pincode"
+                                                        value={newHospitalData.pincode}
+                                                        onChange={(e) => setNewHospitalData(prev => ({ ...prev, pincode: e.target.value }))}
+                                                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-slate-700">Complete Address</label>
+                                                <textarea
+                                                    placeholder="Enter complete address..."
+                                                    rows={2}
+                                                    value={newHospitalData.completeAddress}
+                                                    onChange={(e) => setNewHospitalData(prev => ({ ...prev, completeAddress: e.target.value }))}
+                                                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none resize-none text-slate-800"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-200">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hospital Name (*)</label>
+                                        <div className="relative">
+                                            <select
+                                                required={!isAddingHospital}
+                                                value={selectedHospitalName}
+                                                onChange={(e) => handleHospitalNameChange(e.target.value)}
+                                                className="w-full pl-4 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all appearance-none text-slate-800"
+                                            >
+                                                <option value="" disabled>Select Hospital</option>
+                                                {uniqueHospitalNames.map(name => (
+                                                    <option key={name} value={name}>{name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Branch (*)</label>
+                                        <div className="relative">
+                                            <select
+                                                required={!isAddingHospital}
+                                                value={selectedBranchId}
+                                                onChange={(e) => handleBranchChange(e.target.value)}
+                                                disabled={!selectedHospitalName}
+                                                className={cn(
+                                                    "w-full pl-4 pr-4 py-2 border rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all appearance-none text-slate-800",
+                                                    selectedHospitalName ? "bg-slate-50 border-slate-200" : "bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed"
+                                                )}
+                                            >
+                                                <option value="" disabled>
+                                                    {selectedHospitalName ? "Select Branch" : "Select Hospital First"}
+                                                </option>
+                                                {branchesForSelectedHospital.map(h => (
+                                                    <option key={h._id} value={h._id}>
+                                                        {h.branch || "Main Branch"}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
 
