@@ -74,7 +74,11 @@ const patientRegistrationSchema = new mongoose.Schema(
       receivedThrough: {
         type: String,
         required: true,
-        enum: ["Employee", "Person", "Courier", "Bus", "None"],
+        enum: ["Employee", "Person", "Courier", "Bus", "None", "Transfer"],
+      },
+      // If "Transfer" selected
+      transfer: {
+        labName: { type: String, trim: true },
       },
       // If "Employee" selected
       employee: {
@@ -159,6 +163,28 @@ const patientRegistrationSchema = new mongoose.Schema(
         ref: "Sample",
       }
     ],
+    testResults: [
+      {
+        testId: { type: mongoose.Schema.Types.ObjectId, ref: "Sample" },
+        testName: { type: String, trim: true },
+        resultValue: { type: String, trim: true, default: "" },
+        unit: { type: String, trim: true, default: "" },
+        referenceRange: { type: String, trim: true, default: "-" },
+        flag: {
+          type: String,
+          enum: ["Normal", "Abnormal", "Critical", ""],
+          default: "Normal"
+        }
+      }
+    ],
+    authorizationStatus: {
+      type: String,
+      enum: ["PENDING", "RESULT_ENTERED", "PENDING_AUTHORIZATION", "AUTHORIZED", "FLAGGED", "REJECTED"],
+      default: "PENDING"
+    },
+    authorizedBy: { type: String, trim: true, default: "" },
+    authorizedAt: { type: String, trim: true, default: "" },
+    notes: { type: String, trim: true, default: "" }
   },
   {
     timestamps: true,

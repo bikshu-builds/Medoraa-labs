@@ -160,6 +160,7 @@ const StaffManagement: React.FC = () => {
                         "inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider rounded border w-fit",
                         role === "admin" && "bg-purple-50 text-purple-700 border-purple-100",
                         role === "registration" && "bg-cyan-50 text-cyan-700 border-cyan-100",
+                        role === "examiner" && "bg-indigo-50 text-indigo-700 border-indigo-100",
                         role === "authorization" && "bg-amber-50 text-amber-700 border-amber-100",
                         role === "inventory" && "bg-emerald-50 text-emerald-700 border-emerald-100"
                     )}>

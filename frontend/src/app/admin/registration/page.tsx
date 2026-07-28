@@ -5,12 +5,13 @@ import {
     MapPin, User, FileText, Share2, Clipboard, ShieldAlert, Check,
     RefreshCw, X, Printer, Calendar, Clock, Truck, Bus, UserCheck,
     Search, ChevronDown, CheckCircle2, ChevronRight, UserPlus, Info,
-    Activity, ShoppingCart, Download, FileSpreadsheet, Plus, ArrowLeft
+    Activity, ShoppingCart, Download, FileSpreadsheet, Plus, ArrowLeft, Loader2
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import JsBarcode from "jsbarcode";
 import * as XLSX from "xlsx";
+import PathologyReportModal from "../components/PathologyReportModal";
 
 interface BarcodeProps {
     value: string;
@@ -46,6 +47,91 @@ const Barcode: React.FC<BarcodeProps> = ({
     }, [value, width, height, displayValue]);
 
     return <svg ref={svgRef}></svg>;
+};
+
+// Container badge color and text parser for thermal bottle labels
+const getContainerBadgeInfo = (test: any, samplesList: any[] = []) => {
+    let containerStr = "";
+    let testNameStr = "";
+
+    if (typeof test === "object" && test !== null) {
+        testNameStr = test.testName || test.name || "";
+        containerStr = test.container || "";
+
+        if ((!containerStr || containerStr === "-") && samplesList.length > 0) {
+            const found = samplesList.find(
+                s => (test._id && s._id === test._id) || (testNameStr && s.testName?.toLowerCase() === testNameStr.toLowerCase())
+            );
+            if (found && found.container && found.container !== "-") {
+                containerStr = found.container;
+            }
+        }
+    } else if (typeof test === "string") {
+        testNameStr = test;
+        if (samplesList.length > 0) {
+            const found = samplesList.find(s => s.testName?.toLowerCase() === test.toLowerCase());
+            if (found && found.container && found.container !== "-") {
+                containerStr = found.container;
+            }
+        }
+    }
+
+    if (!containerStr || containerStr === "-" || containerStr.toLowerCase() === "none") {
+        return {
+            text: (testNameStr || "SAMPLE").toUpperCase(),
+            bgColor: "#0d9488",
+            textColor: "#ffffff"
+        };
+    }
+
+    const containerUpper = containerStr.toUpperCase();
+
+    // Map color
+    let bgColor = "#0d9488"; // Default Teal
+    let textColor = "#ffffff";
+
+    if (/RED|PLAIN/i.test(containerUpper)) {
+        bgColor = "#dc2626"; // Vibrant Red
+    } else if (/VIOLET|LAVENDER|PURPLE|EDTA/i.test(containerUpper)) {
+        bgColor = "#7c3aed"; // Violet
+    } else if (/YELLOW|SST|GEL/i.test(containerUpper)) {
+        bgColor = "#d97706"; // Amber Yellow
+    } else if (/BLUE|CITRATE/i.test(containerUpper)) {
+        bgColor = "#2563eb"; // Royal Blue
+    } else if (/GREEN|HEPARIN/i.test(containerUpper)) {
+        bgColor = "#16a34a"; // Green
+    } else if (/GREY|GRAY|FLUORIDE/i.test(containerUpper)) {
+        bgColor = "#4b5563"; // Grey
+    } else if (/BLACK|ESR/i.test(containerUpper)) {
+        bgColor = "#18181b"; // Black
+    } else if (/ORANGE/i.test(containerUpper)) {
+        bgColor = "#ea580c";
+    } else if (/PINK/i.test(containerUpper)) {
+        bgColor = "#db2777";
+    }
+
+    // Clean text to show on badge (extract non-color container name)
+    let cleanedText = containerUpper
+        .replace(/\(|\)/g, " ")
+        .replace(/\b(RED|VIOLET|LAVENDER|PURPLE|YELLOW|BLUE|GREEN|GREY|GRAY|BLACK|ORANGE|PINK|CAP|TUBE|COLOR|TOP|BOTTLE|CONTAINER|VACUTAINER)\b/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    if (!cleanedText) {
+        if (/RED/i.test(containerUpper)) cleanedText = "PLAIN";
+        else if (/VIOLET|LAVENDER|PURPLE/i.test(containerUpper)) cleanedText = "EDTA";
+        else if (/YELLOW/i.test(containerUpper)) cleanedText = "SST";
+        else if (/BLUE/i.test(containerUpper)) cleanedText = "CITRATE";
+        else if (/GREEN/i.test(containerUpper)) cleanedText = "HEPARIN";
+        else if (/GREY|GRAY/i.test(containerUpper)) cleanedText = "FLUORIDE";
+        else cleanedText = containerUpper;
+    }
+
+    return {
+        text: cleanedText,
+        bgColor,
+        textColor
+    };
 };
 
 // Cascading Locations Data
@@ -217,7 +303,8 @@ const PatientRegistrationForm: React.FC = () => {
         selectedHospital: "",
         selectedDoctor: "",
         sampleReceived: {
-            receivedThrough: "None" as "None" | "Employee" | "Person" | "Courier" | "Bus",
+            receivedThrough: "None" as "None" | "Employee" | "Person" | "Courier" | "Bus" | "Transfer",
+            transfer: { labName: "None" },
             employee: { name: "", id: "", mobileNumber: "", department: "", designation: "", dateReceived: "", timeReceived: "", remarks: "" },
             person: { name: "", mobileNumber: "", relationship: "", address: "", idProofType: "Aadhaar", idProofNumber: "", dateReceived: "", timeReceived: "", remarks: "" },
             courier: { companyName: "", trackingNumber: "", orderNumber: "", contactNumber: "", pickupLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good" as "Good" | "Damaged" | "Opened", remarks: "" },
@@ -233,6 +320,10 @@ const PatientRegistrationForm: React.FC = () => {
     const [showReceipt, setShowReceipt] = useState(false);
     const [printType, setPrintType] = useState<"receipt" | "label">("receipt");
 
+    // Official Pathology Report Modal State
+    const [reportModalRecord, setReportModalRecord] = useState<any | null>(null);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
     // Test selection states
     const [showTestSelection, setShowTestSelection] = useState(false);
     const [availableSamples, setAvailableSamples] = useState<any[]>([]);
@@ -244,6 +335,15 @@ const PatientRegistrationForm: React.FC = () => {
     const [sidebarView, setSidebarView] = useState<"category" | "organ">("category");
     const [triggerPrintOnComplete, setTriggerPrintOnComplete] = useState(false);
     const [isSavingTests, setIsSavingTests] = useState(false);
+    const [isAddingStaff, setIsAddingStaff] = useState(false);
+    const [isSavingStaff, setIsSavingStaff] = useState(false);
+    const [newStaffData, setNewStaffData] = useState({
+        name: "",
+        role: "registration",
+        email: "",
+        mobileNumber: "",
+        password: ""
+    });
 
     // Patient directory states
     const [showForm, setShowForm] = useState(false);
@@ -433,6 +533,7 @@ const PatientRegistrationForm: React.FC = () => {
         };
         fetchMaster();
         fetchRegistrations();
+        fetchSamples();
 
         // Fetch user role
         const storedUser = localStorage.getItem("adminUser");
@@ -552,7 +653,8 @@ const PatientRegistrationForm: React.FC = () => {
         if (transport.receivedThrough === "None") return true;
         if (transport.receivedThrough === "Employee") {
             const emp = transport.employee || {};
-            return (emp.name || "").trim() !== "" && (emp.id || "").trim() !== "";
+            const isEmpMobileValid = !emp.mobileNumber || /^\d{10}$/.test(emp.mobileNumber);
+            return (emp.name || "").trim() !== "" && (emp.id || "").trim() !== "" && isEmpMobileValid;
         }
         if (transport.receivedThrough === "Person") {
             const per = transport.person || {};
@@ -562,13 +664,19 @@ const PatientRegistrationForm: React.FC = () => {
         }
         if (transport.receivedThrough === "Courier") {
             const cour = transport.courier || {};
-            return (cour.companyName || "").trim() !== "" && (cour.trackingNumber || "").trim() !== "";
+            return (cour.companyName || "").trim() !== "";
+        }
+        if (transport.receivedThrough === "Transfer") {
+            const tr = transport.transfer || {};
+            return (tr.labName || "").trim() !== "";
         }
         if (transport.receivedThrough === "Bus") {
             const b = transport.bus || {};
+            const isCondMobileValid = !b.conductorMobileNumber || /^\d{10}$/.test(b.conductorMobileNumber);
             return (b.busNumber || "").trim() !== "" &&
                 (b.busServiceName || "").trim() !== "" &&
-                /^\d{10}$/.test(b.driverMobileNumber || "");
+                /^\d{10}$/.test(b.driverMobileNumber || "") &&
+                isCondMobileValid;
         }
         return false;
     })();
@@ -626,6 +734,7 @@ const PatientRegistrationForm: React.FC = () => {
             selectedDoctor: selectedDoctor,
             sampleReceived: record.sampleReceived || {
                 receivedThrough: "None",
+                transfer: { labName: "None" },
                 employee: { name: "", id: "", mobileNumber: "", department: "", designation: "", dateReceived: "", timeReceived: "", remarks: "" },
                 person: { name: "", mobileNumber: "", relationship: "", address: "", idProofType: "Aadhaar", idProofNumber: "", dateReceived: "", timeReceived: "", remarks: "" },
                 courier: { companyName: "", trackingNumber: "", orderNumber: "", contactNumber: "", pickupLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good", remarks: "" },
@@ -652,6 +761,7 @@ const PatientRegistrationForm: React.FC = () => {
                 selectedDoctor: "",
                 sampleReceived: {
                     receivedThrough: "None",
+                    transfer: { labName: "None" },
                     employee: { name: "", id: "", mobileNumber: "", department: "", designation: "", dateReceived: "", timeReceived: "", remarks: "" },
                     person: { name: "", mobileNumber: "", relationship: "", address: "", idProofType: "Aadhaar", idProofNumber: "", dateReceived: "", timeReceived: "", remarks: "" },
                     courier: { companyName: "", trackingNumber: "", orderNumber: "", contactNumber: "", pickupLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good", remarks: "" },
@@ -677,9 +787,31 @@ const PatientRegistrationForm: React.FC = () => {
                 ? `${formData.selectedDoctor || ""} (${formData.selectedHospital || ""})`
                 : `Self (${formData.selectedLab || "Medoraa Labs (Our Lab)"})`;
 
+            // Clean up sampleReceived depending on what is selected
+            const cleanedSampleReceived = { ...formData.sampleReceived };
+            if (cleanedSampleReceived.receivedThrough === "Transfer") {
+                delete (cleanedSampleReceived as any).employee;
+                delete (cleanedSampleReceived as any).person;
+                delete (cleanedSampleReceived as any).courier;
+                delete (cleanedSampleReceived as any).bus;
+            } else {
+                delete (cleanedSampleReceived as any).transfer;
+                if (cleanedSampleReceived.receivedThrough === "None") {
+                    delete (cleanedSampleReceived as any).employee;
+                    delete (cleanedSampleReceived as any).person;
+                    delete (cleanedSampleReceived as any).courier;
+                    delete (cleanedSampleReceived as any).bus;
+                } else if (cleanedSampleReceived.receivedThrough === "Courier") {
+                    delete (cleanedSampleReceived as any).employee;
+                    delete (cleanedSampleReceived as any).person;
+                    delete (cleanedSampleReceived as any).bus;
+                }
+            }
+
             const payload = {
                 ...formData,
-                referredBy: referredByValue
+                referredBy: referredByValue,
+                sampleReceived: cleanedSampleReceived
             };
 
             const res = await fetch(getApiUrl("/api/admin/registrations"), {
@@ -708,6 +840,67 @@ const PatientRegistrationForm: React.FC = () => {
             alert("An error occurred while saving the registration");
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleAddNewStaff = async () => {
+        if (!newStaffData.name.trim()) {
+            alert("Name is required");
+            return;
+        }
+        if (!newStaffData.email.trim()) {
+            alert("Email is required");
+            return;
+        }
+        if (!newStaffData.password.trim()) {
+            alert("Password is required");
+            return;
+        }
+        if (newStaffData.mobileNumber && newStaffData.mobileNumber.replace(/\D/g, "").length !== 10) {
+            alert("Mobile number must be exactly 10 digits");
+            return;
+        }
+
+        setIsSavingStaff(true);
+        try {
+            const token = localStorage.getItem("adminToken");
+            const res = await fetch(getApiUrl("/api/admin/admins"), {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    name: newStaffData.name,
+                    role: newStaffData.role,
+                    email: newStaffData.email,
+                    mobileNumber: newStaffData.mobileNumber,
+                    password: newStaffData.password,
+                    status: "active"
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                const newlyAdded = data.data;
+                setStaff(prev => [...prev, newlyAdded]);
+                const label = `${newlyAdded.name} (${newlyAdded.role || "Staff"})`;
+                setFormData(prev => ({ ...prev, sampleDrawnBy: label }));
+                setIsAddingStaff(false);
+                setNewStaffData({
+                    name: "",
+                    role: "registration",
+                    email: "",
+                    mobileNumber: "",
+                    password: ""
+                });
+            } else {
+                alert(data.message || "Failed to add staff");
+            }
+        } catch (err: any) {
+            console.error("Add staff failed", err);
+            alert(err.message || "An error occurred while adding staff");
+        } finally {
+            setIsSavingStaff(false);
         }
     };
 
@@ -1210,6 +1403,7 @@ const PatientRegistrationForm: React.FC = () => {
                                         selectedDoctor: "",
                                         sampleReceived: {
                                             receivedThrough: "Employee",
+                                            transfer: { labName: "None" },
                                             employee: { name: "", id: "", mobileNumber: "", department: "", designation: "", dateReceived: "", timeReceived: "", remarks: "" },
                                             person: { name: "", mobileNumber: "", relationship: "", address: "", idProofType: "Aadhaar", idProofNumber: "", dateReceived: "", timeReceived: "", remarks: "" },
                                             courier: { companyName: "", trackingNumber: "", orderNumber: "", contactNumber: "", pickupLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good", remarks: "" },
@@ -1338,6 +1532,29 @@ const PatientRegistrationForm: React.FC = () => {
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
                                                         <div className="flex items-center justify-end gap-1.5">
+                                                            <button
+                                                                type="button"
+                                                                disabled={reg.authorizationStatus !== "AUTHORIZED"}
+                                                                onClick={() => {
+                                                                    if (reg.authorizationStatus === "AUTHORIZED") {
+                                                                        setReportModalRecord(reg);
+                                                                        setIsReportModalOpen(true);
+                                                                    }
+                                                                }}
+                                                                className={cn(
+                                                                    "p-1.5 rounded-full transition-all cursor-pointer",
+                                                                    reg.authorizationStatus === "AUTHORIZED"
+                                                                        ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:scale-105 active:scale-95"
+                                                                        : "bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600 opacity-40 cursor-not-allowed"
+                                                                )}
+                                                                title={
+                                                                    reg.authorizationStatus === "AUTHORIZED"
+                                                                        ? "Download / Print Official Pathology Report"
+                                                                        : "Download disabled — Awaiting Pathologist Authorization"
+                                                                }
+                                                            >
+                                                                <Download className="w-3.5 h-3.5" />
+                                                            </button>
                                                             <button
                                                                 onClick={() => {
                                                                     setSavedRecord(reg);
@@ -1633,13 +1850,106 @@ const PatientRegistrationForm: React.FC = () => {
                                                 />
                                             </div>
                                         ) : (
-                                            <SearchableSelect
-                                                label="Sample Drawn By"
-                                                options={staffOptions}
-                                                value={formData.sampleDrawnBy}
-                                                onChange={(val) => setFormData(prev => ({ ...prev, sampleDrawnBy: val }))}
-                                                placeholder="Select employee"
-                                            />
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-center">
+                                                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                                        Sample Drawn By
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsAddingStaff(prev => !prev)}
+                                                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 uppercase tracking-wider flex items-center gap-1 transition-all"
+                                                    >
+                                                        {isAddingStaff ? "× Cancel Add" : "+ Add Staff"}
+                                                    </button>
+                                                </div>
+                                                
+                                                {isAddingStaff ? (
+                                                    <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-xl space-y-4 animate-in fade-in duration-200">
+                                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] border-b border-slate-100 dark:border-slate-800 pb-1.5">Add New Staff Member</h4>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                            <div className="flex flex-col gap-1">
+                                                                <label className="text-[9px] font-bold text-slate-500 uppercase">Full Name *</label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Staff Name"
+                                                                    value={newStaffData.name}
+                                                                    onChange={(e) => setNewStaffData(prev => ({ ...prev, name: e.target.value }))}
+                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-850 dark:text-slate-200"
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <label className="text-[9px] font-bold text-slate-500 uppercase">Role *</label>
+                                                                <select
+                                                                    value={newStaffData.role}
+                                                                    onChange={(e) => setNewStaffData(prev => ({ ...prev, role: e.target.value }))}
+                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                                >
+                                                                    <option value="registration">Registration</option>
+                                                                    <option value="authorization">Authorization</option>
+                                                                    <option value="inventory">Inventory</option>
+                                                                    <option value="admin">Admin</option>
+                                                                </select>
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <label className="text-[9px] font-bold text-slate-500 uppercase">Email Address *</label>
+                                                                <input
+                                                                    type="email"
+                                                                    placeholder="email@example.com"
+                                                                    value={newStaffData.email}
+                                                                    onChange={(e) => setNewStaffData(prev => ({ ...prev, email: e.target.value }))}
+                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-850 dark:text-slate-200"
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <label className="text-[9px] font-bold text-slate-500 uppercase">Mobile Number</label>
+                                                                <input
+                                                                    type="tel"
+                                                                    placeholder="10-digit mobile"
+                                                                    value={newStaffData.mobileNumber}
+                                                                    onChange={(e) => setNewStaffData(prev => ({ ...prev, mobileNumber: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
+                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-850 dark:text-slate-200"
+                                                                />
+                                                            </div>
+                                                            <div className="sm:col-span-2 flex flex-col gap-1">
+                                                                <label className="text-[9px] font-bold text-slate-500 uppercase">Password *</label>
+                                                                <input
+                                                                    type="password"
+                                                                    placeholder="Password"
+                                                                    value={newStaffData.password}
+                                                                    onChange={(e) => setNewStaffData(prev => ({ ...prev, password: e.target.value }))}
+                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-850 dark:text-slate-200"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                                            <button
+                                                                type="button"
+                                                                disabled={isSavingStaff}
+                                                                onClick={handleAddNewStaff}
+                                                                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-md shadow-blue-600/10"
+                                                            >
+                                                                {isSavingStaff ? (
+                                                                    <>
+                                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                        Adding...
+                                                                    </>
+                                                                ) : (
+                                                                    "Save Staff"
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <SearchableSelect
+                                                        label=""
+                                                        options={staffOptions}
+                                                        value={formData.sampleDrawnBy}
+                                                        onChange={(val) => setFormData(prev => ({ ...prev, sampleDrawnBy: val }))}
+                                                        placeholder="Select employee"
+                                                    />
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -1656,457 +1966,179 @@ const PatientRegistrationForm: React.FC = () => {
                                     </div>
 
                                     <div className="space-y-3">
-                                        <div className="flex flex-col gap-1">
-                                            <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                                Received Through <span className="text-rose-500 font-bold">*</span>
-                                            </label>
-                                            <select
-                                                value={formData.sampleReceived.receivedThrough}
-                                                onChange={(e) => {
-                                                    const type = e.target.value;
+                                        {/* Tabs: In & Transfer */}
+                                        <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200/40 dark:border-slate-700/45 mb-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
                                                     setFormData(prev => ({
                                                         ...prev,
-                                                        sampleReceived: { ...prev.sampleReceived, receivedThrough: type as any }
+                                                        sampleReceived: {
+                                                            ...prev.sampleReceived,
+                                                            receivedThrough: "None"
+                                                        }
                                                     }));
                                                 }}
-                                                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none font-bold shadow-sm"
+                                                className={cn(
+                                                    "flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5",
+                                                    formData.sampleReceived.receivedThrough !== "Transfer"
+                                                        ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm"
+                                                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-350"
+                                                )}
                                             >
-                                                <option value="None">None (Sample Drawn at Lab)</option>
-                                                <option value="Employee">Employee Name & ID</option>
-                                                <option value="Person">Delivery Person Details</option>
-                                                <option value="Courier">Courier Transport</option>
-                                                <option value="Bus">Bus Transport / Parcel</option>
-                                            </select>
+                                                <Download className="w-3.5 h-3.5" />
+                                                In
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        sampleReceived: {
+                                                            ...prev.sampleReceived,
+                                                            receivedThrough: "Transfer"
+                                                        }
+                                                    }));
+                                                }}
+                                                className={cn(
+                                                    "flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5",
+                                                    formData.sampleReceived.receivedThrough === "Transfer"
+                                                        ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm"
+                                                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-350"
+                                                )}
+                                            >
+                                                <Share2 className="w-3.5 h-3.5" />
+                                                Transfer
+                                            </button>
                                         </div>
 
-                                        {/* DYNAMIC FIELDS */}
-                                        {formData.sampleReceived.receivedThrough !== "None" && (
-                                            <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-slate-100 dark:border-slate-800 space-y-2">
-                                                {/* Option A: Employee */}
-                                                {formData.sampleReceived.receivedThrough === "Employee" && (
-                                                    <div className="grid grid-cols-2 gap-2 text-left">
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Name <span className="text-rose-500 font-bold">*</span></label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.employee.name}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, name: e.target.value } } }))}
-                                                                placeholder="Name"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold animate-fadeIn"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Employee ID <span className="text-rose-500 font-bold">*</span></label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.employee.id}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, id: e.target.value } } }))}
-                                                                placeholder="EMP-ID"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold animate-fadeIn"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Mobile</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.employee.mobileNumber}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, mobileNumber: e.target.value } } }))}
-                                                                placeholder="Mobile (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Department</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.employee.department}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, department: e.target.value } } }))}
-                                                                placeholder="Dept (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Designation</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.employee.designation}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, designation: e.target.value } } }))}
-                                                                placeholder="Desig (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Date/Time Received</label>
-                                                            <div className="flex gap-1">
-                                                                <input
-                                                                    type="text"
-                                                                    value={formData.sampleReceived.employee.dateReceived}
-                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, dateReceived: e.target.value } } }))}
-                                                                    placeholder="Date (Optional)"
-                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
-                                                                />
-                                                                <input
-                                                                    type="text"
-                                                                    value={formData.sampleReceived.employee.timeReceived}
-                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, timeReceived: e.target.value } } }))}
-                                                                    placeholder="Time (Optional)"
-                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5 col-span-2">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Remarks</label>
-                                                            <textarea
-                                                                rows={1}
-                                                                value={formData.sampleReceived.employee.remarks}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, employee: { ...prev.sampleReceived.employee, remarks: e.target.value } } }))}
-                                                                placeholder="Remarks (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold resize-none"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {/* Option B: Person */}
-                                                {formData.sampleReceived.receivedThrough === "Person" && (
-                                                    <div className="grid grid-cols-2 gap-2 text-left">
-                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Name <span className="text-rose-500 font-bold">*</span></label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.person.name}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, name: e.target.value } } }))}
-                                                                placeholder="Name"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Mobile <span className="text-rose-500 font-bold">*</span></label>
-                                                            <input
-                                                                type="text"
-                                                                maxLength={10}
-                                                                value={formData.sampleReceived.person.mobileNumber}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, mobileNumber: e.target.value.replace(/\D/g, "") } } }))}
-                                                                placeholder="10-digit mobile"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Relationship <span className="text-rose-500 font-bold">*</span></label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.person.relationship}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, relationship: e.target.value } } }))}
-                                                                placeholder="e.g. Brother, Staff"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Address</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.person.address}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, address: e.target.value } } }))}
-                                                                placeholder="Address (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">ID Proof Type</label>
-                                                            <select
-                                                                value={formData.sampleReceived.person.idProofType}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, idProofType: e.target.value } } }))}
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold"
-                                                            >
-                                                                <option value="Aadhaar">Aadhaar</option>
-                                                                <option value="PAN">PAN</option>
-                                                                <option value="Voter ID">Voter ID</option>
-                                                                <option value="Driving License">Driving License</option>
-                                                                <option value="Other">Other</option>
-                                                            </select>
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">ID Proof Number</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.person.idProofNumber}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, idProofNumber: e.target.value } } }))}
-                                                                placeholder="ID Number (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5 col-span-2">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Date/Time Received</label>
-                                                            <div className="flex gap-1">
-                                                                <input
-                                                                    type="text"
-                                                                    value={formData.sampleReceived.person.dateReceived}
-                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, dateReceived: e.target.value } } }))}
-                                                                    placeholder="Date (Optional)"
-                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
-                                                                />
-                                                                <input
-                                                                    type="text"
-                                                                    value={formData.sampleReceived.person.timeReceived}
-                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, timeReceived: e.target.value } } }))}
-                                                                    placeholder="Time (Optional)"
-                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5 col-span-2">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Remarks</label>
-                                                            <textarea
-                                                                rows={1}
-                                                                value={formData.sampleReceived.person.remarks}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, person: { ...prev.sampleReceived.person, remarks: e.target.value } } }))}
-                                                                placeholder="Remarks (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold resize-none"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {/* Option C: Courier */}
+                                        {/* Content for In Tab */}
+                                        {formData.sampleReceived.receivedThrough !== "Transfer" && (
+                                            <div className="space-y-3">
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                                        Received Through <span className="text-rose-500 font-bold">*</span>
+                                                    </label>
+                                                    <select
+                                                        value={formData.sampleReceived.receivedThrough === "None" ? "None" : "Courier"}
+                                                        onChange={(e) => {
+                                                            const type = e.target.value;
+                                                            setFormData(prev => {
+                                                                const updated = {
+                                                                    ...prev,
+                                                                    sampleReceived: { ...prev.sampleReceived, receivedThrough: type as any }
+                                                                };
+                                                                if (type === "Courier") {
+                                                                    const now = new Date();
+                                                                    const localDate = now.toISOString().split('T')[0];
+                                                                    const localTime = now.toTimeString().split(' ')[0].slice(0, 5);
+                                                                    if (!updated.sampleReceived.courier.arrivalDate) {
+                                                                        updated.sampleReceived.courier.arrivalDate = localDate;
+                                                                    }
+                                                                    if (!updated.sampleReceived.courier.arrivalTime) {
+                                                                        updated.sampleReceived.courier.arrivalTime = localTime;
+                                                                    }
+                                                                }
+                                                                return updated;
+                                                            });
+                                                        }}
+                                                        className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none font-bold shadow-sm"
+                                                    >
+                                                        <option value="None">Sample Drawn at Lab</option>
+                                                        <option value="Courier">Other (Collected from Outside)</option>
+                                                    </select>
+                                                </div>
+
                                                 {formData.sampleReceived.receivedThrough === "Courier" && (
-                                                    <div className="grid grid-cols-2 gap-2 text-left">
-                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Company <span className="text-rose-500 font-bold">*</span></label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.courier.companyName}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, companyName: e.target.value } } }))}
-                                                                placeholder="e.g. DHL"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Tracking # <span className="text-rose-500 font-bold">*</span></label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.courier.trackingNumber}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, trackingNumber: e.target.value } } }))}
-                                                                placeholder="Tracking ID"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Order #</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.courier.orderNumber}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, orderNumber: e.target.value } } }))}
-                                                                placeholder="Order # (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Contact Number</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.courier.contactNumber}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, contactNumber: e.target.value } } }))}
-                                                                placeholder="Contact (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Pickup Location</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.courier.pickupLocation}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, pickupLocation: e.target.value } } }))}
-                                                                placeholder="Pickup (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Received By (Employee)</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.courier.receivedByEmployee}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, receivedByEmployee: e.target.value } } }))}
-                                                                placeholder="Employee (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Condition</label>
-                                                            <select
-                                                                value={formData.sampleReceived.courier.packageCondition}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, packageCondition: e.target.value as any } } }))}
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold"
-                                                            >
-                                                                <option value="Good">Good</option>
-                                                                <option value="Damaged">Damaged</option>
-                                                                <option value="Opened">Opened</option>
-                                                            </select>
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Arrival Date/Time</label>
-                                                            <div className="flex gap-1">
+                                                    <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-3 animate-in fade-in duration-200">
+                                                        <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-100 dark:border-slate-800">Outside Collection Details</h3>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                                                            <div className="flex flex-col gap-1">
+                                                                <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                                                    Mode of Transport <span className="text-rose-500 font-bold">*</span>
+                                                                </label>
                                                                 <input
                                                                     type="text"
+                                                                    value={formData.sampleReceived.courier.companyName}
+                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, companyName: e.target.value } } }))}
+                                                                    placeholder="e.g. Courier, Employee, Person, Bus, etc."
+                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                                                    Docket Number / Tracking ID
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.sampleReceived.courier.trackingNumber}
+                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, trackingNumber: e.target.value } } }))}
+                                                                    placeholder="Tracking ID (Optional)"
+                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                                                    Date Received
+                                                                </label>
+                                                                <input
+                                                                    type="date"
                                                                     value={formData.sampleReceived.courier.arrivalDate}
                                                                     onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, arrivalDate: e.target.value } } }))}
-                                                                    placeholder="Date"
-                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
                                                                 />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1">
+                                                                <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                                                    Time Received
+                                                                </label>
                                                                 <input
-                                                                    type="text"
+                                                                    type="time"
                                                                     value={formData.sampleReceived.courier.arrivalTime}
                                                                     onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, arrivalTime: e.target.value } } }))}
-                                                                    placeholder="Time"
-                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
+                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-col gap-1 col-span-1 md:col-span-2">
+                                                                <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                                                    Remarks
+                                                                </label>
+                                                                <textarea
+                                                                    rows={2}
+                                                                    value={formData.sampleReceived.courier.remarks}
+                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, remarks: e.target.value } } }))}
+                                                                    placeholder="Enter any transport/package remarks..."
+                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all resize-none text-slate-850 dark:text-slate-200"
                                                                 />
                                                             </div>
                                                         </div>
-                                                        <div className="flex flex-col gap-0.5 col-span-2">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Remarks</label>
-                                                            <textarea
-                                                                rows={1}
-                                                                value={formData.sampleReceived.courier.remarks}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, remarks: e.target.value } } }))}
-                                                                placeholder="Remarks (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold resize-none"
-                                                            />
-                                                        </div>
                                                     </div>
                                                 )}
-                                                {/* Option D: Bus */}
-                                                {formData.sampleReceived.receivedThrough === "Bus" && (
-                                                    <div className="grid grid-cols-2 gap-2 text-left">
-                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Bus Number <span className="text-rose-500 font-bold">*</span></label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.bus.busNumber}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, busNumber: e.target.value } } }))}
-                                                                placeholder="Bus Number"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Service Name <span className="text-rose-500 font-bold">*</span></label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.bus.busServiceName}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, busServiceName: e.target.value } } }))}
-                                                                placeholder="Bus Service"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5 animate-fadeIn">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Driver Mobile <span className="text-rose-500 font-bold">*</span></label>
-                                                            <input
-                                                                type="text"
-                                                                maxLength={10}
-                                                                value={formData.sampleReceived.bus.driverMobileNumber}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, driverMobileNumber: e.target.value.replace(/\D/g, "") } } }))}
-                                                                placeholder="Mobile"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Driver Name</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.bus.driverName}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, driverName: e.target.value } } }))}
-                                                                placeholder="Driver Name"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Conductor Name</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.bus.conductorName}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, conductorName: e.target.value } } }))}
-                                                                placeholder="Conductor Name"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Conductor Mobile</label>
-                                                            <input
-                                                                type="text"
-                                                                maxLength={10}
-                                                                value={formData.sampleReceived.bus.conductorMobileNumber}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, conductorMobileNumber: e.target.value.replace(/\D/g, "") } } }))}
-                                                                placeholder="Conductor Mobile"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Origin</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.bus.originLocation}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, originLocation: e.target.value } } }))}
-                                                                placeholder="Origin"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Destination</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.bus.destinationLocation}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, destinationLocation: e.target.value } } }))}
-                                                                placeholder="Destination"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Received By</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.bus.receivedByEmployee}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, receivedByEmployee: e.target.value } } }))}
-                                                                placeholder="Employee Name"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Condition</label>
-                                                            <input
-                                                                type="text"
-                                                                value={formData.sampleReceived.bus.packageCondition}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, packageCondition: e.target.value } } }))}
-                                                                placeholder="e.g. Good"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                                                            />
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5 col-span-2">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Arrival Date/Time</label>
-                                                            <div className="flex gap-1">
-                                                                <input
-                                                                    type="text"
-                                                                    value={formData.sampleReceived.bus.arrivalDate}
-                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, arrivalDate: e.target.value } } }))}
-                                                                    placeholder="Date"
-                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
-                                                                />
-                                                                <input
-                                                                    type="text"
-                                                                    value={formData.sampleReceived.bus.arrivalTime}
-                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, arrivalTime: e.target.value } } }))}
-                                                                    placeholder="Time"
-                                                                    className="w-1/2 px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-semibold"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex flex-col gap-0.5 col-span-2">
-                                                            <label className="text-[9px] font-bold text-slate-500 uppercase">Remarks</label>
-                                                            <textarea
-                                                                rows={1}
-                                                                value={formData.sampleReceived.bus.remarks}
-                                                                onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, bus: { ...prev.sampleReceived.bus, remarks: e.target.value } } }))}
-                                                                placeholder="Remarks (Optional)"
-                                                                className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold resize-none"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Content for Transfer Tab */}
+                                        {formData.sampleReceived.receivedThrough === "Transfer" && (
+                                            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-3 animate-in fade-in duration-200 text-left">
+                                                <SearchableSelect
+                                                    label="Transfer to Lab"
+                                                    options={["None", ...hospitals.flatMap(h => (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`))]}
+                                                    value={formData.sampleReceived.transfer?.labName || ""}
+                                                    onChange={(val) => {
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            sampleReceived: {
+                                                                ...prev.sampleReceived,
+                                                                transfer: {
+                                                                    ...prev.sampleReceived.transfer,
+                                                                    labName: val
+                                                                }
+                                                            }
+                                                        }));
+                                                    }}
+                                                    placeholder="Search and select lab..."
+                                                    mandatory={true}
+                                                />
                                             </div>
                                         )}
                                     </div>
@@ -2393,6 +2425,14 @@ const PatientRegistrationForm: React.FC = () => {
                                         </>
                                     )}
 
+                                    {savedRecord.sampleReceived.receivedThrough === "Transfer" && (
+                                        <>
+                                            <div className="flex justify-between py-1 border-b border-slate-100/50 col-span-1 md:col-span-2">
+                                                <span className="text-slate-400 font-medium">Transferred To Lab:</span>
+                                                <span className="font-extrabold text-teal-600 dark:text-teal-400">{savedRecord.sampleReceived.transfer?.labName || "N/A"}</span>
+                                            </div>
+                                        </>
+                                    )}
                                     {/* Bus Detail receipt fields */}
                                     {savedRecord.sampleReceived.receivedThrough === "Bus" && (
                                         <>
@@ -2517,6 +2557,8 @@ const PatientRegistrationForm: React.FC = () => {
                         const sampleDigits = regDigits.slice(-8);
                         const sampleId = `S${sampleDigits}${index + 1}`;
 
+                        const badgeInfo = getContainerBadgeInfo(test, availableSamples);
+
                         return (
                             <div key={test._id || index} className="vial-label-card" style={{ pageBreakAfter: "always", breakAfter: "page" }}>
                                 {/* Logo Column */}
@@ -2565,13 +2607,19 @@ const PatientRegistrationForm: React.FC = () => {
                                     </div>
                                     <div className="label-qr-wrapper">
                                         <img
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`Patient:${savedRecord.patientName}|ID:${savedRecord.registrationNumber}|Sample:${sampleId}|Test:${test.testName}`)}`}
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`Patient:${savedRecord.patientName}|ID:${savedRecord.registrationNumber}|Sample:${sampleId}|Test:${typeof test === 'object' ? (test.testName || test.name) : test}`)}`}
                                             alt="QR Code"
                                             className="label-qr-img"
                                         />
                                     </div>
-                                    <div className="label-test-badge">
-                                        {test.testName}
+                                    <div
+                                        className="label-test-badge"
+                                        style={{
+                                            backgroundColor: badgeInfo.bgColor,
+                                            color: badgeInfo.textColor
+                                        }}
+                                    >
+                                        {badgeInfo.text}
                                     </div>
                                 </div>
 
@@ -2742,8 +2790,6 @@ const PatientRegistrationForm: React.FC = () => {
                         }
                         .label-test-badge {
                             width: 100%;
-                            background-color: #0d9488 !important;
-                            color: white !important;
                             font-size: 8px;
                             font-weight: 800;
                             text-align: center;
@@ -2833,6 +2879,12 @@ const PatientRegistrationForm: React.FC = () => {
                     }
                 `}</style>
             )}
+            {/* Official Pathology Report Modal */}
+            <PathologyReportModal
+                record={reportModalRecord}
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+            />
         </div>
     );
 };

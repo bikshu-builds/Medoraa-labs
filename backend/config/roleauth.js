@@ -5,6 +5,7 @@ const roleAuth = {
   admin: commonAuth(["admin"]),
   registration: commonAuth(["registration"]),
   authorization: commonAuth(["authorization"]),
+  examiner: commonAuth(["examiner"]),
   inventory: commonAuth(["inventory"]),
 
   // ── Broad access (ANY authenticated employee) ────────────────────────────────

@@ -119,7 +119,7 @@ const DonutChart = ({ data }: { data: { label: string, value: number, color: str
 const Dashboard: React.FC = () => {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [userRole, setUserRole] = useState<string>("admin");
+    const [userRole, setUserRole] = useState<string | null>(null);
     const [userName, setUserName] = useState<string>("Administrator");
 
     // Sub-Dashboard Search Filters
@@ -163,18 +163,6 @@ const Dashboard: React.FC = () => {
                 return;
             }
 
-            // Extract role & name
-            const storedUser = localStorage.getItem("adminUser");
-            if (storedUser) {
-                try {
-                    const user = JSON.parse(storedUser);
-                    setUserRole(user.role || "admin");
-                    setUserName(user.name || "Administrator");
-                } catch (e) {
-                    console.error(e);
-                }
-            }
-
             // Only fetch admin metrics API if role is admin
             const res = await fetch(getApiUrl("/api/admin/dashboard"), {
                 headers: { "Authorization": `Bearer ${token}` }
@@ -201,8 +189,44 @@ const Dashboard: React.FC = () => {
     };
 
     useEffect(() => {
+        if (typeof window !== "undefined") {
+            const storedUser = localStorage.getItem("adminUser");
+            if (storedUser) {
+                try {
+                    const user = JSON.parse(storedUser);
+                    const role = user.role || "admin";
+                    setUserName(user.name || "Administrator");
+                    setUserRole(role);
+
+                    if (role === "authorization") {
+                        window.location.replace("/authorization");
+                        return;
+                    } else if (role === "examiner") {
+                        window.location.replace("/examiner");
+                        return;
+                    } else if (role === "registration") {
+                        window.location.replace("/registration");
+                        return;
+                    }
+                } catch (e) {
+                    console.error(e);
+                    setUserRole("admin");
+                }
+            } else {
+                setUserRole("admin");
+            }
+        }
         fetchData();
     }, []);
+
+    if (!userRole || userRole === "authorization" || userRole === "examiner" || userRole === "registration") {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+                <div className="w-8 h-8 border-2 border-slate-200 border-t-indigo-600 rounded-full animate-spin" />
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest animate-pulse">Redirecting to Workspace Portal...</p>
+            </div>
+        );
+    }
 
     if (isLoading) {
         return (

@@ -13,8 +13,12 @@ const {
 const {
     addRegistration,
     getRegistrations,
-    updateRegistrationTests
+    updateRegistrationTests,
+    updateRegistrationAuthorization,
+    downloadReportPDF
 } = require("../controllers/registration");
+
+// Samples Directory Routes
 const {
     getSamples,
     addSample,
@@ -28,6 +32,9 @@ const adminMiddleware = require("../middleware/adminMiddleware");
 // Public Route
 router.post("/login", login);
 
+// Direct Pathology PDF Report Endpoint (accessible with query token or header for React Native & Web)
+router.get("/registrations/:id/pdf", downloadReportPDF);
+
 // Protected Staff Routes (accessible by any logged in staff role)
 router.use(authMiddleware);
 
@@ -40,6 +47,7 @@ router.get("/admins", getAdmins);
 router.post("/registrations", addRegistration);
 router.get("/registrations", getRegistrations);
 router.put("/registrations/:id/tests", updateRegistrationTests);
+router.put("/registrations/:id/authorization", updateRegistrationAuthorization);
 
 // Samples Directory Routes
 router.get("/samples", getSamples);

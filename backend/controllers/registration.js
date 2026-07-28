@@ -1,5 +1,6 @@
 const PatientRegistration = require("../models/PatientRegistration");
 const Counter = require("../models/Counter");
+const Sample = require("../models/Sample");
 
 // Helper to get auto-generated system date, time, and YYYYMMDD code
 const getFormattedDateTime = () => {
@@ -100,9 +101,24 @@ exports.getRegistrations = async (req, res) => {
 exports.updateRegistrationTests = async (req, res) => {
     try {
         const { testIds } = req.body;
+
+        // Fetch sample master details to populate initial testResults array
+        let initialTestResults = [];
+        if (Array.isArray(testIds) && testIds.length > 0) {
+            const samples = await Sample.find({ _id: { $in: testIds } });
+            initialTestResults = samples.map(s => ({
+                testId: s._id,
+                testName: s.testName,
+                resultValue: "",
+                unit: "",
+                referenceRange: s.referenceRange || "-",
+                flag: "Normal"
+            }));
+        }
+
         const registration = await PatientRegistration.findByIdAndUpdate(
             req.params.id,
-            { tests: testIds },
+            { tests: testIds, testResults: initialTestResults },
             { new: true }
         ).populate("tests");
 
@@ -119,4 +135,99 @@ exports.updateRegistrationTests = async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 };
+
+// @desc    Update authorization status & test result values
+exports.updateRegistrationAuthorization = async (req, res) => {
+    try {
+        const {
+            testResults,
+            authorizationStatus,
+            notes,
+            authorizedBy,
+            patientName,
+            age,
+            gender,
+            mobileNumber,
+            address,
+            referredBy
+        } = req.body;
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString();
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const updateData = {
+            authorizationStatus: authorizationStatus || "AUTHORIZED",
+            notes: notes || "",
+            authorizedBy: authorizedBy || (req.user ? req.user.name : "Medical Officer"),
+            authorizedAt: `${dateStr} ${timeStr}`
+        };
+
+        if (patientName !== undefined) updateData.patientName = patientName;
+        if (age !== undefined) updateData.age = age;
+        if (gender !== undefined) updateData.gender = gender;
+        if (mobileNumber !== undefined) updateData.mobileNumber = mobileNumber;
+        if (address !== undefined) updateData.address = address;
+        if (referredBy !== undefined) updateData.referredBy = referredBy;
+
+        if (Array.isArray(testResults)) {
+            updateData.testResults = testResults;
+        }
+
+        const registration = await PatientRegistration.findByIdAndUpdate(
+            req.params.id,
+            updateData,
+            { new: true }
+        ).populate("tests");
+
+        if (!registration) {
+            return res.status(404).json({ success: false, message: "Registration not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Report ${authorizationStatus || 'updated'} successfully`,
+            data: registration
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Download Pathology PDF Report (Authorized Only)
+// @route   GET /api/admin/registrations/:id/pdf
+exports.downloadReportPDF = async (req, res) => {
+    try {
+        const { generatePathologyPDF } = require("../services/pdfGenerator");
+        const registration = await PatientRegistration.findById(req.params.id).populate("tests");
+        if (!registration) {
+            return res.status(404).json({ success: false, message: "Patient registration record not found" });
+        }
+
+        // Enforce Authorization-Only gate
+        if (registration.authorizationStatus !== "AUTHORIZED") {
+            return res.status(403).json({
+                success: false,
+                message: "Download blocked — Pathology report is awaiting formal pathologist sign-off."
+            });
+        }
+
+        // Generate PDF Buffer
+        const pdfBuffer = await generatePathologyPDF(registration);
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+            "Content-Disposition",
+            `inline; filename=Pathology_Report_${registration.registrationNumber || registration._id}.pdf`
+        );
+        res.setHeader("Content-Length", pdfBuffer.length);
+
+        return res.send(pdfBuffer);
+    } catch (err) {
+        console.error("PDF Generation Error:", err);
+        return res.status(500).json({ success: false, message: "Error generating PDF report: " + err.message });
+    }
+};
+
+
 

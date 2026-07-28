@@ -69,7 +69,7 @@ export interface Staff {
     name: string;
     email: string;
     mobileNumber?: string;
-    role: "admin" | "registration" | "authorization" | "inventory";
+    role: "admin" | "registration" | "authorization" | "examiner" | "inventory";
     status: "active" | "inactive";
     createdAt: string;
     updatedAt: string;

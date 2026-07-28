@@ -73,6 +73,9 @@ const LabPartnerModal: React.FC<LabPartnerModalProps> = ({ isOpen, onClose, onSa
         setIsSubmitting(true);
         setError("");
         try {
+            if (formData.mobileNumber && formData.mobileNumber.replace(/\D/g, "").length !== 10) {
+                throw new Error("Mobile number must be exactly 10 digits");
+            }
             const cleanData = {
                 ...formData,
                 affiliationType: "LAB" as const,
@@ -205,7 +208,7 @@ const LabPartnerModal: React.FC<LabPartnerModalProps> = ({ isOpen, onClose, onSa
                                             placeholder="9876543210" 
                                             required
                                             value={formData.mobileNumber}
-                                            onChange={(e) => setFormData({...formData, mobileNumber: e.target.value})}
+                                            onChange={(e) => setFormData({...formData, mobileNumber: e.target.value.replace(/\D/g, "").slice(0, 10)})}
                                             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all text-slate-800"
                                         />
                                     </div>

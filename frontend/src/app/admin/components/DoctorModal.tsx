@@ -10,6 +10,7 @@ interface DoctorModalProps {
     onClose: () => void;
     onSave: (doctorData: Partial<Doctor>) => Promise<void>;
     doctor?: Doctor | null;
+    onHospitalAdded?: () => void;
 }
 
 interface FormDataType extends Partial<Omit<Doctor, 'referralPercentage'>> {
@@ -17,7 +18,7 @@ interface FormDataType extends Partial<Omit<Doctor, 'referralPercentage'>> {
     referralPercentage?: number | string;
 }
 
-const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doctor }) => {
+const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doctor, onHospitalAdded }) => {
     const [formData, setFormData] = useState<FormDataType>({
         doctorName: "",
         affiliationType: "HOSPITAL",
@@ -71,6 +72,96 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
     const handleBranchChange = (branchId: string) => {
         setSelectedBranchId(branchId);
         setFormData(prev => ({ ...prev, hospitalId: branchId }));
+    };
+
+    const [isSavingHospital, setIsSavingHospital] = useState(false);
+
+    const handleAddNewHospital = async () => {
+        if (!newHospitalData.hospitalName.trim()) {
+            setError("Hospital Name is required to add a new hospital");
+            return;
+        }
+        if (!newHospitalData.branch.trim()) {
+            setError("Branch is required to add a new hospital");
+            return;
+        }
+        if (newHospitalData.telephoneNumber && newHospitalData.telephoneNumber.replace(/\D/g, "").length !== 10) {
+            setError("Telephone/Mobile number must be exactly 10 digits");
+            return;
+        }
+        if (!newHospitalData.stateName.trim() || !newHospitalData.district.trim()) {
+            setError("State and District are required to add a new hospital");
+            return;
+        }
+
+        setIsSavingHospital(true);
+        setError("");
+        try {
+            const token = localStorage.getItem("adminToken");
+            const res = await fetch(getApiUrl("/api/admin/hospitals"), {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    hospitalName: newHospitalData.hospitalName,
+                    branch: newHospitalData.branch,
+                    pocName: newHospitalData.pocName,
+                    telephoneNumber: newHospitalData.telephoneNumber,
+                    address: {
+                        state: newHospitalData.stateName,
+                        district: newHospitalData.district,
+                        city: newHospitalData.city,
+                        pincode: newHospitalData.pincode,
+                        village: newHospitalData.village,
+                        doorNo: newHospitalData.doorNo,
+                        completeAddress: newHospitalData.completeAddress
+                    },
+                    labs: newHospitalLabs.filter(l => l.trim() !== "")
+                })
+            });
+            const data = await res.json();
+            if (!data.success) {
+                throw new Error(data.message || "Failed to create new hospital");
+            }
+            
+            const newHosp = data.data;
+            
+            // Add new hospital to local hospitals list
+            setHospitals(prev => [...prev, newHosp]);
+            
+            // Select the newly added hospital and its branch
+            setSelectedHospitalName(newHosp.hospitalName || "");
+            setSelectedBranchId(newHosp._id);
+            setFormData(prev => ({ ...prev, hospitalId: newHosp._id }));
+            
+            // Reset input fields
+            setIsAddingHospital(false);
+            setNewHospitalData({
+                hospitalName: "",
+                branch: "",
+                pocName: "",
+                telephoneNumber: "",
+                stateName: "",
+                district: "",
+                city: "",
+                pincode: "",
+                village: "",
+                doorNo: "",
+                completeAddress: ""
+            });
+            setNewHospitalLabs([""]);
+            
+            if (onHospitalAdded) {
+                onHospitalAdded();
+            }
+        } catch (err: any) {
+            console.error(err);
+            setError(err.message || "Failed to create new hospital");
+        } finally {
+            setIsSavingHospital(false);
+        }
     };
 
     useEffect(() => {
@@ -174,11 +265,20 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
         setIsSubmitting(true);
         setError("");
         try {
+            if (formData.mobileNumber && formData.mobileNumber.replace(/\D/g, "").length !== 10) {
+                throw new Error("Doctor's mobile number must be exactly 10 digits");
+            }
+            if (isAddingHospital && newHospitalData.telephoneNumber && newHospitalData.telephoneNumber.replace(/\D/g, "").length !== 10) {
+                throw new Error("Hospital telephone/mobile number must be exactly 10 digits");
+            }
             let finalHospitalId = selectedBranchId;
 
             if (isAddingHospital) {
                 if (!newHospitalData.hospitalName.trim()) {
                     throw new Error("Hospital Name is required to add a new hospital");
+                }
+                if (!newHospitalData.branch.trim()) {
+                    throw new Error("Branch is required to add a new hospital");
                 }
                 const token = localStorage.getItem("adminToken");
                 const res = await fetch(getApiUrl("/api/admin/hospitals"), {
@@ -209,6 +309,9 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                     throw new Error(data.message || "Failed to create new hospital");
                 }
                 finalHospitalId = data.data._id;
+                if (onHospitalAdded) {
+                    onHospitalAdded();
+                }
             }
 
             if (!finalHospitalId) {
@@ -292,9 +395,10 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                             </div>
 
                                             <div className="space-y-1">
-                                                <label className="text-[11px] font-bold text-slate-700">Branch</label>
+                                                <label className="text-[11px] font-bold text-slate-700">Branch *</label>
                                                 <input
                                                     type="text"
+                                                    required={isAddingHospital}
                                                     placeholder="e.g. City Center, Jubilee Hills"
                                                     value={newHospitalData.branch}
                                                     onChange={(e) => setNewHospitalData(prev => ({ ...prev, branch: e.target.value }))}
@@ -319,7 +423,7 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                                     type="tel"
                                                     placeholder="Telephone Number"
                                                     value={newHospitalData.telephoneNumber}
-                                                    onChange={(e) => setNewHospitalData(prev => ({ ...prev, telephoneNumber: e.target.value }))}
+                                                    onChange={(e) => setNewHospitalData(prev => ({ ...prev, telephoneNumber: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
                                                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
                                                 />
                                             </div>
@@ -451,6 +555,23 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                                 />
                                             </div>
                                         </div>
+                                    </div>
+                                    <div className="flex justify-end pt-4 border-t border-slate-200/60">
+                                        <button
+                                            type="button"
+                                            disabled={isSavingHospital}
+                                            onClick={handleAddNewHospital}
+                                            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded text-xs transition-all active:scale-95 shadow-md shadow-blue-500/10"
+                                        >
+                                            {isSavingHospital ? (
+                                                <>
+                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    Adding Hospital...
+                                                </>
+                                            ) : (
+                                                "Add Hospital"
+                                            )}
+                                        </button>
                                     </div>
                                 </div>
                             ) : (
@@ -584,7 +705,7 @@ const DoctorModal: React.FC<DoctorModalProps> = ({ isOpen, onClose, onSave, doct
                                                     placeholder="+91 00000 00000" 
                                                     required
                                                     value={formData.mobileNumber}
-                                                    onChange={(e) => setFormData({...formData, mobileNumber: e.target.value})}
+                                                    onChange={(e) => setFormData({...formData, mobileNumber: e.target.value.replace(/\D/g, "").slice(0, 10)})}
                                                     className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all"
                                                 />
                                             </div>

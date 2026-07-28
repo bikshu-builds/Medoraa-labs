@@ -6,7 +6,7 @@ interface DashboardCardProps {
     title: string;
     value: string | number;
     icon: LucideIcon;
-    color: 'blue' | 'emerald' | 'purple' | 'amber' | 'rose';
+    color: 'blue' | 'emerald' | 'purple' | 'amber' | 'rose' | 'indigo';
     description?: string;
 }
 
@@ -17,6 +17,7 @@ const DashboardCard: React.FC<DashboardCardProps> = ({ title, value, icon: Icon,
         purple: "text-purple-600 bg-purple-50 border-purple-100",
         amber: "text-amber-600 bg-amber-50 border-amber-100",
         rose: "text-rose-600 bg-rose-50 border-rose-100",
+        indigo: "text-indigo-600 bg-indigo-50 border-indigo-100",
     };
 
     return (

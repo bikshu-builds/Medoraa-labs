@@ -60,6 +60,12 @@ const StaffModal: React.FC<StaffModalProps> = ({ isOpen, onClose, onSave, staff 
                 return;
             }
 
+            if (formData.mobileNumber && formData.mobileNumber.replace(/\D/g, "").length !== 10) {
+                setError("Mobile number must be exactly 10 digits");
+                setIsSubmitting(false);
+                return;
+            }
+
             const payload: any = { ...formData };
             // If editing and password is empty, don't submit password
             if (staff && !formData.password) {
@@ -145,7 +151,7 @@ const StaffModal: React.FC<StaffModalProps> = ({ isOpen, onClose, onSave, staff 
                                     type="tel" 
                                     placeholder="+91 98765 43210" 
                                     value={formData.mobileNumber}
-                                    onChange={(e) => setFormData({...formData, mobileNumber: e.target.value})}
+                                    onChange={(e) => setFormData({...formData, mobileNumber: e.target.value.replace(/\D/g, "").slice(0, 10)})}
                                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none transition-all text-slate-800"
                                 />
                             </div>
@@ -179,6 +185,7 @@ const StaffModal: React.FC<StaffModalProps> = ({ isOpen, onClose, onSave, staff 
                                     className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded text-sm font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-500 appearance-none"
                                 >
                                     <option value="registration">Registration</option>
+                                    <option value="examiner">Examiner</option>
                                     <option value="authorization">Authorization</option>
                                     <option value="inventory">Inventory</option>
                                     <option value="admin">Admin</option>

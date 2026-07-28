@@ -22,6 +22,7 @@ import {
     LineChart,
     Map,
     Sparkles,
+    FlaskConical,
     Shield,
     AlertTriangle,
     Database,
@@ -42,6 +43,7 @@ import { getApiUrl } from "@/lib/api";
 
 const Sidebar: React.FC = () => {
     const pathname = usePathname();
+    const [isMounted, setIsMounted] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<"add" | "manage">("add");
     const [formData, setFormData] = useState({ name: "", email: "", password: "" });
@@ -57,50 +59,15 @@ const Sidebar: React.FC = () => {
     const [editEmail, setEditEmail] = useState("");
     const [editPassword, setEditPassword] = useState("");
     const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({
-        "Referral Module": false,
         "Registrations": false
     });
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     useEffect(() => {
-        if (pathname === "/admin/hospitals" || pathname === "/admin/doctors") {
-            setOpenDropdowns(prev => ({ ...prev, "Referral Module": true }));
-        }
+        setIsMounted(true);
         if (pathname === "/admin/registration" || pathname === "/admin/registration/samples") {
             setOpenDropdowns(prev => ({ ...prev, "Registrations": true }));
         }
-    }, [pathname]);
-
-    const menuItems = [
-        {
-            group: "Main", items: [
-                { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", isDropdown: false, roles: ["admin", "registration", "authorization", "inventory"] },
-                {
-                    name: "Registrations",
-                    icon: FileText,
-                    isDropdown: true,
-                    roles: ["admin", "registration"],
-                    subItems: [
-                        { name: "Patient Registration", icon: UserPlus, path: "/admin/registration" },
-                        { name: "Samples", icon: Database, path: "/admin/registration/samples" }
-                    ]
-                },
-                {
-                    name: "Referral Module",
-                    icon: Share2,
-                    isDropdown: true,
-                    roles: ["admin"],
-                    subItems: [
-                        { name: "Hospital", icon: Home, path: "/admin/hospitals" },
-                        { name: "Doctors", icon: UserPlus, path: "/admin/doctors" },
-                    ]
-                },
-                { name: "Staff", icon: Users, path: "/admin/staff", isDropdown: false, roles: ["admin"] },
-            ]
-        }
-    ];
-
-    useEffect(() => {
         const storedUser = localStorage.getItem("adminUser");
         if (storedUser) {
             try {
@@ -109,7 +76,29 @@ const Sidebar: React.FC = () => {
                 console.error(e);
             }
         }
-    }, []);
+    }, [pathname]);
+
+    const menuItems = [
+        {
+            group: "Main", items: [
+                { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", isDropdown: false, roles: ["admin"] },
+                { name: "Examiner Desk", icon: FlaskConical, path: "/examiner", isDropdown: false, roles: ["admin", "examiner"] },
+                { name: "Authorization Desk", icon: ShieldCheck, path: "/authorization", isDropdown: false, roles: ["admin", "authorization"] },
+                {
+                    name: "Registrations",
+                    icon: FileText,
+                    isDropdown: true,
+                    roles: ["admin", "registration"],
+                    subItems: [
+                        { name: "Patient Registration", icon: UserPlus, path: "/registration" },
+                        { name: "Samples", icon: Database, path: "/admin/registration/samples" }
+                    ]
+                },
+                { name: "Referral Module", icon: Share2, path: "/admin/doctors", isDropdown: false, roles: ["admin"] },
+                { name: "Staff", icon: Users, path: "/admin/staff", isDropdown: false, roles: ["admin"] },
+            ]
+        }
+    ];
 
     const fetchAdmins = async () => {
         try {
@@ -277,7 +266,7 @@ const Sidebar: React.FC = () => {
             {/* Navigation */}
             <nav className="flex-1 overflow-y-auto px-3 py-6 no-scrollbar">
                 {menuItems.map((group, gIdx) => {
-                    const userRole = currentAdmin?.role || "admin";
+                    const userRole = isMounted ? (currentAdmin?.role || "") : "";
                     const filteredItems = group.items.filter(item => {
                         if (item.roles) {
                             return item.roles.includes(userRole);
