@@ -3,32 +3,33 @@ const puppeteer = require("puppeteer");
 let browserInstance = null;
 
 async function getBrowser() {
-  try {
-    // Reuse existing browser if it's still running
-    if (browserInstance && browserInstance.isConnected()) {
-      return browserInstance;
-    }
-
+  if (!browserInstance || !browserInstance.isConnected()) {
     browserInstance = await puppeteer.launch({
+      headless: true,
+      executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ],
+    }).catch(() => puppeteer.launch({
       headless: true,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
-        "--disable-gpu",
+        "--disable-gpu"
       ],
-    });
+    }));
 
-    // Reset browserInstance if the browser closes
-    browserInstance.on("disconnected", () => {
-      browserInstance = null;
-    });
-
-    return browserInstance;
-  } catch (err) {
-    console.error("Failed to launch browser:", err);
-    throw err;
+    if (browserInstance) {
+      browserInstance.on("disconnected", () => {
+        browserInstance = null;
+      });
+    }
   }
+  return browserInstance;
 }
 
 /**
