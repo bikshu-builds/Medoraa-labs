@@ -42,6 +42,11 @@ const sampleSchema = new mongoose.Schema(
       default: "-",
       trim: true,
     },
+    units: {
+      type: String,
+      default: "-",
+      trim: true,
+    },
     referenceRange: {
       type: String,
       default: "-",

@@ -138,6 +138,27 @@ const patientRegistrationSchema = new mongoose.Schema(
       },
     },
 
+    // Section 4.5: Sample Transfer Logistics (Outsource Transfer)
+    sampleTransfer: {
+      modeOfTransfer: { type: String, trim: true, default: "" },
+      referenceLab: { type: String, trim: true, default: "" },
+      contactPersonName: { type: String, trim: true, default: "" },
+      contactNumber: { type: String, trim: true, default: "" },
+      vehicleNumber: { type: String, trim: true, default: "" },
+      courierAgency: { type: String, trim: true, default: "" },
+      docketNumber: { type: String, trim: true, default: "" },
+      remarks: { type: String, trim: true, default: "" },
+      transferredTestIds: [{ type: String }],
+      transferredTestNames: [{ type: String }],
+      testStatuses: [
+        {
+          testName: { type: String, trim: true },
+          status: { type: String, default: "At Lab" }
+        }
+      ],
+      transferredAt: { type: Date }
+    },
+
     // Section 5: Registration Details
     registrationDate: {
       type: String, // DD-MM-YYYY
@@ -170,6 +191,9 @@ const patientRegistrationSchema = new mongoose.Schema(
         resultValue: { type: String, trim: true, default: "" },
         unit: { type: String, trim: true, default: "" },
         referenceRange: { type: String, trim: true, default: "-" },
+        organ: { type: String, trim: true, default: "-" },
+        category: { type: String, trim: true, default: "-" },
+        method: { type: String, trim: true, default: "-" },
         flag: {
           type: String,
           enum: ["Normal", "Abnormal", "Critical", ""],
@@ -184,7 +208,16 @@ const patientRegistrationSchema = new mongoose.Schema(
     },
     authorizedBy: { type: String, trim: true, default: "" },
     authorizedAt: { type: String, trim: true, default: "" },
-    notes: { type: String, trim: true, default: "" }
+    notes: { type: String, trim: true, default: "" },
+    
+    // Section 6: Billing & Payment Information
+    subtotal: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
+    discountType: { type: String, enum: ["fixed", "percentage"], default: "fixed" },
+    totalAmount: { type: Number, default: 0 },
+    paidAmount: { type: Number, default: 0 },
+    paymentMethod: { type: String, trim: true, default: "Cash" },
+    paymentStatus: { type: String, enum: ["PAID", "PENDING", "PARTIAL"], default: "PAID" }
   },
   {
     timestamps: true,

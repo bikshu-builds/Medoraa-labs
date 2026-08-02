@@ -15,7 +15,10 @@ const {
     getRegistrations,
     updateRegistrationTests,
     updateRegistrationAuthorization,
-    downloadReportPDF
+    transferRegistrationSample,
+    downloadReportPDF,
+    downloadTransferLabelPDF,
+    downloadReceiptPDF
 } = require("../controllers/registration");
 
 // Samples Directory Routes
@@ -24,16 +27,26 @@ const {
     addSample,
     updateSample,
     deleteSample,
+    deleteAllSamples,
     importSamples
 } = require("../controllers/sample");
+const {
+    getSettings,
+    uploadQrCode,
+    deleteQrCode
+} = require("../controllers/settings");
+
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
 
 // Public Route
 router.post("/login", login);
 
-// Direct Pathology PDF Report Endpoint (accessible with query token or header for React Native & Web)
+// Direct PDF Endpoints (accessible for browser print & mobile view)
 router.get("/registrations/:id/pdf", downloadReportPDF);
+router.get("/registrations/:id/transfer-label-pdf", downloadTransferLabelPDF);
+router.get("/registrations/:id/receipt-pdf", downloadReceiptPDF);
+
 
 // Protected Staff Routes (accessible by any logged in staff role)
 router.use(authMiddleware);
@@ -48,16 +61,25 @@ router.post("/registrations", addRegistration);
 router.get("/registrations", getRegistrations);
 router.put("/registrations/:id/tests", updateRegistrationTests);
 router.put("/registrations/:id/authorization", updateRegistrationAuthorization);
+router.put("/registrations/:id/transfer-sample", transferRegistrationSample);
 
 // Samples Directory Routes
 router.get("/samples", getSamples);
 router.post("/samples", addSample);
 router.put("/samples/:id", updateSample);
+router.delete("/samples", deleteAllSamples);
 router.delete("/samples/:id", deleteSample);
 router.post("/samples/import", importSamples);
 
+// Settings & Configuration Routes
+router.get("/settings", getSettings);
+
 // Admin-only Mutation Routes
 router.use(adminMiddleware);
+
+// Settings Mutations
+router.post("/settings/qr-code", uploadQrCode);
+router.delete("/settings/qr-code", deleteQrCode);
 
 // Admin Account Management Mutations
 router.post("/admins", addAdmin);

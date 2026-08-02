@@ -28,6 +28,7 @@ interface SampleItem {
     container: string;
     sampleUsedForTest: string;
     reportTime: string;
+    units: string;
     referenceRange: string;
     labPrice: string;
     patientPrice: string;
@@ -64,6 +65,7 @@ export default function SamplesDirectoryPage() {
     const [container, setContainer] = useState("");
     const [sampleUsedForTest, setSampleUsedForTest] = useState("");
     const [reportTime, setReportTime] = useState("");
+    const [units, setUnits] = useState("");
     const [referenceRange, setReferenceRange] = useState("");
     const [labPrice, setLabPrice] = useState("");
     const [patientPrice, setPatientPrice] = useState("");
@@ -123,6 +125,7 @@ export default function SamplesDirectoryPage() {
         setContainer("");
         setSampleUsedForTest("");
         setReportTime("");
+        setUnits("");
         setReferenceRange("");
         setLabPrice("");
         setPatientPrice("");
@@ -144,6 +147,7 @@ export default function SamplesDirectoryPage() {
         setContainer(sample.container || "");
         setSampleUsedForTest(sample.sampleUsedForTest || "");
         setReportTime(sample.reportTime || "");
+        setUnits(sample.units || "");
         setReferenceRange(sample.referenceRange || "");
         setLabPrice(sample.labPrice || "");
         setPatientPrice(sample.patientPrice || "");
@@ -161,6 +165,7 @@ export default function SamplesDirectoryPage() {
         setContainer(sample["Container"] || "");
         setSampleUsedForTest(sample["Sample Used for test"] || "");
         setReportTime(sample["Report Time"] || "");
+        setUnits(sample["Units"] || sample["Unit"] || "");
         setReferenceRange(sample["Reference Range"] || "");
         setLabPrice(sample["Lab Price"] || "");
         setPatientPrice(sample["Patient Price"] || "");
@@ -191,6 +196,7 @@ export default function SamplesDirectoryPage() {
                 "Container": container,
                 "Sample Used for test": sampleUsedForTest,
                 "Report Time": reportTime,
+                "Units": units,
                 "Reference Range": referenceRange,
                 "Lab Price": labPrice,
                 "Patient Price": patientPrice
@@ -226,6 +232,7 @@ export default function SamplesDirectoryPage() {
                     container,
                     sampleUsedForTest,
                     reportTime,
+                    units,
                     referenceRange,
                     labPrice,
                     patientPrice
@@ -273,6 +280,40 @@ export default function SamplesDirectoryPage() {
         }
     };
 
+    const handleDeleteAll = async () => {
+        if (samples.length === 0) {
+            showToast("error", "No sample records available to delete");
+            return;
+        }
+
+        const confirmDelete = window.confirm(
+            `⚠️ DANGER: Are you sure you want to PERMANENTLY DELETE ALL ${samples.length} samples from the catalog directory?\n\nThis action cannot be undone.`
+        );
+        if (!confirmDelete) return;
+
+        setActionLoading(true);
+        try {
+            const token = localStorage.getItem("adminToken");
+            const res = await fetch(getApiUrl("/api/admin/samples"), {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast("success", data.message || "Successfully deleted all samples");
+                setSamples([]);
+                loadSamples();
+            } else {
+                showToast("error", data.message || "Failed to delete all samples");
+            }
+        } catch (err) {
+            console.error("Failed deleting all samples:", err);
+            showToast("error", "Network error when deleting all samples");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     // Download XLS template
     const handleDownloadTemplate = () => {
         const templateHeaders = [
@@ -285,7 +326,8 @@ export default function SamplesDirectoryPage() {
                 "Container": "SST (Yellow)",
                 "Sample Used for test": "Serum",
                 "Report Time": "Same Day",
-                "Reference Range": "0.2 - 1.2 mg/dL",
+                "Units": "mg/dL",
+                "Reference Range": "0.2 - 1.2",
                 "Lab Price": "150",
                 "Patient Price": "200"
             },
@@ -298,7 +340,8 @@ export default function SamplesDirectoryPage() {
                 "Container": "Red Cap",
                 "Sample Used for test": "Serum",
                 "Report Time": "Same Day",
-                "Reference Range": "0.6 - 1.2 mg/dL",
+                "Units": "mg/dL",
+                "Reference Range": "0.6 - 1.2",
                 "Lab Price": "120",
                 "Patient Price": "180"
             }
@@ -330,6 +373,7 @@ export default function SamplesDirectoryPage() {
             "Container": sample.container || "",
             "Sample Used for test": sample.sampleUsedForTest || "",
             "Report Time": sample.reportTime || "",
+            "Units": sample.units || "",
             "Reference Range": sample.referenceRange || "",
             "Lab Price": sample.labPrice || "",
             "Patient Price": sample.patientPrice || ""
@@ -403,6 +447,7 @@ export default function SamplesDirectoryPage() {
                     const containerVal = findValue([["container"], ["tube"], ["cap"]]);
                     const sampleUsedForTestVal = findValue([["sample", "used"], ["sampleused"], ["sample"], ["specimen"]]);
                     const reportTimeVal = findValue([["report", "time"], ["reporttime"], ["tat"], ["reporting"]]);
+                    const unitsVal = findValue([["units"], ["unit"]]);
                     const referenceRangeVal = findValue([["reference", "range"], ["referencerange"], ["ref", "range"], ["reference"], ["range"]]);
                     const labPriceVal = findValue([["lab", "price"], ["labprice"], ["b2b"]]);
                     const patientPriceVal = findValue([["patient", "price"], ["patientprice"], ["mrp"], ["patient"]]);
@@ -422,6 +467,7 @@ export default function SamplesDirectoryPage() {
                         "Container": clean(containerVal),
                         "Sample Used for test": clean(sampleUsedForTestVal),
                         "Report Time": clean(reportTimeVal),
+                        "Units": clean(unitsVal),
                         "Reference Range": clean(referenceRangeVal),
                         "Lab Price": clean(labPriceVal),
                         "Patient Price": clean(patientPriceVal)
@@ -571,6 +617,7 @@ export default function SamplesDirectoryPage() {
                                     <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Container</th>
                                     <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Sample Used</th>
                                     <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Report Time</th>
+                                    <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Units</th>
                                     <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Reference Range</th>
                                     <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Lab Price</th>
                                     <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Patient Price</th>
@@ -593,6 +640,7 @@ export default function SamplesDirectoryPage() {
                                             <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 dark:text-slate-400">{sample["Container"]}</td>
                                             <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 dark:text-slate-400">{sample["Sample Used for test"]}</td>
                                             <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 dark:text-slate-400">{sample["Report Time"]}</td>
+                                            <td className="py-3.5 px-4 text-xs font-bold text-blue-600 dark:text-blue-400">{sample["Units"] || sample["Unit"] || "-"}</td>
                                             <td className="py-3.5 px-4 text-xs font-mono text-slate-550 dark:text-slate-450">{sample["Reference Range"]}</td>
                                             <td className="py-3.5 px-4 text-xs font-extrabold text-blue-600 dark:text-blue-400">
                                                 {sample["Lab Price"] !== "-" ? `₹${sample["Lab Price"]}` : "-"}
@@ -622,7 +670,7 @@ export default function SamplesDirectoryPage() {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={12} className="py-16 text-center">
+                                        <td colSpan={13} className="py-16 text-center">
                                             <div className="flex flex-col items-center justify-center gap-3">
                                                 <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-955/20 flex items-center justify-center text-amber-505">
                                                     <FileSpreadsheet className="w-6 h-6" />
@@ -763,15 +811,27 @@ export default function SamplesDirectoryPage() {
                                         </div>
                                     </div>
 
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase">Biological Reference Range</label>
-                                        <input
-                                            type="text"
-                                            value={referenceRange}
-                                            onChange={(e) => setReferenceRange(e.target.value)}
-                                            placeholder="e.g. 70 - 110 mg/dL"
-                                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-205"
-                                        />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase">Units / Unit of Measure</label>
+                                            <input
+                                                type="text"
+                                                value={units}
+                                                onChange={(e) => setUnits(e.target.value)}
+                                                placeholder="e.g. mg/dL, g/dL, U/L, %"
+                                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-205"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase">Biological Reference Range</label>
+                                            <input
+                                                type="text"
+                                                value={referenceRange}
+                                                onChange={(e) => setReferenceRange(e.target.value)}
+                                                placeholder="e.g. 70 - 110"
+                                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-205"
+                                            />
+                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">
@@ -880,6 +940,15 @@ export default function SamplesDirectoryPage() {
                                 <FileSpreadsheet className="w-3.5 h-3.5" />
                                 Export Excel
                             </button>
+                            <button
+                                onClick={handleDeleteAll}
+                                disabled={actionLoading || samples.length === 0}
+                                className="flex items-center gap-1.5 px-3.5 py-2 border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 hover:bg-rose-100 dark:bg-rose-955/20 dark:hover:bg-rose-950/40 text-rose-700 dark:text-rose-400 font-bold rounded-xl text-xs transition-all active:scale-95 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Permanently delete all samples from catalog"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Delete All
+                            </button>
                             <input 
                                 type="file" 
                                 ref={fileInputRef} 
@@ -934,6 +1003,7 @@ export default function SamplesDirectoryPage() {
                                 <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Container</th>
                                 <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Sample Used</th>
                                 <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Report Time</th>
+                                <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Units</th>
                                 <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Reference Range</th>
                                 <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Lab Price</th>
                                 <th className="py-3 px-4 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Patient Price</th>
@@ -945,7 +1015,7 @@ export default function SamplesDirectoryPage() {
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={userRole === "admin" ? 12 : 11} className="py-12 text-center">
+                                    <td colSpan={userRole === "admin" ? 13 : 12} className="py-12 text-center">
                                         <div className="flex flex-col items-center justify-center gap-3">
                                             <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
                                             <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Loading Samples Catalog...</span>
@@ -967,6 +1037,7 @@ export default function SamplesDirectoryPage() {
                                         <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 dark:text-slate-400">{sample.container}</td>
                                         <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 dark:text-slate-400">{sample.sampleUsedForTest}</td>
                                         <td className="py-3.5 px-4 text-xs font-semibold text-slate-600 dark:text-slate-400">{sample.reportTime}</td>
+                                        <td className="py-3.5 px-4 text-xs font-bold text-blue-600 dark:text-blue-400">{sample.units || "-"}</td>
                                         <td className="py-3.5 px-4 text-xs font-mono text-slate-550 dark:text-slate-450">{sample.referenceRange}</td>
                                         <td className="py-3.5 px-4 text-xs font-extrabold text-blue-600 dark:text-blue-400">
                                             {sample.slno !== "-" ? `₹${sample.labPrice}` : "-"}
@@ -998,7 +1069,7 @@ export default function SamplesDirectoryPage() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={userRole === "admin" ? 12 : 11} className="py-16 text-center">
+                                    <td colSpan={userRole === "admin" ? 13 : 12} className="py-16 text-center">
                                         <div className="flex flex-col items-center justify-center gap-3">
                                             <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
                                                 <FileSpreadsheet className="w-6 h-6" />
@@ -1136,15 +1207,27 @@ export default function SamplesDirectoryPage() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase">Biological Reference Range</label>
-                                    <input
-                                        type="text"
-                                        value={referenceRange}
-                                        onChange={(e) => setReferenceRange(e.target.value)}
-                                        placeholder="e.g. 70 - 110 mg/dL"
-                                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-205"
-                                    />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase">Units / Unit of Measure</label>
+                                        <input
+                                            type="text"
+                                            value={units}
+                                            onChange={(e) => setUnits(e.target.value)}
+                                            placeholder="e.g. mg/dL, g/dL, U/L, %"
+                                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-205"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-550 dark:text-slate-450 uppercase">Biological Reference Range</label>
+                                        <input
+                                            type="text"
+                                            value={referenceRange}
+                                            onChange={(e) => setReferenceRange(e.target.value)}
+                                            placeholder="e.g. 70 - 110"
+                                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-slate-205"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">

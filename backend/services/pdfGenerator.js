@@ -33,14 +33,15 @@ async function getBrowser() {
 
 /**
  * Generates an official Pathology PDF Report buffer for a given patient registration record.
+ * Each test category (e.g., Hematology, Biochemistry, Serology, Microbiology) is printed on its own dedicated page with demographics header, test results, signature block, and note footer.
  * @param {Object} record Patient registration document
  * @returns {Promise<Buffer>} PDF Buffer
  */
 async function generatePathologyPDF(record) {
     const todayDate = new Date().toLocaleDateString("en-GB");
 
-    // Group test results by category / organ
-    const testResults = (record.testResults && record.testResults.length > 0)
+    // Extract test results and map with populated test details for category / classification
+    const rawResults = (record.testResults && record.testResults.length > 0)
         ? record.testResults
         : ((record.tests && record.tests.length > 0)
             ? record.tests.map(t => ({
@@ -48,36 +49,84 @@ async function generatePathologyPDF(record) {
                 resultValue: t.resultValue || "—",
                 unit: t.unit || "",
                 referenceRange: typeof t === "object" ? (t.referenceRange || "-") : "-",
-                category: t.category || "GENERAL PATHOLOGY"
+                category: typeof t === "object" ? (t.category || t.organ || "GENERAL PATHOLOGY") : "GENERAL PATHOLOGY",
+                method: typeof t === "object" ? (t.method || "") : ""
             }))
-            : [{ testName: "Routine Pathology Parameter", resultValue: "—", unit: "", referenceRange: "-", category: "GENERAL PATHOLOGY" }]
+            : [{ testName: "Routine Pathology Parameter", resultValue: "—", unit: "", referenceRange: "-", category: "GENERAL PATHOLOGY", method: "" }]
         );
 
+    // Map each result to its specific Classification/Category (checking category FIRST)
+    const testResults = rawResults.map(tr => {
+        const itemObj = tr.toObject ? tr.toObject() : tr;
+        
+        const popTest = (typeof itemObj.testId === "object" && itemObj.testId !== null) ? itemObj.testId : null;
+        const matchedTest = popTest || (record.tests || []).find(t => {
+            if (!t) return false;
+            const targetId = itemObj.testId ? (itemObj.testId._id ? itemObj.testId._id.toString() : itemObj.testId.toString()) : null;
+            if (t._id && targetId && t._id.toString() === targetId) return true;
+            if (t.testName && itemObj.testName && t.testName.trim().toLowerCase() === itemObj.testName.trim().toLowerCase()) return true;
+            return false;
+        });
+
+        let categoryName = "";
+        if (popTest && popTest.category && popTest.category !== "-") {
+            categoryName = popTest.category;
+        } else if (itemObj.category && itemObj.category !== "-") {
+            categoryName = itemObj.category;
+        } else if (matchedTest && matchedTest.category && matchedTest.category !== "-") {
+            categoryName = matchedTest.category;
+        } else if (popTest && popTest.organ && popTest.organ !== "-") {
+            categoryName = popTest.organ;
+        } else if (itemObj.organ && itemObj.organ !== "-") {
+            categoryName = itemObj.organ;
+        } else if (matchedTest && matchedTest.organ && matchedTest.organ !== "-") {
+            categoryName = matchedTest.organ;
+        } else {
+            categoryName = "GENERAL PATHOLOGY";
+        }
+
+        const methodStr = (popTest && popTest.method && popTest.method !== "-")
+            ? popTest.method
+            : ((itemObj.method && itemObj.method !== "-")
+                ? itemObj.method
+                : (matchedTest && matchedTest.method && matchedTest.method !== "-" ? matchedTest.method : ""));
+
+        return {
+            ...itemObj,
+            category: categoryName.trim().toUpperCase(),
+            method: methodStr
+        };
+    });
+
+    // Group test items strictly by Category / Classification
     const categoryGroups = {};
     testResults.forEach(item => {
-        const cat = (item.category || "PATHOLOGY OBSERVATIONS").toUpperCase();
-        if (!categoryGroups[cat]) {
-            categoryGroups[cat] = [];
+        let catKey = item.category || "GENERAL PATHOLOGY";
+        if (!categoryGroups[catKey]) {
+            categoryGroups[catKey] = [];
         }
-        categoryGroups[cat].push(item);
+        categoryGroups[catKey].push(item);
     });
 
     const categoryKeys = Object.keys(categoryGroups);
 
     // Format sample text
-    let sampleTypeText = "Clot-Act, Blood / Urine";
+    let sampleTypeText = "Clot-Act, Urine";
     if (record.sampleReceived) {
         if (typeof record.sampleReceived === "string") {
             sampleTypeText = record.sampleReceived;
         } else if (typeof record.sampleReceived === "object") {
-            sampleTypeText = record.sampleReceived.sampleType || record.sampleReceived.transportMethod || "Clot-Act, Blood / Urine";
+            sampleTypeText = record.sampleReceived.sampleType || record.sampleReceived.transportMethod || "Clot-Act, Urine";
         }
     }
 
     const patientAge = record.age ? `${record.age.value} ${record.age.type}` : "N/A";
     const patientGender = record.gender || "N/A";
+    const sampleDrawnByText = record.sampleDrawnBy || record.sampleReceived?.person?.name || "Zedlabs, Eluru";
+    const reportIssuedDate = record.authorizedAt || record.registrationDate || todayDate;
+    const pathologistName = record.authorizedBy || "Dr.Ravi Kumar Manyam";
 
-    // Build HTML template
+    // Build HTML template with per-category page wrapping
     const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -87,7 +136,10 @@ async function generatePathologyPDF(record) {
         <style>
             @page {
                 size: A4;
-                margin: 15mm 15mm 15mm 15mm;
+                margin: 10mm 15mm 10mm 15mm;
+            }
+            * {
+                box-sizing: border-box;
             }
             body {
                 font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -97,19 +149,28 @@ async function generatePathologyPDF(record) {
                 background-color: #ffffff;
                 -webkit-print-color-adjust: exact;
             }
-            .page-container {
-                width: 100%;
+            .report-page {
                 box-sizing: border-box;
+                min-height: 270mm;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                page-break-after: always;
+                break-after: page;
+            }
+            .report-page:last-child {
+                page-break-after: auto;
+                break-after: auto;
             }
             .demographics-table {
                 width: 100%;
                 border-collapse: collapse;
                 border: 1.5px solid #000000;
-                margin-bottom: 24px;
+                margin-bottom: 20px;
                 font-size: 11px;
             }
             .demographics-table td {
-                padding: 6px 10px;
+                padding: 5px 8px;
                 border: 1px solid #000000;
                 vertical-align: middle;
             }
@@ -121,7 +182,7 @@ async function generatePathologyPDF(record) {
                 font-weight: 700;
             }
             .category-block {
-                margin-bottom: 24px;
+                flex: 1;
             }
             .category-title {
                 text-align: center;
@@ -129,14 +190,14 @@ async function generatePathologyPDF(record) {
                 font-weight: 900;
                 text-transform: uppercase;
                 text-decoration: underline;
-                margin-bottom: 16px;
+                margin-bottom: 18px;
                 letter-spacing: 0.5px;
             }
             .results-table {
                 width: 100%;
                 border-collapse: collapse;
                 font-size: 11px;
-                margin-bottom: 12px;
+                margin-bottom: 16px;
             }
             .results-table th {
                 border-bottom: 2px solid #000000;
@@ -152,30 +213,26 @@ async function generatePathologyPDF(record) {
             }
             .test-method {
                 font-size: 10.5px;
-                margin-top: 10px;
+                margin-top: 20px;
                 color: #1f2937;
             }
             .test-method-label {
                 font-weight: 900;
             }
+            .page-footer {
+                margin-top: 20px;
+            }
             .signature-block {
-                margin-top: 40px;
                 text-align: right;
                 font-size: 11px;
+                margin-bottom: 20px;
             }
             .signature-name {
                 font-family: Georgia, serif;
                 font-style: italic;
                 font-weight: bold;
                 font-size: 20px;
-                margin-bottom: 4px;
-            }
-            .signature-line {
-                border-top: 1px solid #000000;
-                width: 200px;
-                margin-left: auto;
-                margin-top: 4px;
-                margin-bottom: 4px;
+                margin-bottom: 2px;
             }
             .signature-title {
                 font-weight: 800;
@@ -184,56 +241,76 @@ async function generatePathologyPDF(record) {
                 color: #4b5563;
                 font-weight: 600;
             }
-            .page-break {
-                page-break-before: always;
+            .footer-note {
+                font-size: 10px;
+                font-weight: 800;
+                color: #000000;
             }
         </style>
     </head>
     <body>
-        <div class="page-container">
-            <!-- Boxed Demographics Table -->
-            <table class="demographics-table">
-                <tr>
-                    <td style="width: 58%;">
-                        <span class="label">NAME :</span> <span class="val">${record.patientName}</span>
-                    </td>
-                    <td style="width: 42%;">
-                        <span class="label">Age :</span> <span class="val">${patientAge}</span> &nbsp;&nbsp;&nbsp;&nbsp;
-                        <span class="label">Sex :</span> <span class="val">${patientGender}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <span class="label">Ref/Dr :</span> <span class="val">${record.referredBy || "SELF (Self)"}</span>
-                    </td>
-                    <td>
-                        <span class="label">Registration Date :</span> <span class="val">${record.registrationDate || todayDate}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <span class="label">Sample Drawn By :</span> <span class="val">${record.sampleReceived?.person || "Zedlabs, Eluru"}</span>
-                    </td>
-                    <td>
-                        <span class="label">Report Issued Date :</span> <span class="val">${record.authorizedAt || record.registrationDate || todayDate}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <span class="label">SAMPLE :</span> <span class="val">${sampleTypeText}</span>
-                    </td>
-                    <td>
-                        <span class="label">Report No :</span> <span class="val" style="font-family: monospace;">${record.registrationNumber}</span>
-                    </td>
-                </tr>
-            </table>
+        ${categoryKeys.map((categoryName) => {
+            const items = categoryGroups[categoryName];
+            
+            let titleDisplay = categoryName.trim().toUpperCase();
+            if (!titleDisplay.endsWith("#")) {
+                if (titleDisplay.endsWith("REPORT")) {
+                    titleDisplay = `${titleDisplay}#`;
+                } else if (titleDisplay.length <= 4) {
+                    titleDisplay = `${titleDisplay}#`;
+                } else {
+                    titleDisplay = `${titleDisplay} REPORT#`;
+                }
+            }
 
-            <!-- Organ / Category Grouped Sections -->
-            ${categoryKeys.map((catName, idx) => {
-                const items = categoryGroups[catName];
-                return `
-                    <div class="category-block ${idx > 0 ? "page-break" : ""}">
-                        <div class="category-title">${catName} REPORT#</div>
+            const methodText = items[0]?.method && items[0].method !== "-" 
+                ? items[0].method 
+                : "Enzyme Kinetic Assay; Fully Automated Laboratory Analyzer";
+
+            return `
+                <div class="report-page">
+                    <!-- Page Header: Demographics Table -->
+                    <div class="page-header">
+                        <table class="demographics-table">
+                            <tr>
+                                <td style="width: 58%;">
+                                    <span class="label">NAME :</span> <span class="val">${record.patientName}</span>
+                                </td>
+                                <td style="width: 42%;">
+                                    <span class="label">Age :</span> <span class="val">${patientAge}</span> &nbsp;&nbsp;&nbsp;&nbsp;
+                                    <span class="label">Sex :</span> <span class="val">${patientGender}</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="label">Ref/Dr :</span> <span class="val">${record.referredBy || "SELF (Self)"}</span>
+                                </td>
+                                <td>
+                                    <span class="label">Registration Date :</span> <span class="val">${record.registrationDate || todayDate}</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="label">Sample Drawn By :</span> <span class="val">${sampleDrawnByText}</span>
+                                </td>
+                                <td>
+                                    <span class="label">Report Issued Date :</span> <span class="val">${reportIssuedDate}</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="label">SAMPLE :</span> <span class="val">${sampleTypeText}</span>
+                                </td>
+                                <td>
+                                    <span class="label">Report No :</span> <span class="val" style="font-family: monospace;">${record.registrationNumber}</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- Page Body: Category Test Results -->
+                    <div class="category-block">
+                        <div class="category-title">${titleDisplay}</div>
                         <table class="results-table">
                             <thead>
                                 <tr>
@@ -254,27 +331,32 @@ async function generatePathologyPDF(record) {
                         </table>
 
                         <div class="test-method">
-                            <span class="test-method-label">Test Method :-</span> Enzyme Kinetic Assay; Fully Automated Biochemistry & Hematology Analyzer
+                            <span class="test-method-label">Test Method :-</span> ${methodText}
+                        </div>
+
+                        ${record.notes ? `
+                            <div style="margin-top: 15px; font-size: 11px;">
+                                <span style="font-weight: 800; text-transform: uppercase;">Clinical Remarks:</span>
+                                <span style="font-style: italic;">${record.notes}</span>
+                            </div>
+                        ` : ""}
+                    </div>
+
+                    <!-- Page Footer: Pathologist Signature & Clinical Note -->
+                    <div class="page-footer">
+                        <div class="signature-block">
+                            <div class="signature-name">${pathologistName}</div>
+                            <div class="signature-title">Dr.Ravi Kumar Manyam; Ph.D</div>
+                            <div class="signature-sub">Biochemist & Pathologist</div>
+                        </div>
+
+                        <div class="footer-note">
+                            NOTE : Please Correlate Clinically. If Any Discrepancy, Please Contact.
                         </div>
                     </div>
-                `;
-            }).join("")}
-
-            ${record.notes ? `
-                <div style="margin-top: 15px; font-size: 11px;">
-                    <span style="font-weight: 800; text-transform: uppercase;">Clinical Remarks:</span>
-                    <span style="font-style: italic;">${record.notes}</span>
                 </div>
-            ` : ""}
-
-            <!-- Pathologist Signature Block -->
-            <div class="signature-block">
-                <div class="signature-name">${record.authorizedBy || "Dr. Ravi Kumar Manyam"}</div>
-                <div class="signature-line"></div>
-                <div class="signature-title">Dr. Ravi Kumar Manyam; Ph.D</div>
-                <div class="signature-sub">Biochemist & Pathologist</div>
-            </div>
-        </div>
+            `;
+        }).join("")}
     </body>
     </html>
     `;
@@ -289,8 +371,8 @@ async function generatePathologyPDF(record) {
             format: "A4",
             printBackground: true,
             margin: {
-                top: "15mm",
-                bottom: "15mm",
+                top: "10mm",
+                bottom: "10mm",
                 left: "15mm",
                 right: "15mm"
             }
@@ -301,5 +383,761 @@ async function generatePathologyPDF(record) {
     }
 }
 
-module.exports = { generatePathologyPDF, getBrowser };
+/**
+ * Helper to generate Code128 Vector SVG
+ */
+function generateCode128SVG(text) {
+    const CODE128B_PATTERNS = [
+        "212222","222122","222221","121223","121322","131222","122213","122312","132212","221213",
+        "221312","231212","112232","122132","122231","113222","123122","123221","223211","221132",
+        "221231","213212","223112","312131","311222","321122","321221","312212","322112","322211",
+        "212123","212321","232121","111323","131123","131321","112313","132113","132311","211313",
+        "231113","231311","112133","112331","132131","113123","113321","133121","313121","211331",
+        "231131","213113","213311","213131","311123","311321","331121","312113","312311","332111",
+        "314111","221411","431111","111224","111422","121124","121421","141122","141221","112214",
+        "112412","122114","122411","142112","142211","241211","221114","413111","241112","134111",
+        "111242","121142","121241","114212","124112","124211","411212","421112","421211","212141",
+        "214121","412121","111143","111341","131141","114113","114311","411113","411311","113141",
+        "114131","311141","411131","211412","211214","211232","2331112"
+    ];
+    const START_B = 104;
+    const STOP = 106;
+
+    let checksum = START_B;
+    let patternSequence = [CODE128B_PATTERNS[START_B]];
+
+    for (let i = 0; i < text.length; i++) {
+        const charCode = text.charCodeAt(i);
+        const codeVal = charCode - 32;
+        if (codeVal >= 0 && codeVal <= 95) {
+            checksum += codeVal * (i + 1);
+            patternSequence.push(CODE128B_PATTERNS[codeVal]);
+        }
+    }
+
+    const checkDigit = checksum % 103;
+    patternSequence.push(CODE128B_PATTERNS[checkDigit]);
+    patternSequence.push(CODE128B_PATTERNS[STOP]);
+
+    const fullPattern = patternSequence.join("");
+    let x = 0;
+    const barHeight = 40;
+    let rects = "";
+
+    for (let i = 0; i < fullPattern.length; i++) {
+        const width = parseInt(fullPattern[i], 10);
+        if (i % 2 === 0) {
+            rects += `<rect x="${x}" y="0" width="${width}" height="${barHeight}" fill="#000000"/>`;
+        }
+        x += width;
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${x} ${barHeight}" width="100%" height="${barHeight}px" preserveAspectRatio="none">${rects}</svg>`;
+}
+
+/**
+ * Generates an official Thermal Outsource Transfer Label PDF Buffer (100mm x 150mm / 4" x 6")
+ * @param {Object} record Patient registration document
+ * @param {Object} [hospitalDoc] Destination hospital document (if matched)
+ * @returns {Promise<Buffer>} PDF Buffer
+ */
+async function generateTransferLabelPDF(record, hospitalDoc = null) {
+    const transfer = record.sampleTransfer || {};
+    const refLabName = (transfer.referenceLab || "REFERENCE LABORATORY").toUpperCase();
+    
+    // Address & Contact info resolution
+    let labAddress = "Diagnostic Outsource Center";
+    let labPhone = transfer.contactNumber || "N/A";
+    let pocName = transfer.contactPersonName || "Lab In-Charge";
+
+    if (hospitalDoc) {
+        if (hospitalDoc.pocName) pocName = hospitalDoc.pocName;
+        if (hospitalDoc.telephoneNumber) labPhone = hospitalDoc.telephoneNumber;
+        if (hospitalDoc.address) {
+            const addrParts = [
+                hospitalDoc.address.doorNo,
+                hospitalDoc.address.completeAddress,
+                hospitalDoc.address.city || hospitalDoc.address.village,
+                hospitalDoc.address.district,
+                hospitalDoc.address.state,
+                hospitalDoc.address.pincode
+            ].filter(Boolean);
+            if (addrParts.length > 0) labAddress = addrParts.join(", ");
+        }
+    }
+
+    const regNo = record.registrationNumber || record._id;
+    const barcodeSVG = generateCode128SVG(regNo);
+    const dateStr = transfer.transferredAt ? new Date(transfer.transferredAt).toLocaleString("en-GB") : new Date().toLocaleString("en-GB");
+
+    const transferredTestsList = (transfer.transferredTestNames && transfer.transferredTestNames.length > 0)
+        ? transfer.transferredTestNames
+        : (record.tests || []).map(t => typeof t === "string" ? t : (t.testName || t.name || "Diagnostic Parameter"));
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Outsource Transfer Label - ${regNo}</title>
+        <style>
+            @page {
+                size: 100mm 150mm;
+                margin: 0;
+            }
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            body {
+                width: 100mm;
+                height: 150mm;
+                font-family: Arial, Helvetica, sans-serif;
+                background-color: #ffffff;
+                color: #000000;
+                padding: 3mm;
+                font-size: 11px;
+                line-height: 1.25;
+            }
+            .label-box {
+                border: 2.5px solid #000000;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                padding: 3.5mm;
+            }
+            .header-banner {
+                background-color: #000000;
+                color: #ffffff;
+                text-align: center;
+                padding: 4px 0;
+                font-weight: 900;
+                font-size: 11px;
+                letter-spacing: 1px;
+                text-transform: uppercase;
+            }
+            .section {
+                border-bottom: 1.5px solid #000000;
+                padding: 4px 0;
+            }
+            .title-sm {
+                font-size: 9px;
+                font-weight: 800;
+                text-transform: uppercase;
+                color: #000000;
+                margin-bottom: 2px;
+            }
+            .title-lg {
+                font-size: 14px;
+                font-weight: 900;
+                text-transform: uppercase;
+                line-height: 1.15;
+            }
+            .text-bold {
+                font-weight: 800;
+            }
+            .grid-2 {
+                display: flex;
+                justify-content: space-between;
+            }
+            .barcode-container {
+                text-align: center;
+                padding: 4px 0;
+            }
+            .barcode-text {
+                font-family: monospace;
+                font-size: 11px;
+                font-weight: 900;
+                letter-spacing: 2px;
+                margin-top: 2px;
+            }
+            .test-tag-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 3.5px;
+                margin-top: 3px;
+            }
+            .test-tag {
+                border: 1px solid #000000;
+                padding: 2px 5px;
+                font-size: 9.5px;
+                font-weight: 800;
+                border-radius: 2px;
+                background-color: #f4f4f4;
+            }
+            .footer-warning {
+                font-size: 8.5px;
+                font-weight: 900;
+                text-align: center;
+                border-top: 1.5px dashed #000000;
+                padding-top: 3px;
+                text-transform: uppercase;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="label-box">
+            
+            <div>
+                <!-- Banner Header -->
+                <div class="header-banner">
+                    Outsource Sample Dispatch Label
+                </div>
+
+                <!-- Patient Demographics & Barcode Header -->
+                <div class="section" style="padding: 5px; background-color: #f8fafc; border-bottom: 1.5px solid #000;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div class="title-sm" style="font-size: 8px; color: #475569;">PATIENT DETAILS</div>
+                            <div style="font-size: 13px; font-weight: 900; text-transform: uppercase;">${record.patientName || "PATIENT"}</div>
+                            <div style="font-size: 9.5px; font-weight: 800; color: #1e293b;">
+                                Reg No: <span style="font-family: monospace; font-size: 10.5px;">${regNo}</span> | ${record.age?.value || ""}${record.age?.type?.substring(0, 1) || ""} / ${record.gender?.substring(0, 1) || ""}
+                            </div>
+                            ${record.mobileNumber ? `<div style="font-size: 8.5px; font-weight: 700; color: #64748b;">Ph: ${record.mobileNumber}</div>` : ""}
+                        </div>
+                        <div style="text-align: right; max-width: 120px;">
+                            ${barcodeSVG}
+                            <div class="barcode-text" style="font-size: 9.5px; margin-top: 1px;">* ${regNo} *</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sender & Receiver (TO / FROM) -->
+                <div class="section" style="display: flex; justify-content: space-between; padding: 5px; background-color: #ffffff; gap: 6px;">
+                    <div style="width: 48%; border-right: 1px solid #cbd5e1; padding-right: 4px;">
+                        <div class="title-sm" style="font-size: 8px; color: #64748b;">FROM (SENDER LAB):</div>
+                        <div style="font-weight: 900; font-size: 10.5px;">MEDORAA DIAGNOSTICS</div>
+                        <div style="font-size: 8.5px; font-weight: 600; color: #475569;">Main Center, Eluru</div>
+                        <div style="font-size: 8px; font-weight: 700; color: #64748b;">Date: ${dateStr}</div>
+                    </div>
+                    <div style="width: 48%;">
+                        <div class="title-sm" style="font-size: 8px; color: #2563eb;">TO (REFERENCE LAB):</div>
+                        <div class="title-lg" style="font-size: 12px; color: #1e3a8a;">${refLabName}</div>
+                        <div style="font-size: 9px; font-weight: 800; margin-top: 1px;">Contact: ${pocName}</div>
+                        <div style="font-size: 8.5px; font-weight: 700; color: #475569;">Ph: ${labPhone}</div>
+                    </div>
+                </div>
+
+                <!-- Dispatch & Logistics Grid (ALL FORM FIELDS) -->
+                <div class="section" style="padding: 5px; background-color: #f1f5f9;">
+                    <div class="title-sm" style="font-size: 9px; font-weight: 900; border-bottom: 1px solid #cbd5e1; pb: 2px; margin-bottom: 4px;">
+                        DISPATCH & LOGISTICS INFORMATION
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; font-size: 9px;">
+                        <div>
+                            <span style="font-weight: 700; color: #64748b; font-size: 8px; display: block; text-transform: uppercase;">Mode of Transfer:</span>
+                            <span style="font-weight: 900; text-transform: uppercase;">${transfer.modeOfTransfer || "N/A"}</span>
+                        </div>
+                        <div>
+                            <span style="font-weight: 700; color: #64748b; font-size: 8px; display: block; text-transform: uppercase;">Courier / Logistics Agency:</span>
+                            <span style="font-weight: 900;">${transfer.courierAgency || "N/A"}</span>
+                        </div>
+                        <div>
+                            <span style="font-weight: 700; color: #64748b; font-size: 8px; display: block; text-transform: uppercase;">Contact Person Name:</span>
+                            <span style="font-weight: 900;">${transfer.contactPersonName || "N/A"}</span>
+                        </div>
+                        <div>
+                            <span style="font-weight: 700; color: #64748b; font-size: 8px; display: block; text-transform: uppercase;">Contact Mobile Number:</span>
+                            <span style="font-weight: 900;">${transfer.contactNumber || "N/A"}</span>
+                        </div>
+                        <div>
+                            <span style="font-weight: 700; color: #64748b; font-size: 8px; display: block; text-transform: uppercase;">Vehicle Number:</span>
+                            <span style="font-weight: 900; font-family: monospace;">${transfer.vehicleNumber || "N/A"}</span>
+                        </div>
+                        <div>
+                            <span style="font-weight: 700; color: #64748b; font-size: 8px; display: block; text-transform: uppercase;">Docket / Tracking Number:</span>
+                            <span style="font-weight: 900; color: #1e40af; font-family: monospace;">${transfer.docketNumber || "N/A"}</span>
+                        </div>
+                    </div>
+
+                    ${transfer.remarks ? `
+                    <div style="margin-top: 4px; padding-top: 3px; border-top: 1px dashed #cbd5e1; font-size: 8.5px;">
+                        <span style="font-weight: 800; color: #475569; text-transform: uppercase;">Dispatch Instructions / Remarks:</span>
+                        <span style="font-weight: 700; color: #0f172a; font-style: italic;"> ${transfer.remarks}</span>
+                    </div>` : ''}
+                </div>
+
+                <!-- Transferred Tests Enclosed -->
+                <div class="section" style="border-bottom: none; padding: 5px;">
+                    <div class="grid-2" style="align-items: center; margin-bottom: 3px;">
+                        <span class="title-sm" style="font-size: 9px; font-weight: 900;">PRESCRIBED OUTSOURCED TESTS (${transferredTestsList.length}):</span>
+                        <span style="font-size: 8px; font-weight: 900; color: #15803d; background-color: #dcfce7; padding: 1px 4px; border-radius: 2px;">TRANSFERRED</span>
+                    </div>
+                    <div class="test-tag-list">
+                        ${transferredTestsList.map(tName => `<span class="test-tag">${tName}</span>`).join("")}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Alert -->
+            <div class="footer-warning">
+                ★ CAUTION: BIOLOGICAL DIAGNOSTIC SPECIMEN — HANDLE WITH CARE ★
+            </div>
+
+        </div>
+    </body>
+    </html>
+    `;
+
+    const browser = await getBrowser();
+    const page = await browser.newPage();
+
+    try {
+        await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+        const pdfBuffer = await page.pdf({
+            width: "100mm",
+            height: "150mm",
+            printBackground: true,
+            margin: {
+                top: "2mm",
+                bottom: "2mm",
+                left: "2mm",
+                right: "2mm"
+            }
+        });
+        return pdfBuffer;
+    } finally {
+        await page.close();
+    }
+}
+
+/**
+ * Generates an official Patient Registration & Payment Receipt PDF Buffer
+ * Classic diagnostic lab receipt layout design.
+ * @param {Object} record Patient registration document
+ * @returns {Promise<Buffer>} PDF Buffer
+ */
+async function generateReceiptPDF(record) {
+    const regNo = record.registrationNumber || record._id;
+    const barcodeSVG = generateCode128SVG(regNo);
+    const dateStr = record.registrationDate || new Date().toLocaleDateString("en-GB");
+    const timeStr = record.registrationTime || new Date().toLocaleTimeString();
+
+    // Transport details formatting
+    const sampleReceived = record.sampleReceived || {};
+    let transportDetails = "";
+    if (sampleReceived.receivedThrough === "Employee") {
+        transportDetails = `Collector: ${sampleReceived.employee?.name || "N/A"} (${sampleReceived.employee?.id || "N/A"}) - ${sampleReceived.employee?.department || "N/A"}`;
+    } else if (sampleReceived.receivedThrough === "Person") {
+        transportDetails = `Person: ${sampleReceived.person?.name || "N/A"} (Ph: ${sampleReceived.person?.mobileNumber || "N/A"}) ID: ${sampleReceived.person?.idProofType || "ID"}: ${sampleReceived.person?.idProofNumber || "N/A"}`;
+    } else if (sampleReceived.receivedThrough === "Courier") {
+        transportDetails = `Courier: ${sampleReceived.courier?.companyName || "N/A"} (Track No: ${sampleReceived.courier?.trackingNumber || "N/A"}, Condition: ${sampleReceived.courier?.packageCondition || "Good"})`;
+    } else if (sampleReceived.receivedThrough === "Transfer") {
+        transportDetails = `Transfer To Lab: ${sampleReceived.transfer?.labName || "N/A"}`;
+    } else if (sampleReceived.receivedThrough === "Bus") {
+        transportDetails = `Bus: ${sampleReceived.bus?.busServiceName || "N/A"} (Reg: ${sampleReceived.bus?.busNumber || "N/A"}, Driver Ph: ${sampleReceived.bus?.driverMobileNumber || "N/A"})`;
+    }
+
+    const tests = record.tests || [];
+    const computedSubtotal = tests.reduce((sum, t) => sum + (parseFloat(t.patientPrice || t.price || 0) || 0), 0);
+    const subtotal = (record.subtotal !== undefined && record.subtotal > 0) ? record.subtotal : computedSubtotal;
+    
+    let rawDiscount = record.discount || 0;
+    let discount = rawDiscount;
+    if (record.discountType === "percentage" && rawDiscount > 0 && rawDiscount <= 100) {
+        discount = (subtotal * rawDiscount) / 100;
+    }
+    discount = Math.min(subtotal, Math.max(0, discount));
+
+    const computedTotalAmount = Math.max(0, subtotal - discount);
+    const totalAmount = (record.totalAmount !== undefined && record.totalAmount > 0 && record.totalAmount !== subtotal)
+        ? record.totalAmount
+        : computedTotalAmount;
+    const paidAmount = (record.paidAmount !== undefined && record.paidAmount > 0 && record.paidAmount !== subtotal)
+        ? record.paidAmount
+        : (record.paid !== undefined && record.paid > 0 ? record.paid : totalAmount);
+    const balanceDue = Math.max(0, totalAmount - paidAmount);
+    const paymentMethod = record.paymentMethod || "Cash";
+
+    const locationStr = record.location?.state
+        ? [record.location.city, record.location.district, record.location.state].filter(Boolean).join(", ")
+        : "";
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Receipt - ${regNo}</title>
+        <style>
+            @page {
+                size: A4;
+                margin: 10mm 12mm 10mm 12mm;
+            }
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            body {
+                font-family: 'Georgia', 'Times New Roman', serif;
+                color: #000000;
+                background-color: #ffffff;
+                padding: 10px;
+                font-size: 12px;
+                line-height: 1.4;
+                -webkit-print-color-adjust: exact;
+            }
+            .receipt-container {
+                border: 2px solid #000000;
+                padding: 16px;
+                min-height: 240mm;
+                max-height: 255mm;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            }
+            .header-table {
+                width: 100%;
+                border-bottom: 3px double #000000;
+                padding-bottom: 12px;
+                margin-bottom: 15px;
+            }
+            .brand-title {
+                font-family: 'Helvetica Neue', Arial, sans-serif;
+                font-size: 24px;
+                font-weight: 900;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+                color: #000000;
+            }
+            .brand-sub {
+                font-family: 'Helvetica Neue', Arial, sans-serif;
+                font-size: 9px;
+                font-weight: 700;
+                letter-spacing: 1.5px;
+                text-transform: uppercase;
+                color: #333333;
+                margin-top: 2px;
+            }
+            .header-contact {
+                font-family: Arial, sans-serif;
+                font-size: 9.5px;
+                text-align: right;
+                color: #222222;
+                line-height: 1.4;
+            }
+            .title-banner {
+                text-align: center;
+                border: 1px solid #000000;
+                background-color: #f8f8f8;
+                padding: 6px;
+                font-family: Arial, sans-serif;
+                font-weight: 800;
+                font-size: 13px;
+                letter-spacing: 1.5px;
+                text-transform: uppercase;
+                margin-bottom: 15px;
+            }
+            .meta-grid {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 15px;
+            }
+            .meta-grid td {
+                padding: 6px 8px;
+                border: 1px solid #000000;
+                vertical-align: top;
+                font-size: 11px;
+            }
+            .meta-label {
+                font-family: Arial, sans-serif;
+                font-weight: 700;
+                text-transform: uppercase;
+                font-size: 10px;
+                color: #333333;
+            }
+            .meta-val {
+                font-weight: 700;
+                color: #000000;
+            }
+            .items-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 15px;
+                font-size: 11px;
+            }
+            .items-table th {
+                font-family: Arial, sans-serif;
+                background-color: #f0f0f0;
+                border: 1px solid #000000;
+                padding: 8px;
+                text-align: left;
+                font-weight: 800;
+                font-size: 10px;
+                text-transform: uppercase;
+            }
+            .items-table td {
+                border: 1px solid #000000;
+                padding: 8px;
+                vertical-align: middle;
+            }
+            .summary-table {
+                width: 45%;
+                margin-left: auto;
+                border-collapse: collapse;
+                margin-bottom: 20px;
+            }
+            .summary-table td {
+                padding: 6px 10px;
+                border: 1px solid #000000;
+                font-size: 11px;
+            }
+            .summary-label {
+                font-family: Arial, sans-serif;
+                font-weight: 700;
+                text-align: right;
+                text-transform: uppercase;
+                font-size: 10px;
+            }
+            .summary-val {
+                text-align: right;
+                font-weight: 800;
+                font-family: monospace;
+                font-size: 12px;
+            }
+            .total-row td {
+                background-color: #f8f8f8;
+                font-size: 13px;
+            }
+            .barcode-section {
+                text-align: center;
+                margin-top: 15px;
+                margin-bottom: 25px;
+            }
+            .barcode-box {
+                display: inline-block;
+                width: 220px;
+            }
+            .barcode-num {
+                font-family: monospace;
+                font-size: 11px;
+                font-weight: 800;
+                letter-spacing: 2px;
+                margin-top: 3px;
+            }
+            .signature-section {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-end;
+                margin-top: 30px;
+                padding-top: 10px;
+                font-family: Arial, sans-serif;
+                font-size: 10px;
+                font-weight: 700;
+            }
+            .sig-box {
+                text-align: center;
+                width: 200px;
+            }
+            .sig-line {
+                border-top: 1px solid #000000;
+                margin-bottom: 5px;
+            }
+            .footer-note {
+                font-family: Arial, sans-serif;
+                font-size: 9.5px;
+                text-align: center;
+                font-weight: 700;
+                border-top: 1px dashed #000000;
+                padding-top: 8px;
+                margin-top: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="receipt-container">
+            <div>
+                <!-- Classic Header -->
+                <table class="header-table">
+                    <tr>
+                        <td>
+                            <div class="brand-title">MEDORAA LABS</div>
+                            <div class="brand-sub">DIAGNOSTIC & PATHOLOGY CLINICAL MANAGEMENT SYSTEM</div>
+                        </td>
+                        <td class="header-contact">
+                            <div>Medoraa HQ, Road No 10, Banjara Hills</div>
+                            <div>Hyderabad - 500034</div>
+                            <div>Tel: +91 40 2345 6789</div>
+                            <div>Email: contact@medoraalabs.com</div>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Receipt Title -->
+                <div class="title-banner">
+                    Patient Registration Acknowledgement & Bill Receipt
+                </div>
+
+                <!-- Registration & Patient Demographics Grid -->
+                <table class="meta-grid">
+                    <tr>
+                        <td style="width: 50%;">
+                            <span class="meta-label">REGISTRATION NO:</span><br/>
+                            <span class="meta-val" style="font-family: monospace; font-size: 13px;">${regNo}</span>
+                        </td>
+                        <td style="width: 50%;">
+                            <span class="meta-label">DATE & TIME:</span><br/>
+                            <span class="meta-val">${dateStr} | ${timeStr}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <span class="meta-label">PATIENT NAME:</span><br/>
+                            <span class="meta-val" style="font-size: 12px; text-transform: uppercase;">${record.patientName}</span>
+                        </td>
+                        <td>
+                            <span class="meta-label">AGE / GENDER:</span><br/>
+                            <span class="meta-val">${record.age?.value ? `${record.age.value} ${record.age.type}` : "N/A"} / ${record.gender || "N/A"}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <span class="meta-label">MOBILE NUMBER:</span><br/>
+                            <span class="meta-val">+91 ${record.mobileNumber || "N/A"}</span>
+                        </td>
+                        <td>
+                            <span class="meta-label">REFERRED BY DOCTOR:</span><br/>
+                            <span class="meta-val" style="text-transform: uppercase;">${record.referredBy || "SELF"}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2">
+                            <span class="meta-label">ADDRESS & LOCATION:</span><br/>
+                            <span class="meta-val">${record.address || "N/A"}${locationStr ? ` (${locationStr})` : ""}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <span class="meta-label">SAMPLE DRAWN BY:</span><br/>
+                            <span class="meta-val">${record.sampleDrawnBy || "N/A"}</span>
+                        </td>
+                        <td>
+                            <span class="meta-label">TRANSPORT LOGISTICS:</span><br/>
+                            <span class="meta-val">${sampleReceived.receivedThrough || "Standard"}</span>
+                            ${transportDetails ? `<div style="font-size: 9.5px; font-weight: 600; margin-top: 2px;">${transportDetails}</div>` : ""}
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Prescribed Tests / Billing Table -->
+                <div style="font-family: Arial, sans-serif; font-weight: 800; font-size: 11px; text-transform: uppercase; margin-bottom: 6px;">
+                    Prescribed Investigations & Charges
+                </div>
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 8%; text-align: center;">S.No</th>
+                            <th style="width: 52%;">Test / Parameter Name</th>
+                            <th style="width: 22%;">Category</th>
+                            <th style="width: 18%; text-align: right;">Price (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tests.length > 0 ? tests.map((t, idx) => `
+                            <tr>
+                                <td style="text-align: center; font-weight: 700;">${idx + 1}</td>
+                                <td style="font-weight: 700;">${typeof t === 'string' ? t : (t.testName || t.name)}</td>
+                                <td style="text-transform: uppercase; font-size: 10px;">${(typeof t === 'object' && t.category) ? t.category : "General"}</td>
+                                <td style="text-align: right; font-weight: 800; font-family: monospace;">₹${parseFloat(t.patientPrice || 0).toFixed(2)}</td>
+                            </tr>
+                        `).join("") : `
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: #666; font-style: italic; padding: 12px;">
+                                    No tests selected for this registration.
+                                </td>
+                            </tr>
+                        `}
+                    </tbody>
+                </table>
+
+                <!-- Billing Totals Summary -->
+                <table class="summary-table">
+                    <tr>
+                        <td class="summary-label">Subtotal Amount:</td>
+                        <td class="summary-val">₹${parseFloat(subtotal).toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td class="summary-label">Discount:</td>
+                        <td class="summary-val" style="color: #008000;">${discount > 0 ? `- ₹${parseFloat(discount).toFixed(2)}` : `₹0.00`}</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td class="summary-label" style="font-weight: 900; font-size: 11px;">Total Net Amount:</td>
+                        <td class="summary-val" style="font-weight: 900; font-size: 13px;">₹${parseFloat(totalAmount).toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td class="summary-label" style="font-weight: 800; color: #1e40af;">Amount Paid by Patient:</td>
+                        <td class="summary-val" style="font-weight: 900; color: #1e40af; font-size: 12px;">₹${parseFloat(paidAmount).toFixed(2)}</td>
+                    </tr>
+                    ${balanceDue > 0 ? `
+                    <tr>
+                        <td class="summary-label" style="color: #dc2626; font-weight: 800;">Balance Due:</td>
+                        <td class="summary-val" style="color: #dc2626; font-weight: 900; font-size: 12px;">₹${parseFloat(balanceDue).toFixed(2)}</td>
+                    </tr>
+                    ` : ""}
+                    <tr>
+                        <td class="summary-label">Payment Mode:</td>
+                        <td class="summary-val" style="text-transform: uppercase; font-size: 11px;">${paymentMethod}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div>
+                <!-- Barcode Section -->
+                <div class="barcode-section">
+                    <div class="barcode-box">
+                        ${barcodeSVG}
+                        <div class="barcode-num">* ${regNo} *</div>
+                    </div>
+                </div>
+
+                <!-- Signatures -->
+                <div class="signature-section">
+                    <div class="sig-box">
+                        <div class="sig-line"></div>
+                        <div>ISSUED BY DESK OPERATOR</div>
+                    </div>
+                    <div class="sig-box">
+                        <div class="sig-line"></div>
+                        <div>AUTHORIZED SIGNATURE</div>
+                    </div>
+                </div>
+
+                <!-- Footer Disclaimer -->
+                <div class="footer-note">
+                    Thank you for choosing Medoraa Labs. Please bring this receipt for sample status queries.
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    const browser = await getBrowser();
+    const page = await browser.newPage();
+
+    try {
+        await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+        const pdfBuffer = await page.pdf({
+            format: "A4",
+            printBackground: true,
+            margin: {
+                top: "8mm",
+                bottom: "8mm",
+                left: "10mm",
+                right: "10mm"
+            }
+        });
+        return pdfBuffer;
+    } finally {
+        await page.close();
+    }
+}
+
+module.exports = { generatePathologyPDF, generateTransferLabelPDF, generateReceiptPDF, getBrowser };
+
+
 

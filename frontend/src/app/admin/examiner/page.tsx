@@ -143,7 +143,7 @@ export default function ExaminerDashboard() {
 
             selectedSamples.forEach(sample => {
                 if (!existingNames.has(sample.testName.trim().toLowerCase())) {
-                    let unit = sample.unit || "";
+                    let unit = sample.units || sample.unit || "";
                     if (!unit && sample.referenceRange) {
                         const parts = sample.referenceRange.trim().split(" ");
                         if (parts.length > 1) {

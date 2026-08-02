@@ -5,13 +5,14 @@ import {
     MapPin, User, FileText, Share2, Clipboard, ShieldAlert, Check,
     RefreshCw, X, Printer, Calendar, Clock, Truck, Bus, UserCheck,
     Search, ChevronDown, CheckCircle2, ChevronRight, UserPlus, Info,
-    Activity, ShoppingCart, Download, FileSpreadsheet, Plus, ArrowLeft, Loader2
+    Activity, ShoppingCart, Download, FileSpreadsheet, Plus, ArrowLeft, Loader2, QrCode, Maximize2, ExternalLink
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import JsBarcode from "jsbarcode";
 import * as XLSX from "xlsx";
 import PathologyReportModal from "../components/PathologyReportModal";
+import SampleTransferModal from "../components/SampleTransferModal";
 
 interface BarcodeProps {
     value: string;
@@ -324,6 +325,15 @@ const PatientRegistrationForm: React.FC = () => {
     const [reportModalRecord, setReportModalRecord] = useState<any | null>(null);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
+    // Billing & QR Code states
+    const [discountVal, setDiscountVal] = useState<string>("0");
+    const [discountType, setDiscountType] = useState<"fixed" | "percentage">("percentage");
+    const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
+    const [customPaymentMethod, setCustomPaymentMethod] = useState<string>("");
+    const [adminQrCode, setAdminQrCode] = useState<string>("");
+    const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
+    const [isTransferModalOpen, setIsTransferModalOpen] = useState<boolean>(false);
+
     // Test selection states
     const [showTestSelection, setShowTestSelection] = useState(false);
     const [availableSamples, setAvailableSamples] = useState<any[]>([]);
@@ -386,6 +396,20 @@ const PatientRegistrationForm: React.FC = () => {
         } finally {
             setIsLoadingSamples(false);
         }
+
+        // Fetch UPI QR code from settings
+        try {
+            const token = localStorage.getItem("adminToken");
+            const setRes = await fetch(getApiUrl("/api/admin/settings"), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const setData = await setRes.json();
+            if (setData.success && setData.data?.upiQrCode) {
+                setAdminQrCode(setData.data.upiQrCode);
+            }
+        } catch (err) {
+            console.error("Failed to fetch lab settings", err);
+        }
     };
 
     const handleSaveTests = async () => {
@@ -393,13 +417,30 @@ const PatientRegistrationForm: React.FC = () => {
         setIsSavingTests(true);
         try {
             const token = localStorage.getItem("adminToken");
+            const subtotal = availableSamples
+                .filter(s => selectedTestIds.includes(s._id))
+                .reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0);
+            const rawDiscount = parseFloat(discountVal) || 0;
+            const calculatedDiscount = (subtotal * rawDiscount) / 100;
+            const finalDiscount = Math.min(subtotal, Math.max(0, calculatedDiscount));
+            const totalAmount = Math.max(0, subtotal - finalDiscount);
+            const finalPaymentMethod = paymentMethod === "Other" ? (customPaymentMethod.trim() || "Other") : paymentMethod;
+
             const res = await fetch(getApiUrl(`/api/admin/registrations/${savedRecord._id}/tests`), {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
-                body: JSON.stringify({ testIds: selectedTestIds })
+                body: JSON.stringify({
+                    testIds: selectedTestIds,
+                    subtotal,
+                    discount: finalDiscount,
+                    discountType,
+                    totalAmount,
+                    paidAmount: totalAmount,
+                    paymentMethod: finalPaymentMethod
+                })
             });
             const data = await res.json();
             if (data.success) {
@@ -425,11 +466,11 @@ const PatientRegistrationForm: React.FC = () => {
     };
 
     const handlePrintReceipt = () => {
-        setPrintType("receipt");
-        setTimeout(() => {
-            window.print();
-        }, 150);
+        if (savedRecord?._id) {
+            window.open(getApiUrl(`/api/admin/registrations/${savedRecord._id}/receipt-pdf`), "_blank");
+        }
     };
+
 
     const handlePrintLabels = () => {
         setPrintType("label");
@@ -1301,19 +1342,132 @@ const PatientRegistrationForm: React.FC = () => {
                                     )}
                                 </div>
 
-                                <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 space-y-3 shrink-0">
-                                    <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-                                        <span>Subtotal</span>
-                                        <span className="text-slate-800 dark:text-slate-200">
-                                            ₹{availableSamples.filter(s => selectedTestIds.includes(s._id)).reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0)}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-sm font-black border-t border-dashed border-slate-200 dark:border-slate-800 pt-2">
-                                        <span className="text-slate-900 dark:text-white uppercase tracking-wider">Total Payable</span>
-                                        <span className="text-blue-600 dark:text-blue-400 text-lg">
-                                            ₹{availableSamples.filter(s => selectedTestIds.includes(s._id)).reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0)}
-                                        </span>
-                                    </div>
+                                <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 space-y-3.5 shrink-0">
+                                    {(() => {
+                                        const subtotal = availableSamples
+                                            .filter(s => selectedTestIds.includes(s._id))
+                                            .reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0);
+                                        const rawDiscount = parseFloat(discountVal) || 0;
+                                        const calculatedDiscount = discountType === "percentage" ? (subtotal * rawDiscount) / 100 : rawDiscount;
+                                        const finalDiscount = Math.min(subtotal, Math.max(0, calculatedDiscount));
+                                        const totalPayable = Math.max(0, subtotal - finalDiscount);
+                                        const isUpi = paymentMethod === "UPI";
+
+                                        return (
+                                            <div className="space-y-3 font-sans">
+                                                {/* Subtotal */}
+                                                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                                                    <span>Subtotal</span>
+                                                    <span className="text-slate-800 dark:text-slate-200">₹{subtotal}</span>
+                                                </div>
+
+                                                {/* Discount Input */}
+                                                <div className="space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                                            Discount (%)
+                                                        </label>
+                                                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded">
+                                                            % Off
+                                                        </span>
+                                                    </div>
+                                                    <div className="relative flex items-center">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="100"
+                                                            placeholder="e.g. 10"
+                                                            value={discountVal}
+                                                            onChange={(e) => setDiscountVal(e.target.value)}
+                                                            className="w-full px-2.5 py-1 pr-7 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
+                                                        />
+                                                        <span className="absolute right-2.5 text-xs font-black text-slate-400 pointer-events-none">%</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Total Payable */}
+                                                <div className="flex items-center justify-between text-sm font-black border-t border-dashed border-slate-200 dark:border-slate-800 pt-2">
+                                                    <span className="text-slate-900 dark:text-white uppercase tracking-wider">Total Payable</span>
+                                                    <span className="text-blue-600 dark:text-blue-400 text-lg font-black">
+                                                        ₹{totalPayable.toFixed(0)}
+                                                    </span>
+                                                </div>
+
+                                                {/* Payment Method Section */}
+                                                <div className="space-y-1.5 pt-1">
+                                                    <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                                                        Payment Method
+                                                    </label>
+                                                    <select
+                                                        value={paymentMethod}
+                                                        onChange={(e) => setPaymentMethod(e.target.value)}
+                                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                                    >
+                                                        <option value="Cash">Cash</option>
+                                                        <option value="UPI">UPI</option>
+                                                        <option value="Self">Self</option>
+                                                        <option value="Other">Other / Custom</option>
+                                                    </select>
+
+                                                    {/* If Other selected, custom input field */}
+                                                    {paymentMethod === "Other" && (
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Enter payment method..."
+                                                            value={customPaymentMethod}
+                                                            onChange={(e) => setCustomPaymentMethod(e.target.value)}
+                                                            className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-800 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500 mt-1"
+                                                        />
+                                                    )}
+                                                </div>
+
+                                                {/* Display UPI QR Code when UPI selected */}
+                                                {isUpi && (
+                                                    <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+                                                        <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center gap-2 text-center shadow-xs">
+                                                            <div className="flex items-center justify-between w-full">
+                                                                <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1">
+                                                                    <QrCode className="w-3.5 h-3.5" />
+                                                                    Scan UPI QR to Pay
+                                                                </span>
+                                                                {adminQrCode && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setIsQrModalOpen(true)}
+                                                                        className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                                                                        title="Open QR in Popup"
+                                                                    >
+                                                                        <Maximize2 className="w-3 h-3" />
+                                                                        Popup
+                                                                    </button>
+                                                                )}
+                                                            </div>
+
+                                                            {adminQrCode ? (
+                                                                <div
+                                                                    onClick={() => setIsQrModalOpen(true)}
+                                                                    className="group relative cursor-pointer overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800 hover:ring-2 hover:ring-blue-500 transition-all"
+                                                                >
+                                                                    <img
+                                                                        src={adminQrCode}
+                                                                        alt="UPI QR Code"
+                                                                        className="w-36 h-36 object-contain"
+                                                                    />
+                                                                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-[10px] gap-1">
+                                                                        <Maximize2 className="w-3.5 h-3.5" /> Click to Enlarge
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="py-3 px-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                                                                    No QR Code uploaded by Admin yet. Admin can upload QR in Payment QR Code settings.
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
 
@@ -1966,179 +2120,103 @@ const PatientRegistrationForm: React.FC = () => {
                                     </div>
 
                                     <div className="space-y-3">
-                                        {/* Tabs: In & Transfer */}
-                                        <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200/40 dark:border-slate-700/45 mb-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        sampleReceived: {
-                                                            ...prev.sampleReceived,
-                                                            receivedThrough: "None"
+                                        <div className="flex flex-col gap-1">
+                                            <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                                Received Through <span className="text-rose-500 font-bold">*</span>
+                                            </label>
+                                            <select
+                                                value={formData.sampleReceived.receivedThrough === "None" ? "None" : "Courier"}
+                                                onChange={(e) => {
+                                                    const type = e.target.value;
+                                                    setFormData(prev => {
+                                                        const updated = {
+                                                            ...prev,
+                                                            sampleReceived: { ...prev.sampleReceived, receivedThrough: type as any }
+                                                        };
+                                                        if (type === "Courier") {
+                                                            const now = new Date();
+                                                            const localDate = now.toISOString().split('T')[0];
+                                                            const localTime = now.toTimeString().split(' ')[0].slice(0, 5);
+                                                            if (!updated.sampleReceived.courier.arrivalDate) {
+                                                                updated.sampleReceived.courier.arrivalDate = localDate;
+                                                            }
+                                                            if (!updated.sampleReceived.courier.arrivalTime) {
+                                                                updated.sampleReceived.courier.arrivalTime = localTime;
+                                                            }
                                                         }
-                                                    }));
+                                                        return updated;
+                                                    });
                                                 }}
-                                                className={cn(
-                                                    "flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5",
-                                                    formData.sampleReceived.receivedThrough !== "Transfer"
-                                                        ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm"
-                                                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-350"
-                                                )}
+                                                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none font-bold shadow-sm"
                                             >
-                                                <Download className="w-3.5 h-3.5" />
-                                                In
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setFormData(prev => ({
-                                                        ...prev,
-                                                        sampleReceived: {
-                                                            ...prev.sampleReceived,
-                                                            receivedThrough: "Transfer"
-                                                        }
-                                                    }));
-                                                }}
-                                                className={cn(
-                                                    "flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5",
-                                                    formData.sampleReceived.receivedThrough === "Transfer"
-                                                        ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-white shadow-sm"
-                                                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-350"
-                                                )}
-                                            >
-                                                <Share2 className="w-3.5 h-3.5" />
-                                                Transfer
-                                            </button>
+                                                <option value="None">Sample Drawn at Lab</option>
+                                                <option value="Courier">Other (Collected from Outside)</option>
+                                            </select>
                                         </div>
 
-                                        {/* Content for In Tab */}
-                                        {formData.sampleReceived.receivedThrough !== "Transfer" && (
-                                            <div className="space-y-3">
-                                                <div className="flex flex-col gap-1">
-                                                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                                        Received Through <span className="text-rose-500 font-bold">*</span>
-                                                    </label>
-                                                    <select
-                                                        value={formData.sampleReceived.receivedThrough === "None" ? "None" : "Courier"}
-                                                        onChange={(e) => {
-                                                            const type = e.target.value;
-                                                            setFormData(prev => {
-                                                                const updated = {
-                                                                    ...prev,
-                                                                    sampleReceived: { ...prev.sampleReceived, receivedThrough: type as any }
-                                                                };
-                                                                if (type === "Courier") {
-                                                                    const now = new Date();
-                                                                    const localDate = now.toISOString().split('T')[0];
-                                                                    const localTime = now.toTimeString().split(' ')[0].slice(0, 5);
-                                                                    if (!updated.sampleReceived.courier.arrivalDate) {
-                                                                        updated.sampleReceived.courier.arrivalDate = localDate;
-                                                                    }
-                                                                    if (!updated.sampleReceived.courier.arrivalTime) {
-                                                                        updated.sampleReceived.courier.arrivalTime = localTime;
-                                                                    }
-                                                                }
-                                                                return updated;
-                                                            });
-                                                        }}
-                                                        className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none font-bold shadow-sm"
-                                                    >
-                                                        <option value="None">Sample Drawn at Lab</option>
-                                                        <option value="Courier">Other (Collected from Outside)</option>
-                                                    </select>
-                                                </div>
-
-                                                {formData.sampleReceived.receivedThrough === "Courier" && (
-                                                    <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-3 animate-in fade-in duration-200">
-                                                        <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-100 dark:border-slate-800">Outside Collection Details</h3>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                                                    Mode of Transport <span className="text-rose-500 font-bold">*</span>
-                                                                </label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={formData.sampleReceived.courier.companyName}
-                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, companyName: e.target.value } } }))}
-                                                                    placeholder="e.g. Courier, Employee, Person, Bus, etc."
-                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                                                    Docket Number / Tracking ID
-                                                                </label>
-                                                                <input
-                                                                    type="text"
-                                                                    value={formData.sampleReceived.courier.trackingNumber}
-                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, trackingNumber: e.target.value } } }))}
-                                                                    placeholder="Tracking ID (Optional)"
-                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                                                    Date Received
-                                                                </label>
-                                                                <input
-                                                                    type="date"
-                                                                    value={formData.sampleReceived.courier.arrivalDate}
-                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, arrivalDate: e.target.value } } }))}
-                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                                                    Time Received
-                                                                </label>
-                                                                <input
-                                                                    type="time"
-                                                                    value={formData.sampleReceived.courier.arrivalTime}
-                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, arrivalTime: e.target.value } } }))}
-                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1 col-span-1 md:col-span-2">
-                                                                <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                                                    Remarks
-                                                                </label>
-                                                                <textarea
-                                                                    rows={2}
-                                                                    value={formData.sampleReceived.courier.remarks}
-                                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, remarks: e.target.value } } }))}
-                                                                    placeholder="Enter any transport/package remarks..."
-                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all resize-none text-slate-850 dark:text-slate-200"
-                                                                />
-                                                            </div>
-                                                        </div>
+                                        {formData.sampleReceived.receivedThrough === "Courier" && (
+                                            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-3 animate-in fade-in duration-200">
+                                                <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-100 dark:border-slate-800">Outside Collection Details</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                                                    <div className="flex flex-col gap-1">
+                                                        <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                                            Mode of Transport <span className="text-rose-500 font-bold">*</span>
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={formData.sampleReceived.courier.companyName}
+                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, companyName: e.target.value } } }))}
+                                                            placeholder="e.g. Courier, Employee, Person, Bus, etc."
+                                                            className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
+                                                        />
                                                     </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Content for Transfer Tab */}
-                                        {formData.sampleReceived.receivedThrough === "Transfer" && (
-                                            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-3 animate-in fade-in duration-200 text-left">
-                                                <SearchableSelect
-                                                    label="Transfer to Lab"
-                                                    options={["None", ...hospitals.flatMap(h => (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`))]}
-                                                    value={formData.sampleReceived.transfer?.labName || ""}
-                                                    onChange={(val) => {
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            sampleReceived: {
-                                                                ...prev.sampleReceived,
-                                                                transfer: {
-                                                                    ...prev.sampleReceived.transfer,
-                                                                    labName: val
-                                                                }
-                                                            }
-                                                        }));
-                                                    }}
-                                                    placeholder="Search and select lab..."
-                                                    mandatory={true}
-                                                />
+                                                    <div className="flex flex-col gap-1">
+                                                        <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                                            Docket Number / Tracking ID
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={formData.sampleReceived.courier.trackingNumber}
+                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, trackingNumber: e.target.value } } }))}
+                                                            placeholder="Tracking ID (Optional)"
+                                                            className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-1">
+                                                        <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                                            Date Received
+                                                        </label>
+                                                        <input
+                                                            type="date"
+                                                            value={formData.sampleReceived.courier.arrivalDate}
+                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, arrivalDate: e.target.value } } }))}
+                                                            className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-1">
+                                                        <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                                            Time Received
+                                                        </label>
+                                                        <input
+                                                            type="time"
+                                                            value={formData.sampleReceived.courier.arrivalTime}
+                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, arrivalTime: e.target.value } } }))}
+                                                            className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
+                                                        />
+                                                    </div>
+                                                    <div className="flex flex-col gap-1 col-span-1 md:col-span-2">
+                                                        <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                                            Remarks
+                                                        </label>
+                                                        <textarea
+                                                            rows={2}
+                                                            value={formData.sampleReceived.courier.remarks}
+                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, remarks: e.target.value } } }))}
+                                                            placeholder="Enter any transport/package remarks..."
+                                                            className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all resize-none text-slate-850 dark:text-slate-200"
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -2259,288 +2337,230 @@ const PatientRegistrationForm: React.FC = () => {
                     </div>
                 </div>
             )}
-            {/* Legacy absolute overlay removed - integrated as full page view */}
-
-            {/* RECEIPT MODAL OVERLAY (Printable Acknowledgement Receipt) */}
-            {showReceipt && savedRecord && (
-                <div className={cn(
-                    "fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300",
-                    printType === "receipt" ? "print:p-0 print:bg-white print:relative print:z-0 print:flex" : "print:hidden"
-                )}>
-                    <div className="bg-white text-slate-800 rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden print:shadow-none print:w-full print:max-w-none flex flex-col max-h-[90vh] print:max-h-none">
-
-                        {/* Modal controls - hidden in print */}
-                        <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-100 print:hidden shrink-0">
-                            <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
-                                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                                Patient Registered Successfully!
-                            </h3>
+            {/* QR CODE ENLARGED POPUP MODAL */}
+            {isQrModalOpen && adminQrCode && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center text-center space-y-4 font-sans">
+                        {/* Header */}
+                        <div className="w-full flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-blue-50 dark:bg-blue-950/60 rounded-xl text-blue-600 dark:text-blue-400">
+                                    <QrCode className="w-5 h-5" />
+                                </div>
+                                <div className="text-left">
+                                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Scan QR to Pay</h3>
+                                    <p className="text-[10px] font-bold text-slate-400">Scan via PhonePe, GPay, Paytm or UPI</p>
+                                </div>
+                            </div>
                             <button
-                                onClick={() => {
-                                    setShowReceipt(false);
-                                    window.location.href = "/admin/dashboard";
-                                }}
-                                className="p-1 hover:bg-slate-200 rounded-full transition-colors text-slate-500"
+                                onClick={() => setIsQrModalOpen(false)}
+                                className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                             >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        {/* Printable Area */}
-                        <div id={printType === "receipt" ? "print-active-section" : "print-receipt-section"} className="p-8 print:p-0 flex-1 overflow-y-auto print:overflow-visible font-mono text-sm leading-relaxed space-y-6">
-
-                            {/* Receipt Header */}
-                            <div className="text-center space-y-1.5 border-b border-dashed border-slate-300 pb-5">
-                                <h2 className="text-xl font-black uppercase tracking-wider text-slate-900">MEDORAA LABS</h2>
-                                <p className="text-[11px] font-bold text-slate-500">DIAGNOSTIC & PATHOLOGY CLINICAL MANAGEMENT SYSTEM</p>
-                                <p className="text-[10px] font-medium text-slate-400">Medoraa HQ, Road No 10, Banjara Hills, Hyderabad - 500034</p>
-                                <p className="text-[10px] font-medium text-slate-400">Tel: +91 40 2345 6789 | Email: contact@medoraalabs.com</p>
-                            </div>
-
-                            {/* Ticket Title */}
-                            <div className="bg-slate-50 p-2.5 rounded-lg text-center border border-slate-200/50 print:border-slate-300">
-                                <span className="font-extrabold text-xs text-slate-900 uppercase tracking-widest">
-                                    Patient Registration Acknowledgement
-                                </span>
-                            </div>
-
-                            {/* Registration meta numbers */}
-                            <div className="grid grid-cols-2 gap-4 text-xs font-bold bg-slate-50/50 p-3 rounded-lg border border-slate-100">
-                                <div className="space-y-1">
-                                    <p className="text-slate-400 font-medium">REGISTRATION NO:</p>
-                                    <p className="text-slate-900 font-black text-sm tracking-wide">{savedRecord.registrationNumber}</p>
+                        {/* Amount Box */}
+                        {(() => {
+                            const subtotal = availableSamples
+                                .filter(s => selectedTestIds.includes(s._id))
+                                .reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0);
+                            const rawDiscount = parseFloat(discountVal) || 0;
+                            const calculatedDiscount = discountType === "percentage" ? (subtotal * rawDiscount) / 100 : rawDiscount;
+                            const finalDiscount = Math.min(subtotal, Math.max(0, calculatedDiscount));
+                            const totalPayable = Math.max(0, subtotal - finalDiscount);
+                            return (
+                                <div className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl p-3 flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Amount</span>
+                                    <span className="text-xl font-black text-blue-600 dark:text-blue-400">₹{totalPayable.toFixed(0)}</span>
                                 </div>
-                                <div className="space-y-1 text-right">
-                                    <p className="text-slate-400 font-medium">DATE / TIME:</p>
-                                    <p className="text-slate-900">{savedRecord.registrationDate} | {savedRecord.registrationTime}</p>
-                                </div>
-                            </div>
+                            );
+                        })()}
 
-                            {/* Patient Metadata Details */}
-                            <div className="space-y-3">
-                                <h4 className="text-xs font-black text-slate-900 border-b border-slate-200 pb-1 uppercase tracking-wider">Patient Details</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
-                                    <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                        <span className="text-slate-400 font-medium">Name:</span>
-                                        <span className="font-bold text-slate-950 uppercase">{savedRecord.patientName}</span>
-                                    </div>
-                                    <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                        <span className="text-slate-400 font-medium">Age / Gender:</span>
-                                        <span className="font-bold text-slate-950">{savedRecord.age.value} {savedRecord.age.type} / {savedRecord.gender}</span>
-                                    </div>
-                                    <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                        <span className="text-slate-400 font-medium">Mobile Number:</span>
-                                        <span className="font-bold text-slate-950">+91 {savedRecord.mobileNumber}</span>
-                                    </div>
-                                    <div className="flex justify-between py-1 border-b border-slate-100/50 md:col-span-2">
-                                        <span className="text-slate-400 font-medium">Address:</span>
-                                        <span className="font-bold text-slate-950 max-w-[320px] text-right break-words">{savedRecord.address}</span>
-                                    </div>
-                                    {savedRecord.location?.state && (
-                                        <div className="flex justify-between py-1 border-b border-slate-100/50 md:col-span-2">
-                                            <span className="text-slate-400 font-medium">Location:</span>
-                                            <span className="font-bold text-slate-950 text-right">
-                                                {[savedRecord.location.city, savedRecord.location.district, savedRecord.location.state].filter(Boolean).join(", ")}
-                                            </span>
-                                        </div>
-                                    )}
+                        {/* QR Code Image */}
+                        <div className="p-4 bg-white rounded-2xl border-2 border-dashed border-blue-200 dark:border-slate-700 shadow-md inline-block">
+                            <img
+                                src={adminQrCode}
+                                alt="Payment UPI QR Code"
+                                className="w-64 h-64 object-contain rounded-lg"
+                            />
+                        </div>
+
+                        <button
+                            onClick={() => setIsQrModalOpen(false)}
+                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
+                        >
+                            Close Popup
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* RECEIPT MODAL OVERLAY (Printable Acknowledgement Receipt) */}
+            {showReceipt && savedRecord && (
+                <div className={cn(
+                    "fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-300",
+                    printType === "receipt" ? "print:p-0 print:bg-white print:relative print:z-0 print:flex" : "print:hidden"
+                )}>
+                    <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white rounded-2xl shadow-2xl w-full max-w-3xl lg:max-w-4xl overflow-hidden print:shadow-none print:w-full print:max-w-none flex flex-col h-[88vh] max-h-[90vh] print:max-h-none border border-slate-200 dark:border-slate-800">
+
+                        {/* Modal Header Controls - hidden in print */}
+                        <div className="flex items-center justify-between px-5 py-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 print:hidden shrink-0">
+                            <div className="flex items-center gap-2.5">
+                                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                                <div>
+                                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                                        Patient Registered Successfully!
+                                    </h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        Receipt ID: <span className="font-bold text-slate-700 dark:text-slate-200">{savedRecord.registrationNumber}</span>
+                                    </p>
                                 </div>
                             </div>
-
-                            {/* Referral Info details */}
-                            <div className="space-y-3">
-                                <h4 className="text-xs font-black text-slate-900 border-b border-slate-200 pb-1 uppercase tracking-wider">Referral Information</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
-                                    <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                        <span className="text-slate-400 font-medium">Referred By:</span>
-                                        <span className="font-bold text-slate-950 uppercase">{savedRecord.referredBy}</span>
-                                    </div>
-                                    <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                        <span className="text-slate-400 font-medium">Sample Drawn By:</span>
-                                        <span className="font-bold text-slate-950">{savedRecord.sampleDrawnBy || "N/A"}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Sample Transport Info */}
-                            <div className="space-y-3">
-                                <h4 className="text-xs font-black text-slate-900 border-b border-slate-200 pb-1 uppercase tracking-wider">Sample Transport Logistics</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
-                                    <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                        <span className="text-slate-400 font-medium">Transport Method:</span>
-                                        <span className="font-extrabold text-blue-600 dark:text-blue-400 uppercase">{savedRecord.sampleReceived.receivedThrough}</span>
-                                    </div>
-
-                                    {/* Employee Detail receipt fields */}
-                                    {savedRecord.sampleReceived.receivedThrough === "Employee" && (
-                                        <>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                                <span className="text-slate-400 font-medium">Collector Name:</span>
-                                                <span className="font-bold text-slate-950">{savedRecord.sampleReceived.employee?.name || "N/A"}</span>
-                                            </div>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                                <span className="text-slate-400 font-medium">Employee ID:</span>
-                                                <span className="font-bold text-slate-950">{savedRecord.sampleReceived.employee?.id || "N/A"}</span>
-                                            </div>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                                <span className="text-slate-400 font-medium">Department:</span>
-                                                <span className="font-bold text-slate-950">{savedRecord.sampleReceived.employee?.department || "N/A"}</span>
-                                            </div>
-                                        </>
-                                    )}
-
-                                    {/* Person Detail receipt fields */}
-                                    {savedRecord.sampleReceived.receivedThrough === "Person" && (
-                                        <>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                                <span className="text-slate-400 font-medium">Person Name:</span>
-                                                <span className="font-bold text-slate-950">{savedRecord.sampleReceived.person?.name || "N/A"}</span>
-                                            </div>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                                <span className="text-slate-400 font-medium">Mobile Number:</span>
-                                                <span className="font-bold text-slate-950">{savedRecord.sampleReceived.person?.mobileNumber || "N/A"}</span>
-                                            </div>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                                <span className="text-slate-400 font-medium">ID Proof Type / No:</span>
-                                                <span className="font-bold text-slate-950">{savedRecord.sampleReceived.person?.idProofType}: {savedRecord.sampleReceived.person?.idProofNumber || "N/A"}</span>
-                                            </div>
-                                        </>
-                                    )}
-
-                                    {/* Courier Detail receipt fields */}
-                                    {savedRecord.sampleReceived.receivedThrough === "Courier" && (
-                                        <>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                                <span className="text-slate-400 font-medium">Courier Company:</span>
-                                                <span className="font-bold text-slate-950">{savedRecord.sampleReceived.courier?.companyName || "N/A"}</span>
-                                            </div>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                                <span className="text-slate-400 font-medium">Tracking Number:</span>
-                                                <span className="font-bold text-slate-950">{savedRecord.sampleReceived.courier?.trackingNumber || "N/A"}</span>
-                                            </div>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                                <span className="text-slate-400 font-medium">Package Condition:</span>
-                                                <span className="font-bold text-slate-950">{savedRecord.sampleReceived.courier?.packageCondition || "Good"}</span>
-                                            </div>
-                                        </>
-                                    )}
-
-                                    {savedRecord.sampleReceived.receivedThrough === "Transfer" && (
-                                        <>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50 col-span-1 md:col-span-2">
-                                                <span className="text-slate-400 font-medium">Transferred To Lab:</span>
-                                                <span className="font-extrabold text-teal-600 dark:text-teal-400">{savedRecord.sampleReceived.transfer?.labName || "N/A"}</span>
-                                            </div>
-                                        </>
-                                    )}
-                                    {/* Bus Detail receipt fields */}
-                                    {savedRecord.sampleReceived.receivedThrough === "Bus" && (
-                                        <>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                                <span className="text-slate-400 font-medium">Bus Service Name:</span>
-                                                <span className="font-bold text-slate-950">{savedRecord.sampleReceived.bus?.busServiceName || "N/A"}</span>
-                                            </div>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                                <span className="text-slate-400 font-medium">Bus Reg Number:</span>
-                                                <span className="font-bold text-slate-950">{savedRecord.sampleReceived.bus?.busNumber || "N/A"}</span>
-                                            </div>
-                                            <div className="flex justify-between py-1 border-b border-slate-100/50">
-                                                <span className="text-slate-400 font-medium">Driver Mobile:</span>
-                                                <span className="font-bold text-slate-950">{savedRecord.sampleReceived.bus?.driverMobileNumber || "N/A"}</span>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Selected Tests Detail */}
-                            <div className="space-y-3 pt-2">
-                                <h4 className="text-xs font-black text-slate-900 border-b border-slate-200 pb-1 uppercase tracking-wider">Prescribed Tests / Investigations</h4>
-                                {savedRecord.tests && savedRecord.tests.length > 0 ? (
-                                    <table className="w-full text-left text-xs font-mono">
-                                        <thead>
-                                            <tr className="border-b border-slate-200 text-slate-400 font-bold">
-                                                <th className="py-1">Test Name</th>
-                                                <th className="py-1">Category</th>
-                                                <th className="py-1 text-right">Price</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {savedRecord.tests.map((test: any) => (
-                                                <tr key={test._id} className="text-slate-950 font-semibold">
-                                                    <td className="py-1.5">{test.testName}</td>
-                                                    <td className="py-1.5 uppercase">{test.category || "General"}</td>
-                                                    <td className="py-1.5 text-right font-bold">₹{parseFloat(test.patientPrice) || 0}</td>
-                                                </tr>
-                                            ))}
-                                            <tr className="border-t border-dashed border-slate-300 font-black text-slate-900 text-sm">
-                                                <td colSpan={2} className="py-2 text-right">TOTAL AMOUNT:</td>
-                                                <td className="py-2 text-right">₹{savedRecord.tests.reduce((sum: number, t: any) => sum + (parseFloat(t.patientPrice) || 0), 0)}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                ) : (
-                                    <div className="text-center text-slate-400 text-xs py-2 border border-dashed border-slate-200 rounded-lg font-bold">
-                                        No tests selected for this patient.
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Footer barcode and signoff */}
-                            <div className="border-t border-dashed border-slate-300 pt-6 text-center space-y-4">
-                                <div className="flex flex-col items-center justify-center gap-1 bg-slate-50 py-3 rounded-lg border border-slate-100">
-                                    <div className="mb-1">
-                                        <Barcode value={savedRecord.registrationNumber} width={1.5} height={40} displayValue={false} />
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-600">{savedRecord.registrationNumber}</span>
-                                </div>
-
-                                <div className="flex items-end justify-between text-[10px] font-bold text-slate-400 pt-4">
-                                    <div>
-                                        <p>__________________________</p>
-                                        <p className="mt-1 uppercase">Issued By Desk Operator</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p>__________________________</p>
-                                        <p className="mt-1 uppercase">Authorized Signature</p>
-                                    </div>
-                                </div>
-
-                                <p className="text-[10px] font-bold text-slate-400 text-center tracking-tight pt-2">
-                                    Thank you for choosing Medoraa Labs. Please bring this receipt for sample status queries.
-                                </p>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={() => window.open(getApiUrl(`/api/admin/registrations/${savedRecord._id}/receipt-pdf`), "_blank")}
+                                    className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-slate-300 cursor-pointer"
+                                    title="Open Bill in Full Screen (New Tab)"
+                                >
+                                    <ExternalLink className="w-4.5 h-4.5" />
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowReceipt(false);
+                                        fetchRegistrations();
+                                    }}
+                                    className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-500 dark:text-slate-400 cursor-pointer"
+                                    title="Close Popup"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
                             </div>
                         </div>
 
-                        {/* Modal Action Buttons - hidden in print */}
-                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 print:hidden shrink-0">
-                            <button
-                                onClick={handlePrintReceipt}
-                                className="px-4 py-2 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 text-slate-700 font-bold rounded-lg text-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                            >
-                                <Printer className="w-4 h-4" />
-                                Print Receipt
-                            </button>
-                            <button
-                                onClick={handlePrintLabels}
-                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-all active:scale-95 shadow-md flex items-center gap-1.5 cursor-pointer"
-                            >
-                                <Printer className="w-4 h-4" />
-                                Print Bottle Labels
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setShowReceipt(false);
-                                    window.location.href = "/admin/dashboard";
-                                }}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition-all active:scale-95 shadow-md"
-                            >
-                                Return to Dashboard
-                            </button>
+                        {/* 2-Column Layout: Left Side = Options Panel, Right Side = PDF Preview */}
+                        <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-100 dark:bg-slate-950">
+                            
+                            {/* LEFT PANEL: Options & Action Cards (No Scrollbar) */}
+                            <div className="w-full md:w-[310px] lg:w-[330px] p-4 sm:p-5 bg-slate-50/90 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 print:hidden flex flex-col justify-between overflow-hidden space-y-4 shrink-0">
+                                <div className="space-y-4">
+                                    {/* Section Title */}
+                                    <div>
+                                        <div className="text-xs font-black tracking-wider text-slate-500 uppercase">
+                                            PRINT & LOGISTICS OPTIONS
+                                        </div>
+                                        <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                                            Select an option below to process receipt or dispatch
+                                        </p>
+                                    </div>
+
+                                    {/* Vertical Stack of Action Cards */}
+                                    <div className="space-y-2.5">
+                                        {/* Option 1: Print Receipt */}
+                                        <button
+                                            onClick={handlePrintReceipt}
+                                            className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-blue-50/70 dark:hover:bg-blue-950/30 border-2 border-blue-400/80 hover:border-blue-500 rounded-xl text-blue-600 dark:text-blue-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
+                                        >
+                                            <Printer className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
+                                            <div className="text-left">
+                                                <div className="font-bold text-xs sm:text-sm">Print Receipt</div>
+                                                <div className="text-[11px] font-normal text-slate-400">Generate A4 patient receipt copy</div>
+                                            </div>
+                                        </button>
+
+                                        {/* Option 2: Print Bottle Labels */}
+                                        <button
+                                            onClick={handlePrintLabels}
+                                            className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 border-2 border-emerald-400/80 hover:border-emerald-500 rounded-xl text-emerald-600 dark:text-emerald-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
+                                        >
+                                            <Printer className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                            <div className="text-left">
+                                                <div className="font-bold text-xs sm:text-sm">Print Bottle Labels</div>
+                                                <div className="text-[11px] font-normal text-slate-400">Barcode labels for specimen bottles</div>
+                                            </div>
+                                        </button>
+
+                                        {/* Option 3: Thermal Transfer Label */}
+                                        <button
+                                            onClick={() => {
+                                                if (savedRecord.sampleTransfer) {
+                                                    window.open(getApiUrl(`/api/admin/registrations/${savedRecord._id}/transfer-label-pdf`), "_blank");
+                                                } else {
+                                                    setIsTransferModalOpen(true);
+                                                }
+                                            }}
+                                            className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-amber-50/70 dark:hover:bg-amber-950/30 border-2 border-amber-400/80 hover:border-amber-500 rounded-xl text-amber-600 dark:text-amber-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
+                                        >
+                                            <Printer className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                            <div className="text-left">
+                                                <div className="font-bold text-xs sm:text-sm">Thermal Transfer Label</div>
+                                                <div className="text-[11px] font-normal text-slate-400">Outsource dispatch barcode label</div>
+                                            </div>
+                                        </button>
+
+                                        {/* Option 4: Edit Transfer / Transfer Sample */}
+                                        <button
+                                            onClick={() => setIsTransferModalOpen(true)}
+                                            className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-purple-50/70 dark:hover:bg-purple-950/30 border-2 border-purple-400/80 hover:border-purple-500 rounded-xl text-purple-600 dark:text-purple-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
+                                        >
+                                            <Truck className="w-5 h-5 text-purple-600 dark:text-purple-400 shrink-0" />
+                                            <div className="text-left">
+                                                <div className="font-bold text-xs sm:text-sm">{savedRecord.sampleTransfer ? "Edit Transfer" : "Transfer Sample"}</div>
+                                                <div className="text-[11px] font-normal text-slate-400">Logistics dispatch details</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 pt-2">
+                                    {/* Divider OR */}
+                                    <div className="relative flex items-center">
+                                        <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+                                        <span className="shrink mx-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
+                                            OR
+                                        </span>
+                                        <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+                                    </div>
+
+                                    {/* Done / Complete Registration */}
+                                    <button
+                                        onClick={() => {
+                                            setShowReceipt(false);
+                                            fetchRegistrations();
+                                        }}
+                                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl transition-all active:scale-[0.99] shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        <CheckCircle2 className="w-4 h-4 text-white" />
+                                        <span>Done / Complete Registration</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* RIGHT PANEL: PDF Preview (No Scrollbar) */}
+                            <div className="flex-1 p-2.5 sm:p-3 bg-slate-100 dark:bg-slate-950 flex flex-col overflow-hidden h-full">
+                                <iframe
+                                    src={getApiUrl(`/api/admin/registrations/${savedRecord._id}/receipt-pdf#toolbar=0&navpanes=0&scrollbar=0&view=FitH`)}
+                                    scrolling="no"
+                                    className="w-full h-full rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden bg-white"
+                                    title="Patient Receipt Classic PDF"
+                                />
+                            </div>
+
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* OUTSOURCE SAMPLE TRANSFER LOGISTICS MODAL */}
+            <SampleTransferModal
+                record={savedRecord}
+                isOpen={isTransferModalOpen}
+                onClose={() => setIsTransferModalOpen(false)}
+                onSuccess={(updatedRec) => {
+                    setSavedRecord(updatedRec);
+                    fetchRegistrations();
+                }}
+            />
 
             {/* PRINT LABELS SECTION (Hidden on screen, visible only when printing labels) */}
             {savedRecord && (

@@ -33,6 +33,7 @@ exports.addSample = async (req, res) => {
             container,
             sampleUsedForTest,
             reportTime,
+            units,
             referenceRange,
             labPrice,
             patientPrice
@@ -51,6 +52,7 @@ exports.addSample = async (req, res) => {
             container: cleanValue(container),
             sampleUsedForTest: cleanValue(sampleUsedForTest),
             reportTime: cleanValue(reportTime),
+            units: cleanValue(units),
             referenceRange: cleanValue(referenceRange),
             labPrice: cleanValue(labPrice),
             patientPrice: cleanValue(patientPrice),
@@ -76,6 +78,7 @@ exports.updateSample = async (req, res) => {
             container,
             sampleUsedForTest,
             reportTime,
+            units,
             referenceRange,
             labPrice,
             patientPrice
@@ -94,6 +97,7 @@ exports.updateSample = async (req, res) => {
         if (container !== undefined) updateData.container = cleanValue(container);
         if (sampleUsedForTest !== undefined) updateData.sampleUsedForTest = cleanValue(sampleUsedForTest);
         if (reportTime !== undefined) updateData.reportTime = cleanValue(reportTime);
+        if (units !== undefined) updateData.units = cleanValue(units);
         if (referenceRange !== undefined) updateData.referenceRange = cleanValue(referenceRange);
         if (labPrice !== undefined) updateData.labPrice = cleanValue(labPrice);
         if (patientPrice !== undefined) updateData.patientPrice = cleanValue(patientPrice);
@@ -128,6 +132,21 @@ exports.deleteSample = async (req, res) => {
     }
 };
 
+// @desc    Delete ALL samples
+// @route   DELETE /api/admin/samples
+exports.deleteAllSamples = async (req, res) => {
+    try {
+        const result = await Sample.deleteMany({});
+        res.status(200).json({
+            success: true,
+            message: `Successfully deleted all ${result.deletedCount} samples`,
+            deletedCount: result.deletedCount
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // @desc    Import samples from Excel JSON representation
 // @route   POST /api/admin/samples/import
 exports.importSamples = async (req, res) => {
@@ -155,6 +174,7 @@ exports.importSamples = async (req, res) => {
                 container: cleanValue(item["Container"] || item.container),
                 sampleUsedForTest: cleanValue(item["Sample Used for test"] || item.sampleUsedForTest || item["sampleUsedForTest"] || item["Sample Used"] || item["SampleUsed"]),
                 reportTime: cleanValue(item["Report Time"] || item.reportTime || item["reportTime"] || item["ReportTime"]),
+                units: cleanValue(item["Units"] || item["Unit"] || item.units || item.unit),
                 referenceRange: cleanValue(item["Reference Range"] || item.referenceRange || item["referenceRange"] || item["ReferenceRange"]),
                 labPrice: cleanValue(item["Lab Price"] || item.labPrice || item["labPrice"] || item["LabPrice"]),
                 patientPrice: cleanValue(item["Patient Price"] || item.patientPrice || item["patientPrice"] || item["PatientPrice"]),

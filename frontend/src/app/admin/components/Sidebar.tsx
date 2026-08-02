@@ -36,7 +36,9 @@ import {
     ChevronDown,
     ChevronRight,
     ChevronLeft,
-    Share2
+    Share2,
+    QrCode,
+    Upload
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getApiUrl } from "@/lib/api";
@@ -45,13 +47,19 @@ const Sidebar: React.FC = () => {
     const pathname = usePathname();
     const [isMounted, setIsMounted] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<"add" | "manage">("add");
+    const [activeTab, setActiveTab] = useState<"add" | "manage" | "qrcode">("add");
     const [formData, setFormData] = useState({ name: "", email: "", password: "" });
     const [adminList, setAdminList] = useState<any[]>([]);
     const [currentAdmin, setCurrentAdmin] = useState<any>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
+
+    // QR Code States
+    const [upiQrCode, setUpiQrCode] = useState<string>("");
+    const [upiId, setUpiId] = useState<string>("");
+    const [isUploadingQr, setIsUploadingQr] = useState(false);
+    const [qrSuccessMsg, setQrSuccessMsg] = useState("");
 
     // Edit states
     const [editingAdminId, setEditingAdminId] = useState<string | null>(null);
@@ -115,12 +123,98 @@ const Sidebar: React.FC = () => {
         }
     };
 
+    const fetchSettings = async () => {
+        try {
+            const token = localStorage.getItem("adminToken");
+            const res = await fetch(getApiUrl("/api/admin/settings"), {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.success && data.data) {
+                setUpiQrCode(data.data.upiQrCode || "");
+                setUpiId(data.data.upiId || "");
+            }
+        } catch (err) {
+            console.error("Failed to fetch settings", err);
+        }
+    };
+
+    const handleFileUploadQr = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+            setError("Image size should be less than 5MB");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+            const base64Image = reader.result as string;
+            setIsUploadingQr(true);
+            setError("");
+            setQrSuccessMsg("");
+            try {
+                const token = localStorage.getItem("adminToken");
+                const res = await fetch(getApiUrl("/api/admin/settings/qr-code"), {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ upiQrCode: base64Image, upiId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    setUpiQrCode(base64Image);
+                    setQrSuccessMsg("UPI QR Code uploaded successfully!");
+                    setTimeout(() => setQrSuccessMsg(""), 3000);
+                } else {
+                    setError(data.message || "Failed to upload QR Code");
+                }
+            } catch (err: any) {
+                setError(err.message || "Failed to upload QR Code");
+            } finally {
+                setIsUploadingQr(false);
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleDeleteQr = async () => {
+        if (!confirm("Are you sure you want to delete the active UPI QR Code?")) return;
+        setIsUploadingQr(true);
+        setError("");
+        setQrSuccessMsg("");
+        try {
+            const token = localStorage.getItem("adminToken");
+            const res = await fetch(getApiUrl("/api/admin/settings/qr-code"), {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.success) {
+                setUpiQrCode("");
+                setQrSuccessMsg("UPI QR Code deleted successfully!");
+                setTimeout(() => setQrSuccessMsg(""), 3000);
+            } else {
+                setError(data.message || "Failed to delete QR Code");
+            }
+        } catch (err: any) {
+            setError(err.message || "Failed to delete QR Code");
+        } finally {
+            setIsUploadingQr(false);
+        }
+    };
+
     useEffect(() => {
         if (isModalOpen) {
             fetchAdmins();
+            fetchSettings();
             setActiveTab("add");
             setError("");
             setSuccess(false);
+            setQrSuccessMsg("");
             setEditingAdminId(null);
         }
     }, [isModalOpen]);
@@ -395,15 +489,18 @@ const Sidebar: React.FC = () => {
                 </div>
                 {(currentAdmin?.role === "admin" || !currentAdmin?.role) && (
                     <button
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={() => {
+                            setIsModalOpen(true);
+                            setActiveTab("qrcode");
+                        }}
                         className={cn(
-                            "flex items-center gap-3 w-full py-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-md text-sm transition-all mb-1",
+                            "flex items-center gap-3 w-full py-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-md text-sm transition-all mb-1 cursor-pointer",
                             isCollapsed ? "justify-center px-0" : "px-3"
                         )}
-                        title={isCollapsed ? "Add Admin" : undefined}
+                        title={isCollapsed ? "Payment QR Code" : undefined}
                     >
-                        <ShieldCheck className="w-4 h-4 shrink-0" />
-                        {!isCollapsed && <span className="animate-in fade-in duration-200">Add Admin</span>}
+                        <QrCode className="w-4 h-4 shrink-0 text-blue-400" />
+                        {!isCollapsed && <span className="animate-in fade-in duration-200">Payment QR Code</span>}
                     </button>
                 )}
                 <button
@@ -428,215 +525,81 @@ const Sidebar: React.FC = () => {
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
                     <div className="relative bg-white w-full max-w-md rounded-xl shadow-2xl p-6 border border-slate-200 text-slate-800 font-sans z-[101]">
-                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                             <div>
-                                <h3 className="text-base font-bold text-slate-900">Admin Accounts</h3>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Manage system access privileges</p>
+                                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <QrCode className="w-5 h-5 text-blue-600" />
+                                    UPI Payment QR Code
+                                </h3>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Manage lab payment QR code for patient billing</p>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        {/* Tab Switcher */}
-                        <div className="flex border-b border-slate-100 mt-3 mb-4">
-                            <button
-                                type="button"
-                                onClick={() => { setActiveTab("add"); setError(""); }}
-                                className={cn(
-                                    "flex-1 pb-2 text-xs font-bold uppercase tracking-wider border-b-2 text-center transition-all",
-                                    activeTab === "add" ? "border-blue-600 text-blue-600 font-extrabold" : "border-transparent text-slate-400 hover:text-slate-600"
-                                )}
-                            >
-                                Add Admin
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => { setActiveTab("manage"); setError(""); }}
-                                className={cn(
-                                    "flex-1 pb-2 text-xs font-bold uppercase tracking-wider border-b-2 text-center transition-all",
-                                    activeTab === "manage" ? "border-blue-600 text-blue-600 font-extrabold" : "border-transparent text-slate-400 hover:text-slate-600"
-                                )}
-                            >
-                                Manage ({adminList.length})
-                            </button>
-                        </div>
-
-                        {activeTab === "add" && (
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                {error && (
-                                    <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded text-xs font-semibold">
-                                        {error}
-                                    </div>
-                                )}
-
-                                {success && (
-                                    <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded text-xs font-semibold flex items-center gap-2">
-                                        <CheckCircle2 className="w-4 h-4 shrink-0" />
-                                        Administrator registered successfully!
-                                    </div>
-                                )}
-
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Full Name (*)</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        placeholder="e.g. John Doe"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
-                                    />
+                        <div className="space-y-4 mt-4">
+                            {error && (
+                                <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded text-xs font-semibold">
+                                    {error}
                                 </div>
-
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Email Address (*)</label>
-                                    <input
-                                        type="email"
-                                        required
-                                        placeholder="e.g. admin@medoraa.com"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
-                                    />
+                            )}
+                            {qrSuccessMsg && (
+                                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-600 rounded text-xs font-semibold flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                    {qrSuccessMsg}
                                 </div>
+                            )}
 
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Password (*)</label>
-                                    <input
-                                        type="password"
-                                        required
-                                        placeholder="••••••••"
-                                        value={formData.password}
-                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-sm font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
-                                    />
-                                </div>
+                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-center">
+                                <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                                    Active Payment QR Code
+                                </h4>
 
-                                <div className="pt-2 flex justify-end gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsModalOpen(false)}
-                                        className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={isSubmitting}
-                                        className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-xs uppercase tracking-wider shadow-lg shadow-blue-600/10 disabled:opacity-50"
-                                    >
-                                        {isSubmitting ? (
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                        ) : (
-                                            <CheckCircle2 className="w-3.5 h-3.5" />
-                                        )}
-                                        Create Admin
-                                    </button>
-                                </div>
-                            </form>
-                        )}
-
-                        {activeTab === "manage" && (
-                            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
-                                {error && (
-                                    <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded text-xs font-semibold">
-                                        {error}
-                                    </div>
-                                )}
-                                
-                                {adminList.map((admin) => {
-                                    const selfId = currentAdmin?.id || currentAdmin?._id;
-                                    const isSelf = selfId === admin._id;
-                                    const isEditing = editingAdminId === admin._id;
-
-                                    return (
-                                        <div key={admin._id} className="p-3 bg-slate-50 border border-slate-200/60 rounded-lg space-y-2">
-                                            {isEditing ? (
-                                                <div className="space-y-3">
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <div className="space-y-1">
-                                                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Name</label>
-                                                            <input
-                                                                type="text"
-                                                                value={editName}
-                                                                onChange={(e) => setEditName(e.target.value)}
-                                                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Email</label>
-                                                            <input
-                                                                type="email"
-                                                                value={editEmail}
-                                                                onChange={(e) => setEditEmail(e.target.value)}
-                                                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">New Password</label>
-                                                        <input
-                                                            type="password"
-                                                            placeholder="••••••••"
-                                                            value={editPassword}
-                                                            onChange={(e) => setEditPassword(e.target.value)}
-                                                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none text-slate-800"
-                                                        />
-                                                    </div>
-                                                    <div className="flex justify-end gap-1.5 pt-1">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setEditingAdminId(null)}
-                                                            className="px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleUpdateAdmin(admin._id)}
-                                                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-[10px] uppercase tracking-wider"
-                                                        >
-                                                            Save
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex flex-col min-w-0">
-                                                        <span className="text-xs font-bold text-slate-800 truncate flex items-center gap-1.5">
-                                                            {admin.name}
-                                                            {isSelf && <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[8px] font-bold rounded uppercase tracking-wider border border-blue-100">You</span>}
-                                                        </span>
-                                                        <span className="text-[10px] text-slate-400 font-bold truncate mt-0.5">{admin.email}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleStartEdit(admin)}
-                                                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-white rounded transition-colors"
-                                                            title="Edit Details & Password"
-                                                        >
-                                                            <Pencil className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        {!isSelf && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleDeleteAdmin(admin._id)}
-                                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-white rounded transition-colors"
-                                                                title="Delete Account"
-                                                            >
-                                                                <Trash2 className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
+                                {upiQrCode ? (
+                                    <div className="flex flex-col items-center gap-3">
+                                        <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-sm inline-block">
+                                            <img
+                                                src={upiQrCode}
+                                                alt="Active UPI QR Code"
+                                                className="w-44 h-44 object-contain rounded-lg"
+                                            />
                                         </div>
-                                    );
-                                })}
+                                        <button
+                                            type="button"
+                                            onClick={handleDeleteQr}
+                                            disabled={isUploadingQr}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold rounded-lg text-xs transition-colors border border-rose-200 cursor-pointer"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                            Delete Uploaded QR
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="py-6 flex flex-col items-center justify-center gap-2 text-slate-400">
+                                        <QrCode className="w-12 h-12 text-slate-300 stroke-[1.5]" />
+                                        <p className="text-xs font-medium">No UPI QR Code uploaded yet</p>
+                                    </div>
+                                )}
                             </div>
-                        )}
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                                    {upiQrCode ? "Replace QR Code Image" : "Upload New QR Code Image"}
+                                </label>
+                                <label className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-blue-50 hover:bg-blue-100/80 border-2 border-dashed border-blue-300 text-blue-700 font-bold rounded-xl text-xs cursor-pointer transition-all">
+                                    <Upload className="w-4 h-4" />
+                                    <span>{isUploadingQr ? "Uploading Image..." : "Choose Image (PNG/JPG)"}</span>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        disabled={isUploadingQr}
+                                        onChange={handleFileUploadQr}
+                                        className="hidden"
+                                    />
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
