@@ -2,10 +2,37 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-    MapPin, User, FileText, Share2, Clipboard, ShieldAlert, Check,
-    RefreshCw, X, Printer, Calendar, Clock, Truck, Bus, UserCheck,
-    Search, ChevronDown, CheckCircle2, ChevronRight, UserPlus, Info,
-    Activity, ShoppingCart, Download, FileSpreadsheet, Plus, ArrowLeft, Loader2, QrCode, Maximize2, ExternalLink
+  MapPin,
+  User,
+  FileText,
+  Share2,
+  Clipboard,
+  ShieldAlert,
+  Check,
+  RefreshCw,
+  X,
+  Printer,
+  Calendar,
+  Clock,
+  Truck,
+  Bus,
+  UserCheck,
+  Search,
+  ChevronDown,
+  CheckCircle2,
+  ChevronRight,
+  UserPlus,
+  Info,
+  Activity,
+  ShoppingCart,
+  Download,
+  FileSpreadsheet,
+  Plus,
+  ArrowLeft,
+  Loader2,
+  QrCode,
+  Maximize2,
+  ExternalLink,
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -15,2898 +42,3831 @@ import PathologyReportModal from "../components/PathologyReportModal";
 import SampleTransferModal from "../components/SampleTransferModal";
 
 interface BarcodeProps {
-    value: string;
-    width?: number;
-    height?: number;
-    displayValue?: boolean;
+  value: string;
+  width?: number;
+  height?: number;
+  displayValue?: boolean;
 }
 
 const Barcode: React.FC<BarcodeProps> = ({
-    value,
-    width = 1.2,
-    height = 25,
-    displayValue = false
+  value,
+  width = 1.2,
+  height = 25,
+  displayValue = false,
 }) => {
-    const svgRef = useRef<SVGSVGElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
-    useEffect(() => {
-        if (svgRef.current && value) {
-            try {
-                JsBarcode(svgRef.current, value, {
-                    format: "CODE128",
-                    width,
-                    height,
-                    displayValue,
-                    margin: 0,
-                    background: "transparent",
-                    lineColor: "#000"
-                });
-            } catch (e) {
-                console.error("JsBarcode error:", e);
-            }
-        }
-    }, [value, width, height, displayValue]);
+  useEffect(() => {
+    if (svgRef.current && value) {
+      try {
+        JsBarcode(svgRef.current, value, {
+          format: "CODE128",
+          width,
+          height,
+          displayValue,
+          margin: 0,
+          background: "transparent",
+          lineColor: "#000",
+        });
+      } catch (e) {
+        console.error("JsBarcode error:", e);
+      }
+    }
+  }, [value, width, height, displayValue]);
 
-    return <svg ref={svgRef}></svg>;
+  return <svg ref={svgRef}></svg>;
 };
 
 // Container badge color and text parser for thermal bottle labels
 const getContainerBadgeInfo = (test: any, samplesList: any[] = []) => {
-    let containerStr = "";
-    let testNameStr = "";
+  let containerStr = "";
+  let testNameStr = "";
 
-    if (typeof test === "object" && test !== null) {
-        testNameStr = test.testName || test.name || "";
-        containerStr = test.container || "";
+  if (typeof test === "object" && test !== null) {
+    testNameStr = test.testName || test.name || "";
+    containerStr = test.container || "";
 
-        if ((!containerStr || containerStr === "-") && samplesList.length > 0) {
-            const found = samplesList.find(
-                s => (test._id && s._id === test._id) || (testNameStr && s.testName?.toLowerCase() === testNameStr.toLowerCase())
-            );
-            if (found && found.container && found.container !== "-") {
-                containerStr = found.container;
-            }
-        }
-    } else if (typeof test === "string") {
-        testNameStr = test;
-        if (samplesList.length > 0) {
-            const found = samplesList.find(s => s.testName?.toLowerCase() === test.toLowerCase());
-            if (found && found.container && found.container !== "-") {
-                containerStr = found.container;
-            }
-        }
+    if ((!containerStr || containerStr === "-") && samplesList.length > 0) {
+      const found = samplesList.find(
+        (s) =>
+          (test._id && s._id === test._id) ||
+          (testNameStr &&
+            s.testName?.toLowerCase() === testNameStr.toLowerCase()),
+      );
+      if (found && found.container && found.container !== "-") {
+        containerStr = found.container;
+      }
     }
-
-    if (!containerStr || containerStr === "-" || containerStr.toLowerCase() === "none") {
-        return {
-            text: (testNameStr || "SAMPLE").toUpperCase(),
-            bgColor: "#0d9488",
-            textColor: "#ffffff"
-        };
+  } else if (typeof test === "string") {
+    testNameStr = test;
+    if (samplesList.length > 0) {
+      const found = samplesList.find(
+        (s) => s.testName?.toLowerCase() === test.toLowerCase(),
+      );
+      if (found && found.container && found.container !== "-") {
+        containerStr = found.container;
+      }
     }
+  }
 
-    const containerUpper = containerStr.toUpperCase();
-
-    // Map color
-    let bgColor = "#0d9488"; // Default Teal
-    let textColor = "#ffffff";
-
-    if (/RED|PLAIN/i.test(containerUpper)) {
-        bgColor = "#dc2626"; // Vibrant Red
-    } else if (/VIOLET|LAVENDER|PURPLE|EDTA/i.test(containerUpper)) {
-        bgColor = "#7c3aed"; // Violet
-    } else if (/YELLOW|SST|GEL/i.test(containerUpper)) {
-        bgColor = "#d97706"; // Amber Yellow
-    } else if (/BLUE|CITRATE/i.test(containerUpper)) {
-        bgColor = "#2563eb"; // Royal Blue
-    } else if (/GREEN|HEPARIN/i.test(containerUpper)) {
-        bgColor = "#16a34a"; // Green
-    } else if (/GREY|GRAY|FLUORIDE/i.test(containerUpper)) {
-        bgColor = "#4b5563"; // Grey
-    } else if (/BLACK|ESR/i.test(containerUpper)) {
-        bgColor = "#18181b"; // Black
-    } else if (/ORANGE/i.test(containerUpper)) {
-        bgColor = "#ea580c";
-    } else if (/PINK/i.test(containerUpper)) {
-        bgColor = "#db2777";
-    }
-
-    // Clean text to show on badge (extract non-color container name)
-    let cleanedText = containerUpper
-        .replace(/\(|\)/g, " ")
-        .replace(/\b(RED|VIOLET|LAVENDER|PURPLE|YELLOW|BLUE|GREEN|GREY|GRAY|BLACK|ORANGE|PINK|CAP|TUBE|COLOR|TOP|BOTTLE|CONTAINER|VACUTAINER)\b/gi, "")
-        .replace(/\s+/g, " ")
-        .trim();
-
-    if (!cleanedText) {
-        if (/RED/i.test(containerUpper)) cleanedText = "PLAIN";
-        else if (/VIOLET|LAVENDER|PURPLE/i.test(containerUpper)) cleanedText = "EDTA";
-        else if (/YELLOW/i.test(containerUpper)) cleanedText = "SST";
-        else if (/BLUE/i.test(containerUpper)) cleanedText = "CITRATE";
-        else if (/GREEN/i.test(containerUpper)) cleanedText = "HEPARIN";
-        else if (/GREY|GRAY/i.test(containerUpper)) cleanedText = "FLUORIDE";
-        else cleanedText = containerUpper;
-    }
-
+  if (
+    !containerStr ||
+    containerStr === "-" ||
+    containerStr.toLowerCase() === "none"
+  ) {
     return {
-        text: cleanedText,
-        bgColor,
-        textColor
+      text: (testNameStr || "SAMPLE").toUpperCase(),
+      bgColor: "#0d9488",
+      textColor: "#ffffff",
     };
+  }
+
+  const containerUpper = containerStr.toUpperCase();
+
+  // Map color
+  let bgColor = "#0d9488"; // Default Teal
+  let textColor = "#ffffff";
+
+  if (/RED|PLAIN/i.test(containerUpper)) {
+    bgColor = "#dc2626"; // Vibrant Red
+  } else if (/VIOLET|LAVENDER|PURPLE|EDTA/i.test(containerUpper)) {
+    bgColor = "#7c3aed"; // Violet
+  } else if (/YELLOW|SST|GEL/i.test(containerUpper)) {
+    bgColor = "#d97706"; // Amber Yellow
+  } else if (/BLUE|CITRATE/i.test(containerUpper)) {
+    bgColor = "#2563eb"; // Royal Blue
+  } else if (/GREEN|HEPARIN/i.test(containerUpper)) {
+    bgColor = "#16a34a"; // Green
+  } else if (/GREY|GRAY|FLUORIDE/i.test(containerUpper)) {
+    bgColor = "#4b5563"; // Grey
+  } else if (/BLACK|ESR/i.test(containerUpper)) {
+    bgColor = "#18181b"; // Black
+  } else if (/ORANGE/i.test(containerUpper)) {
+    bgColor = "#ea580c";
+  } else if (/PINK/i.test(containerUpper)) {
+    bgColor = "#db2777";
+  }
+
+  // Clean text to show on badge (extract non-color container name)
+  let cleanedText = containerUpper
+    .replace(/\(|\)/g, " ")
+    .replace(
+      /\b(RED|VIOLET|LAVENDER|PURPLE|YELLOW|BLUE|GREEN|GREY|GRAY|BLACK|ORANGE|PINK|CAP|TUBE|COLOR|TOP|BOTTLE|CONTAINER|VACUTAINER)\b/gi,
+      "",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleanedText) {
+    if (/RED/i.test(containerUpper)) cleanedText = "PLAIN";
+    else if (/VIOLET|LAVENDER|PURPLE/i.test(containerUpper))
+      cleanedText = "EDTA";
+    else if (/YELLOW/i.test(containerUpper)) cleanedText = "SST";
+    else if (/BLUE/i.test(containerUpper)) cleanedText = "CITRATE";
+    else if (/GREEN/i.test(containerUpper)) cleanedText = "HEPARIN";
+    else if (/GREY|GRAY/i.test(containerUpper)) cleanedText = "FLUORIDE";
+    else cleanedText = containerUpper;
+  }
+
+  return {
+    text: cleanedText,
+    bgColor,
+    textColor,
+  };
 };
 
 // Cascading Locations Data
 const locationsData: Record<string, Record<string, string[]>> = {
-    "Maharashtra": {
-        "Mumbai": ["Mumbai South", "Mumbai North", "Andheri", "Bandra", "Chembur", "Ghatkopar", "Mulund"],
-        "Pune": ["Shivajinagar", "Kothrud", "Hinjawadi", "Hadapsar", "Deccan Gymkhana", "Kalyani Nagar"],
-        "Nagpur": ["Dharampeth", "Sitabuldi", "Sadak", "Manish Nagar", "Pratap Nagar"]
-    },
-    "Karnataka": {
-        "Bengaluru": ["Koramangala", "Indiranagar", "Jayanagar", "Whitefield", "HSR Layout", "Malleshwaram", "Yelahanka"],
-        "Mysuru": ["Gokulam", "Vidyaranyapuram", "Jayalakshmipuram", "Hebbal", "Vijayanagar"],
-        "Hubli": ["Keshwapur", "Vidyanagar", "Gokul Road", "Shirur Park"]
-    },
-    "Delhi": {
-        "Central Delhi": ["Connaught Place", "Karol Bagh", "Paharganj", "Rajender Nagar"],
-        "South Delhi": ["Saket", "Hauz Khas", "Greater Kailash", "Green Park", "Vasant Kunj", "Lajpat Nagar"]
-    },
-    "Tamil Nadu": {
-        "Chennai": ["Adyar", "Mylapore", "Velachery", "T. Nagar", "Anna Nagar", "Nungambakkam"],
-        "Coimbatore": ["Gandhipuram", "RS Puram", "Peelamedu", "Saibaba Colony", "Ramanathapuram"]
-    }
+  Maharashtra: {
+    Mumbai: [
+      "Mumbai South",
+      "Mumbai North",
+      "Andheri",
+      "Bandra",
+      "Chembur",
+      "Ghatkopar",
+      "Mulund",
+    ],
+    Pune: [
+      "Shivajinagar",
+      "Kothrud",
+      "Hinjawadi",
+      "Hadapsar",
+      "Deccan Gymkhana",
+      "Kalyani Nagar",
+    ],
+    Nagpur: [
+      "Dharampeth",
+      "Sitabuldi",
+      "Sadak",
+      "Manish Nagar",
+      "Pratap Nagar",
+    ],
+  },
+  Karnataka: {
+    Bengaluru: [
+      "Koramangala",
+      "Indiranagar",
+      "Jayanagar",
+      "Whitefield",
+      "HSR Layout",
+      "Malleshwaram",
+      "Yelahanka",
+    ],
+    Mysuru: [
+      "Gokulam",
+      "Vidyaranyapuram",
+      "Jayalakshmipuram",
+      "Hebbal",
+      "Vijayanagar",
+    ],
+    Hubli: ["Keshwapur", "Vidyanagar", "Gokul Road", "Shirur Park"],
+  },
+  Delhi: {
+    "Central Delhi": [
+      "Connaught Place",
+      "Karol Bagh",
+      "Paharganj",
+      "Rajender Nagar",
+    ],
+    "South Delhi": [
+      "Saket",
+      "Hauz Khas",
+      "Greater Kailash",
+      "Green Park",
+      "Vasant Kunj",
+      "Lajpat Nagar",
+    ],
+  },
+  "Tamil Nadu": {
+    Chennai: [
+      "Adyar",
+      "Mylapore",
+      "Velachery",
+      "T. Nagar",
+      "Anna Nagar",
+      "Nungambakkam",
+    ],
+    Coimbatore: [
+      "Gandhipuram",
+      "RS Puram",
+      "Peelamedu",
+      "Saibaba Colony",
+      "Ramanathapuram",
+    ],
+  },
 };
 
 // Custom Searchable Dropdown Select Component
 interface SearchableSelectProps {
-    label: string;
-    options: string[];
-    value: string;
-    onChange: (val: string) => void;
-    disabled?: boolean;
-    mandatory?: boolean;
-    placeholder?: string;
-    icon?: React.ReactNode;
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (val: string) => void;
+  disabled?: boolean;
+  mandatory?: boolean;
+  placeholder?: string;
+  icon?: React.ReactNode;
 }
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
-    label,
-    options,
-    value,
-    onChange,
-    disabled = false,
-    mandatory = false,
-    placeholder = "Select option...",
-    icon
+  label,
+  options,
+  value,
+  onChange,
+  disabled = false,
+  mandatory = false,
+  placeholder = "Select option...",
+  icon,
 }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [search, setSearch] = useState("");
-    const containerRef = useRef<HTMLDivElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-    const filteredOptions = options.filter(opt =>
-        opt.toLowerCase().includes(search.toLowerCase())
-    );
+  const filteredOptions = options.filter((opt) =>
+    opt.toLowerCase().includes(search.toLowerCase()),
+  );
 
-    return (
-        <div ref={containerRef} className="relative flex flex-col gap-1.5 w-full font-sans">
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                {icon}
-                {label} {mandatory && <span className="text-rose-500 font-bold">*</span>}
-            </label>
-            <div
-                onClick={() => !disabled && setIsOpen(!isOpen)}
-                className={cn(
-                    "flex items-center justify-between px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium cursor-pointer transition-all select-none shadow-sm",
-                    disabled ? "opacity-50 cursor-not-allowed bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800" : "hover:border-blue-500",
-                    isOpen && "border-blue-500 ring-2 ring-blue-500/10"
-                )}
-            >
-                <span className={value ? "text-slate-900 dark:text-slate-100 font-semibold" : "text-slate-400"}>
-                    {value || placeholder}
-                </span>
-                <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)' }} />
-            </div>
+  return (
+    <div
+      ref={containerRef}
+      className="relative flex flex-col gap-1.5 w-full font-sans"
+    >
+      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+        {icon}
+        {label}{" "}
+        {mandatory && <span className="text-rose-500 font-bold">*</span>}
+      </label>
+      <div
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={cn(
+          "flex items-center justify-between px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium cursor-pointer transition-all select-none shadow-sm",
+          disabled
+            ? "opacity-50 cursor-not-allowed bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800"
+            : "hover:border-blue-500",
+          isOpen && "border-blue-500 ring-2 ring-blue-500/10",
+        )}
+      >
+        <span
+          className={
+            value
+              ? "text-slate-900 dark:text-slate-100 font-semibold"
+              : "text-slate-400"
+          }
+        >
+          {value || placeholder}
+        </span>
+        <ChevronDown
+          className="w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200"
+          style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0)" }}
+        />
+      </div>
 
-            {isOpen && !disabled && (
-                <div className="absolute top-[calc(100%+6px)] left-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 max-h-60 overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center gap-2">
-                        <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <input
-                            type="text"
-                            placeholder="Type to filter..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full bg-transparent border-0 outline-none text-xs text-slate-900 dark:text-white placeholder:text-slate-400"
-                        />
-                        {search && (
-                            <button onClick={() => setSearch("")} className="text-slate-400 hover:text-slate-600">
-                                <X className="w-3 h-3" />
-                            </button>
-                        )}
-                    </div>
-                    <div className="overflow-y-auto flex-1 max-h-48 py-1 divide-y divide-slate-50 dark:divide-slate-700/50">
-                        {filteredOptions.length > 0 ? (
-                            filteredOptions.map((opt) => (
-                                <div
-                                    key={opt}
-                                    onClick={() => {
-                                        onChange(opt);
-                                        setIsOpen(false);
-                                        setSearch("");
-                                    }}
-                                    className={cn(
-                                        "px-4 py-2.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700/50 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer font-bold flex items-center justify-between transition-colors",
-                                        opt === value && "bg-blue-50/50 dark:bg-slate-700/30 text-blue-600 dark:text-blue-400 font-extrabold"
-                                    )}
-                                >
-                                    <span>{opt}</span>
-                                    {opt === value && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
-                                </div>
-                            ))
-                        ) : (
-                            <div className="px-4 py-3 text-xs text-slate-400 text-center font-medium">
-                                No matching options
-                            </div>
-                        )}
-                    </div>
-                </div>
+      {isOpen && !disabled && (
+        <div className="absolute top-[calc(100%+6px)] left-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 max-h-60 overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center gap-2">
+            <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Type to filter..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full bg-transparent border-0 outline-none text-xs text-slate-900 dark:text-white placeholder:text-slate-400"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3 h-3" />
+              </button>
             )}
+          </div>
+          <div className="overflow-y-auto flex-1 max-h-48 py-1 divide-y divide-slate-50 dark:divide-slate-700/50">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt) => (
+                <div
+                  key={opt}
+                  onClick={() => {
+                    onChange(opt);
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                  className={cn(
+                    "px-4 py-2.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700/50 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer font-bold flex items-center justify-between transition-colors",
+                    opt === value &&
+                      "bg-blue-50/50 dark:bg-slate-700/30 text-blue-600 dark:text-blue-400 font-extrabold",
+                  )}
+                >
+                  <span>{opt}</span>
+                  {opt === value && (
+                    <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-3 text-xs text-slate-400 text-center font-medium">
+                No matching options
+              </div>
+            )}
+          </div>
         </div>
-    );
+      )}
+    </div>
+  );
 
-    // Mini function to wrap target value assignment
-    function setSearchTerm(val: string) {
-        setSearch(val);
-    }
+  // Mini function to wrap target value assignment
+  function setSearchTerm(val: string) {
+    setSearch(val);
+  }
 };
 
 const PatientRegistrationForm: React.FC = () => {
-    // Master data
-    const [doctors, setDoctors] = useState<any[]>([]);
-    const [staff, setStaff] = useState<any[]>([]);
-    const [hospitals, setHospitals] = useState<any[]>([]);
-    const [isLoadingMaster, setIsLoadingMaster] = useState(true);
+  // Master data
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [isLoadingMaster, setIsLoadingMaster] = useState(true);
 
-    // Live clock states
-    const [liveDate, setLiveDate] = useState("");
-    const [liveTime, setLiveTime] = useState("");
+  // Live clock states
+  const [liveDate, setLiveDate] = useState("");
+  const [liveTime, setLiveTime] = useState("");
 
-    // Form inputs state
-    const [formData, setFormData] = useState({
-        location: {
-            state: "",
-            district: "",
-            city: ""
+  // Form inputs state
+  const [formData, setFormData] = useState({
+    location: {
+      state: "",
+      district: "",
+      city: "",
+    },
+    patientName: "",
+    age: {
+      value: "",
+      type: "Years" as "Years" | "Months" | "Days",
+    },
+    gender: "Male" as "Male" | "Female" | "Other",
+    mobileNumber: "",
+    address: "",
+    referredBy: "Self",
+    sampleDrawnBy: "",
+    referralMode: "Self" as "Self" | "Hospital",
+    selectedLab: "Medoraa Labs (Our Lab)",
+    selectedHospital: "",
+    selectedDoctor: "",
+    sampleReceived: {
+      receivedThrough: "None" as
+        | "None"
+        | "Employee"
+        | "Person"
+        | "Courier"
+        | "Bus"
+        | "Transfer",
+      transfer: { labName: "None" },
+      employee: {
+        name: "",
+        id: "",
+        mobileNumber: "",
+        department: "",
+        designation: "",
+        dateReceived: "",
+        timeReceived: "",
+        remarks: "",
+      },
+      person: {
+        name: "",
+        mobileNumber: "",
+        relationship: "",
+        address: "",
+        idProofType: "Aadhaar",
+        idProofNumber: "",
+        dateReceived: "",
+        timeReceived: "",
+        remarks: "",
+      },
+      courier: {
+        companyName: "",
+        trackingNumber: "",
+        orderNumber: "",
+        contactNumber: "",
+        pickupLocation: "",
+        arrivalDate: "",
+        arrivalTime: "",
+        receivedByEmployee: "",
+        packageCondition: "Good" as "Good" | "Damaged" | "Opened",
+        remarks: "",
+      },
+      bus: {
+        busNumber: "",
+        busServiceName: "",
+        driverName: "",
+        driverMobileNumber: "",
+        conductorName: "",
+        conductorMobileNumber: "",
+        originLocation: "",
+        destinationLocation: "",
+        arrivalDate: "",
+        arrivalTime: "",
+        receivedByEmployee: "",
+        packageCondition: "Good",
+        remarks: "",
+      },
+    },
+  });
+
+  // Form states
+  const [activeTab, setActiveTab] = useState<"patient" | "transport">(
+    "patient",
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDraftRestored, setIsDraftRestored] = useState(false);
+  const [savedRecord, setSavedRecord] = useState<any | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [printType, setPrintType] = useState<"receipt" | "label">("receipt");
+
+  // Official Pathology Report Modal State
+  const [reportModalRecord, setReportModalRecord] = useState<any | null>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
+  // Billing & QR Code states
+  const [discountVal, setDiscountVal] = useState<string>("0");
+  const [discountType, setDiscountType] = useState<"fixed" | "percentage">(
+    "percentage",
+  );
+  const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
+  const [customPaymentMethod, setCustomPaymentMethod] = useState<string>("");
+  const [adminQrCode, setAdminQrCode] = useState<string>("");
+  const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] =
+    useState<boolean>(false);
+
+  // Test selection states
+  const [showTestSelection, setShowTestSelection] = useState(false);
+  const [availableSamples, setAvailableSamples] = useState<any[]>([]);
+  const [selectedTestIds, setSelectedTestIds] = useState<string[]>([]);
+  const [isLoadingSamples, setIsLoadingSamples] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedOrgan, setSelectedOrgan] = useState("All");
+  const [sidebarView, setSidebarView] = useState<"category" | "organ">(
+    "category",
+  );
+  const [triggerPrintOnComplete, setTriggerPrintOnComplete] = useState(false);
+  const [isSavingTests, setIsSavingTests] = useState(false);
+  const [isAddingStaff, setIsAddingStaff] = useState(false);
+  const [isSavingStaff, setIsSavingStaff] = useState(false);
+  const [newStaffData, setNewStaffData] = useState({
+    name: "",
+    role: "registration",
+    email: "",
+    mobileNumber: "",
+    password: "",
+  });
+
+  // Patient directory states
+  const [showForm, setShowForm] = useState(false);
+  const [registrations, setRegistrations] = useState<any[]>([]);
+  const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(false);
+  const [patientSearchQuery, setPatientSearchQuery] = useState("");
+  const [userRole, setUserRole] = useState<string>("registration");
+
+  const fetchRegistrations = async () => {
+    setIsLoadingRegistrations(true);
+    try {
+      const token = localStorage.getItem("adminToken");
+      const res = await fetch(getApiUrl("/api/admin/registrations"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRegistrations(data.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch registrations", err);
+    } finally {
+      setIsLoadingRegistrations(false);
+    }
+  };
+
+  const fetchSamples = async () => {
+    setIsLoadingSamples(true);
+    try {
+      const token = localStorage.getItem("adminToken");
+      const res = await fetch(getApiUrl("/api/admin/samples"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAvailableSamples(data.data);
+      }
+    } catch (err) {
+      console.error("Failed to load samples for selection", err);
+    } finally {
+      setIsLoadingSamples(false);
+    }
+
+    // Fetch UPI QR code from settings
+    try {
+      const token = localStorage.getItem("adminToken");
+      const setRes = await fetch(getApiUrl("/api/admin/settings"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const setData = await setRes.json();
+      if (setData.success && setData.data?.upiQrCode) {
+        setAdminQrCode(setData.data.upiQrCode);
+      }
+    } catch (err) {
+      console.error("Failed to fetch lab settings", err);
+    }
+  };
+
+  const handleSaveTests = async () => {
+    if (!savedRecord) return;
+    setIsSavingTests(true);
+    try {
+      const token = localStorage.getItem("adminToken");
+      const subtotal = availableSamples
+        .filter((s) => selectedTestIds.includes(s._id))
+        .reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0);
+      const rawDiscount = parseFloat(discountVal) || 0;
+      const calculatedDiscount = (subtotal * rawDiscount) / 100;
+      const finalDiscount = Math.min(subtotal, Math.max(0, calculatedDiscount));
+      const totalAmount = Math.max(0, subtotal - finalDiscount);
+      const finalPaymentMethod =
+        paymentMethod === "Other"
+          ? customPaymentMethod.trim() || "Other"
+          : paymentMethod;
+
+      const res = await fetch(
+        getApiUrl(`/api/admin/registrations/${savedRecord._id}/tests`),
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            testIds: selectedTestIds,
+            subtotal,
+            discount: finalDiscount,
+            discountType,
+            totalAmount,
+            paidAmount: totalAmount,
+            paymentMethod: finalPaymentMethod,
+          }),
         },
+      );
+      const data = await res.json();
+      if (data.success) {
+        setSavedRecord(data.data);
+        setShowTestSelection(false);
+        setShowReceipt(true);
+
+        if (triggerPrintOnComplete) {
+          setPrintType("receipt");
+          setTimeout(() => {
+            window.print();
+          }, 500);
+        }
+      } else {
+        alert(data.message || "Failed to save tests");
+      }
+    } catch (err) {
+      console.error("Failed to save tests", err);
+      alert("An error occurred while saving test selections");
+    } finally {
+      setIsSavingTests(false);
+    }
+  };
+
+  const handlePrintReceipt = () => {
+    if (savedRecord?._id) {
+      window.open(
+        getApiUrl(`/api/admin/registrations/${savedRecord._id}/receipt-pdf`),
+        "_blank",
+      );
+    }
+  };
+
+  const handlePrintLabels = () => {
+    setPrintType("label");
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
+  const toggleTestSelection = (id: string) => {
+    setSelectedTestIds((prev) =>
+      prev.includes(id) ? prev.filter((tId) => tId !== id) : [...prev, id],
+    );
+  };
+
+  const handleExportRegistrations = () => {
+    const filtered = registrations.filter((reg) => {
+      const query = patientSearchQuery.toLowerCase().trim();
+      if (!query) return true;
+      let isSampleMatch = false;
+      if (query.startsWith("s") && query.length >= 10) {
+        const sampleBody = query.substring(1, query.length - 1);
+        const regDigitsClean = reg.registrationNumber
+          ? reg.registrationNumber.replace(/[^0-9]/g, "")
+          : "";
+        if (regDigitsClean.includes(sampleBody)) {
+          isSampleMatch = true;
+        }
+      }
+      return (
+        reg.patientName?.toLowerCase().includes(query) ||
+        reg.registrationNumber?.toLowerCase().includes(query) ||
+        reg.mobileNumber?.includes(query) ||
+        reg.referredBy?.toLowerCase().includes(query) ||
+        isSampleMatch
+      );
+    });
+
+    if (filtered.length === 0) {
+      alert("No registration records match the search query to export");
+      return;
+    }
+
+    const exportData = filtered.map((reg) => {
+      const testNames =
+        reg.tests && reg.tests.length > 0
+          ? reg.tests
+              .map((t: any) =>
+                typeof t === "string" ? t : t.testName || t.name,
+              )
+              .join(", ")
+          : "No tests";
+
+      return {
+        "Registration No": reg.registrationNumber || "",
+        Date: reg.registrationDate || "",
+        Time: reg.registrationTime || "",
+        "Patient Name": reg.patientName || "",
+        Age: reg.age ? `${reg.age.value} ${reg.age.type}` : "",
+        Gender: reg.gender || "",
+        "Mobile Number": reg.mobileNumber || "",
+        Address: reg.address || "",
+        State: reg.location?.state || "",
+        District: reg.location?.district || "",
+        "City/Area": reg.location?.city || "",
+        "Referred By": reg.referredBy || "",
+        "Sample Drawn By": reg.sampleDrawnBy || "",
+        "Referral Mode": reg.referralMode || "",
+        "Selected Lab": reg.selectedLab || "",
+        "Tests Prescribed": testNames,
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Registrations");
+
+    // Write to browser
+    XLSX.writeFile(workbook, "patient_registrations.xlsx");
+  };
+
+  // Fetch doctors and staff
+  useEffect(() => {
+    const fetchMaster = async () => {
+      try {
+        const token = localStorage.getItem("adminToken");
+        const docRes = await fetch(getApiUrl("/api/admin/doctors"), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const docData = await docRes.json();
+        if (docData.success) setDoctors(docData.data);
+
+        const staffRes = await fetch(getApiUrl("/api/admin/admins"), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const staffData = await staffRes.json();
+        if (staffData.success) setStaff(staffData.data);
+
+        const hospRes = await fetch(getApiUrl("/api/admin/hospitals"), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const hospData = await hospRes.json();
+        if (hospData.success) setHospitals(hospData.data);
+      } catch (err) {
+        console.error("Failed to load master records", err);
+      } finally {
+        setIsLoadingMaster(false);
+      }
+    };
+    fetchMaster();
+    fetchRegistrations();
+    fetchSamples();
+
+    // Fetch user role
+    const storedUser = localStorage.getItem("adminUser");
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        setUserRole(parsed.role || "admin");
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
+  // Live date-time updates
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      const d = String(now.getDate()).padStart(2, "0");
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const y = now.getFullYear();
+      setLiveDate(`${d}-${m}-${y}`);
+
+      let h = now.getHours();
+      const min = String(now.getMinutes()).padStart(2, "0");
+      const sec = String(now.getSeconds()).padStart(2, "0");
+      const ampm = h >= 12 ? "PM" : "AM";
+      h = h % 12 || 12;
+      setLiveTime(`${String(h).padStart(2, "0")}:${min}:${sec} ${ampm}`);
+    };
+    updateClock();
+    const timer = setInterval(updateClock, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Global barcode scanner listener
+  useEffect(() => {
+    let buffer = "";
+    let lastKeyTime = Date.now();
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA")
+      ) {
+        if (target.id === "patient-search-input") {
+          return;
+        }
+      }
+
+      const currentTime = Date.now();
+      if (currentTime - lastKeyTime > 50) {
+        buffer = "";
+      }
+      lastKeyTime = currentTime;
+
+      if (e.key === "Enter") {
+        if (buffer.length >= 6) {
+          const cleaned = buffer.trim();
+          if (
+            cleaned.toUpperCase().startsWith("REG-") ||
+            cleaned.toUpperCase().startsWith("S0")
+          ) {
+            e.preventDefault();
+            setPatientSearchQuery(cleaned);
+            setShowForm(false);
+            const searchInput = document.getElementById("patient-search-input");
+            if (searchInput) {
+              searchInput.focus();
+            }
+            buffer = "";
+          }
+        }
+        buffer = "";
+      } else if (e.key.length === 1) {
+        buffer += e.key;
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
+  // Auto-save draft check
+  useEffect(() => {
+    const draft = localStorage.getItem("medoraa_registration_draft");
+    if (draft) {
+      try {
+        const parsed = JSON.parse(draft);
+        setFormData(parsed);
+        setIsDraftRestored(true);
+      } catch (e) {
+        console.error("Failed to parse local draft", e);
+      }
+    }
+  }, []);
+
+  // Auto-save form changes
+  const isFirstRun = useRef(true);
+  useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
+    localStorage.setItem(
+      "medoraa_registration_draft",
+      JSON.stringify(formData),
+    );
+  }, [formData]);
+
+  // Validation checks
+  const isMobileValid = /^\d{10}$/.test(formData.mobileNumber);
+  const isAgeValid =
+    formData.age.value !== "" && Number(formData.age.value) > 0;
+  const isNameValid = formData.patientName.trim() !== "";
+  const isAddressValid = formData.address.trim() !== "";
+
+  const isReferralValid =
+    (formData.referralMode || "Self") === "Self"
+      ? true
+      : (formData.selectedHospital || "").trim() !== "" &&
+        (formData.selectedDoctor || "").trim() !== "";
+
+  const transport = formData.sampleReceived;
+  const isTransportValid = (() => {
+    if (!transport) return false;
+    if (transport.receivedThrough === "None") return true;
+    if (transport.receivedThrough === "Employee") {
+      const emp = transport.employee || {};
+      const isEmpMobileValid =
+        !emp.mobileNumber || /^\d{10}$/.test(emp.mobileNumber);
+      return (
+        (emp.name || "").trim() !== "" &&
+        (emp.id || "").trim() !== "" &&
+        isEmpMobileValid
+      );
+    }
+    if (transport.receivedThrough === "Person") {
+      const per = transport.person || {};
+      return (
+        (per.name || "").trim() !== "" &&
+        /^\d{10}$/.test(per.mobileNumber || "") &&
+        (per.relationship || "").trim() !== ""
+      );
+    }
+    if (transport.receivedThrough === "Courier") {
+      const cour = transport.courier || {};
+      return (cour.companyName || "").trim() !== "";
+    }
+    if (transport.receivedThrough === "Transfer") {
+      const tr = transport.transfer || {};
+      return (tr.labName || "").trim() !== "";
+    }
+    if (transport.receivedThrough === "Bus") {
+      const b = transport.bus || {};
+      const isCondMobileValid =
+        !b.conductorMobileNumber || /^\d{10}$/.test(b.conductorMobileNumber);
+      return (
+        (b.busNumber || "").trim() !== "" &&
+        (b.busServiceName || "").trim() !== "" &&
+        /^\d{10}$/.test(b.driverMobileNumber || "") &&
+        isCondMobileValid
+      );
+    }
+    return false;
+  })();
+
+  const isFormValid =
+    isNameValid &&
+    isAgeValid &&
+    isMobileValid &&
+    isAddressValid &&
+    isReferralValid &&
+    isTransportValid;
+
+  // Populate form fields from a saved registration record
+  const populateFormFromRecord = (record: any) => {
+    if (!record) return;
+
+    const refVal = record.referredBy || "Self";
+    let referralMode: "Self" | "Hospital" = "Self";
+    let selectedLab = "Medoraa Labs (Our Lab)";
+    let selectedHospital = "";
+    let selectedDoctor = "";
+
+    if (refVal.startsWith("Self")) {
+      referralMode = "Self";
+      const startIndex = refVal.indexOf("(");
+      const endIndex = refVal.lastIndexOf(")");
+      if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+        selectedLab = refVal.slice(startIndex + 1, endIndex);
+
+        // Parse hospital name if present in the lab name, e.g. "Apollo Lab (Apollo Hospital)"
+        const labOpenParen = selectedLab.lastIndexOf(" (");
+        const labCloseParen = selectedLab.lastIndexOf(")");
+        if (
+          labOpenParen !== -1 &&
+          labCloseParen !== -1 &&
+          labCloseParen > labOpenParen
+        ) {
+          selectedHospital = selectedLab
+            .slice(labOpenParen + 2, labCloseParen)
+            .trim();
+        }
+      }
+    } else {
+      referralMode = "Hospital";
+      const lastOpenParen = refVal.lastIndexOf(" (");
+      const lastCloseParen = refVal.lastIndexOf(")");
+      if (
+        lastOpenParen !== -1 &&
+        lastCloseParen !== -1 &&
+        lastCloseParen > lastOpenParen
+      ) {
+        selectedDoctor = refVal.slice(0, lastOpenParen).trim();
+        selectedHospital = refVal
+          .slice(lastOpenParen + 2, lastCloseParen)
+          .trim();
+      } else {
+        selectedDoctor = refVal;
+      }
+    }
+
+    setFormData({
+      location: record.location || { state: "", district: "", city: "" },
+      patientName: record.patientName || "",
+      age: record.age || { value: "", type: "Years" },
+      gender: record.gender || "Male",
+      mobileNumber: record.mobileNumber || "",
+      address: record.address || "",
+      referredBy: record.referredBy || "Self",
+      sampleDrawnBy: record.sampleDrawnBy || "",
+      referralMode: referralMode,
+      selectedLab: selectedLab,
+      selectedHospital: selectedHospital,
+      selectedDoctor: selectedDoctor,
+      sampleReceived: record.sampleReceived || {
+        receivedThrough: "None",
+        transfer: { labName: "None" },
+        employee: {
+          name: "",
+          id: "",
+          mobileNumber: "",
+          department: "",
+          designation: "",
+          dateReceived: "",
+          timeReceived: "",
+          remarks: "",
+        },
+        person: {
+          name: "",
+          mobileNumber: "",
+          relationship: "",
+          address: "",
+          idProofType: "Aadhaar",
+          idProofNumber: "",
+          dateReceived: "",
+          timeReceived: "",
+          remarks: "",
+        },
+        courier: {
+          companyName: "",
+          trackingNumber: "",
+          orderNumber: "",
+          contactNumber: "",
+          pickupLocation: "",
+          arrivalDate: "",
+          arrivalTime: "",
+          receivedByEmployee: "",
+          packageCondition: "Good",
+          remarks: "",
+        },
+        bus: {
+          busNumber: "",
+          busServiceName: "",
+          driverName: "",
+          driverMobileNumber: "",
+          conductorName: "",
+          conductorMobileNumber: "",
+          originLocation: "",
+          destinationLocation: "",
+          arrivalDate: "",
+          arrivalTime: "",
+          receivedByEmployee: "",
+          packageCondition: "Good",
+          remarks: "",
+        },
+      },
+    });
+  };
+
+  // Reset handler
+  const handleReset = () => {
+    if (
+      confirm(
+        "Are you sure you want to reset the form? This will discard your current inputs and draft.",
+      )
+    ) {
+      setFormData({
+        location: { state: "", district: "", city: "" },
         patientName: "",
-        age: {
-            value: "",
-            type: "Years" as "Years" | "Months" | "Days"
-        },
-        gender: "Male" as "Male" | "Female" | "Other",
+        age: { value: "", type: "Years" },
+        gender: "Male",
         mobileNumber: "",
         address: "",
         referredBy: "Self",
         sampleDrawnBy: "",
-        referralMode: "Self" as "Self" | "Hospital",
+        referralMode: "Self",
         selectedLab: "Medoraa Labs (Our Lab)",
         selectedHospital: "",
         selectedDoctor: "",
         sampleReceived: {
-            receivedThrough: "None" as "None" | "Employee" | "Person" | "Courier" | "Bus" | "Transfer",
-            transfer: { labName: "None" },
-            employee: { name: "", id: "", mobileNumber: "", department: "", designation: "", dateReceived: "", timeReceived: "", remarks: "" },
-            person: { name: "", mobileNumber: "", relationship: "", address: "", idProofType: "Aadhaar", idProofNumber: "", dateReceived: "", timeReceived: "", remarks: "" },
-            courier: { companyName: "", trackingNumber: "", orderNumber: "", contactNumber: "", pickupLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good" as "Good" | "Damaged" | "Opened", remarks: "" },
-            bus: { busNumber: "", busServiceName: "", driverName: "", driverMobileNumber: "", conductorName: "", conductorMobileNumber: "", originLocation: "", destinationLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good", remarks: "" }
+          receivedThrough: "None",
+          transfer: { labName: "None" },
+          employee: {
+            name: "",
+            id: "",
+            mobileNumber: "",
+            department: "",
+            designation: "",
+            dateReceived: "",
+            timeReceived: "",
+            remarks: "",
+          },
+          person: {
+            name: "",
+            mobileNumber: "",
+            relationship: "",
+            address: "",
+            idProofType: "Aadhaar",
+            idProofNumber: "",
+            dateReceived: "",
+            timeReceived: "",
+            remarks: "",
+          },
+          courier: {
+            companyName: "",
+            trackingNumber: "",
+            orderNumber: "",
+            contactNumber: "",
+            pickupLocation: "",
+            arrivalDate: "",
+            arrivalTime: "",
+            receivedByEmployee: "",
+            packageCondition: "Good",
+            remarks: "",
+          },
+          bus: {
+            busNumber: "",
+            busServiceName: "",
+            driverName: "",
+            driverMobileNumber: "",
+            conductorName: "",
+            conductorMobileNumber: "",
+            originLocation: "",
+            destinationLocation: "",
+            arrivalDate: "",
+            arrivalTime: "",
+            receivedByEmployee: "",
+            packageCondition: "Good",
+            remarks: "",
+          },
+        },
+      });
+      localStorage.removeItem("medoraa_registration_draft");
+      setIsDraftRestored(false);
+      setSavedRecord(null);
+    }
+  };
+
+  // Save Registration logic
+  const handleSave = async (printOnSuccess = false) => {
+    if (!isFormValid) return;
+    setIsSaving(true);
+    setTriggerPrintOnComplete(printOnSuccess);
+    setSelectedTestIds([]);
+    try {
+      const token = localStorage.getItem("adminToken");
+
+      const referredByValue =
+        (formData.referralMode || "Self") === "Hospital"
+          ? `${formData.selectedDoctor || ""} (${formData.selectedHospital || ""})`
+          : `Self (${formData.selectedLab || "Medoraa Labs (Our Lab)"})`;
+
+      // Clean up sampleReceived depending on what is selected
+      const cleanedSampleReceived = { ...formData.sampleReceived };
+      if (cleanedSampleReceived.receivedThrough === "Transfer") {
+        delete (cleanedSampleReceived as any).employee;
+        delete (cleanedSampleReceived as any).person;
+        delete (cleanedSampleReceived as any).courier;
+        delete (cleanedSampleReceived as any).bus;
+      } else {
+        delete (cleanedSampleReceived as any).transfer;
+        if (cleanedSampleReceived.receivedThrough === "None") {
+          delete (cleanedSampleReceived as any).employee;
+          delete (cleanedSampleReceived as any).person;
+          delete (cleanedSampleReceived as any).courier;
+          delete (cleanedSampleReceived as any).bus;
+        } else if (cleanedSampleReceived.receivedThrough === "Courier") {
+          delete (cleanedSampleReceived as any).employee;
+          delete (cleanedSampleReceived as any).person;
+          delete (cleanedSampleReceived as any).bus;
         }
-    });
+      }
 
-    // Form states
-    const [activeTab, setActiveTab] = useState<"patient" | "transport">("patient");
-    const [isSaving, setIsSaving] = useState(false);
-    const [isDraftRestored, setIsDraftRestored] = useState(false);
-    const [savedRecord, setSavedRecord] = useState<any | null>(null);
-    const [showReceipt, setShowReceipt] = useState(false);
-    const [printType, setPrintType] = useState<"receipt" | "label">("receipt");
+      const payload = {
+        ...formData,
+        referredBy: referredByValue,
+        sampleReceived: cleanedSampleReceived,
+      };
 
-    // Official Pathology Report Modal State
-    const [reportModalRecord, setReportModalRecord] = useState<any | null>(null);
-    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+      const res = await fetch(getApiUrl("/api/admin/registrations"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Clear draft
+        localStorage.removeItem("medoraa_registration_draft");
+        setIsDraftRestored(false);
+        setSavedRecord(data.data);
 
-    // Billing & QR Code states
-    const [discountVal, setDiscountVal] = useState<string>("0");
-    const [discountType, setDiscountType] = useState<"fixed" | "percentage">("percentage");
-    const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
-    const [customPaymentMethod, setCustomPaymentMethod] = useState<string>("");
-    const [adminQrCode, setAdminQrCode] = useState<string>("");
-    const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
-    const [isTransferModalOpen, setIsTransferModalOpen] = useState<boolean>(false);
+        // Fetch samples and open test selection step
+        await fetchSamples();
+        setShowTestSelection(true);
+      } else {
+        alert(data.message || "Failed to save registration");
+      }
+    } catch (err) {
+      console.error("Save registration failed", err);
+      alert("An error occurred while saving the registration");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-    // Test selection states
-    const [showTestSelection, setShowTestSelection] = useState(false);
-    const [availableSamples, setAvailableSamples] = useState<any[]>([]);
-    const [selectedTestIds, setSelectedTestIds] = useState<string[]>([]);
-    const [isLoadingSamples, setIsLoadingSamples] = useState(false);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState("All");
-    const [selectedOrgan, setSelectedOrgan] = useState("All");
-    const [sidebarView, setSidebarView] = useState<"category" | "organ">("category");
-    const [triggerPrintOnComplete, setTriggerPrintOnComplete] = useState(false);
-    const [isSavingTests, setIsSavingTests] = useState(false);
-    const [isAddingStaff, setIsAddingStaff] = useState(false);
-    const [isSavingStaff, setIsSavingStaff] = useState(false);
-    const [newStaffData, setNewStaffData] = useState({
-        name: "",
-        role: "registration",
-        email: "",
-        mobileNumber: "",
-        password: ""
-    });
+  const handleAddNewStaff = async () => {
+    if (!newStaffData.name.trim()) {
+      alert("Name is required");
+      return;
+    }
+    if (!newStaffData.email.trim()) {
+      alert("Email is required");
+      return;
+    }
+    if (!newStaffData.password.trim()) {
+      alert("Password is required");
+      return;
+    }
+    if (
+      newStaffData.mobileNumber &&
+      newStaffData.mobileNumber.replace(/\D/g, "").length !== 10
+    ) {
+      alert("Mobile number must be exactly 10 digits");
+      return;
+    }
 
-    // Patient directory states
-    const [showForm, setShowForm] = useState(false);
-    const [registrations, setRegistrations] = useState<any[]>([]);
-    const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(false);
-    const [patientSearchQuery, setPatientSearchQuery] = useState("");
-    const [userRole, setUserRole] = useState<string>("registration");
+    setIsSavingStaff(true);
+    try {
+      const token = localStorage.getItem("adminToken");
+      const res = await fetch(getApiUrl("/api/admin/admins"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: newStaffData.name,
+          role: newStaffData.role,
+          email: newStaffData.email,
+          mobileNumber: newStaffData.mobileNumber,
+          password: newStaffData.password,
+          status: "active",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const newlyAdded = data.data;
+        setStaff((prev) => [...prev, newlyAdded]);
+        const label = `${newlyAdded.name} (${newlyAdded.role || "Staff"})`;
+        setFormData((prev) => ({ ...prev, sampleDrawnBy: label }));
+        setIsAddingStaff(false);
+        setNewStaffData({
+          name: "",
+          role: "registration",
+          email: "",
+          mobileNumber: "",
+          password: "",
+        });
+      } else {
+        alert(data.message || "Failed to add staff");
+      }
+    } catch (err: any) {
+      console.error("Add staff failed", err);
+      alert(err.message || "An error occurred while adding staff");
+    } finally {
+      setIsSavingStaff(false);
+    }
+  };
 
-    const fetchRegistrations = async () => {
-        setIsLoadingRegistrations(true);
-        try {
-            const token = localStorage.getItem("adminToken");
-            const res = await fetch(getApiUrl("/api/admin/registrations"), {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            const data = await res.json();
-            if (data.success) {
-                setRegistrations(data.data);
+  // Doctor options helper
+  const doctorOptions = [
+    "Self",
+    ...doctors.map(
+      (d) =>
+        `${d.doctorName} (Ref: ${d.doctorCode || d._id.slice(-4).toUpperCase()})`,
+    ),
+  ];
+  const staffOptions = staff.map((s) => `${s.name} (${s.role || "Staff"})`);
+  const labOptions = [
+    "Medoraa Labs (Our Lab)",
+    ...hospitals.flatMap((h) =>
+      (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`),
+    ),
+  ];
+  const referredByOptions = [
+    "Self",
+    "Medoraa Labs (Our Lab)",
+    ...(formData.selectedHospital && formData.selectedHospital !== "Self"
+      ? [
+          // Filtered labs (without hospital name)
+          ...hospitals
+            .filter((h) => h.hospitalName === formData.selectedHospital)
+            .flatMap((h) => (h.labs || []).map((l: any) => l.labName)),
+          // Filtered doctors (without hospital name)
+          ...doctors
+            .filter((d) => {
+              const docHosp =
+                typeof d.hospitalId === "object"
+                  ? d.hospitalId?.hospitalName
+                  : d.hospitalId;
+              return docHosp === formData.selectedHospital;
+            })
+            .map((d) => {
+              const refCode = d.doctorCode || d._id.slice(-4).toUpperCase();
+              if (
+                d.affiliationType === "LAB" &&
+                d.labId &&
+                typeof d.labId === "object"
+              ) {
+                return `${d.doctorName} (Ref: ${refCode}) (Lab: ${d.labId.labName})`;
+              }
+              return `${d.doctorName} (Ref: ${refCode})`;
+            }),
+        ]
+      : [
+          // All labs (with hospital name)
+          ...hospitals.flatMap((h) =>
+            (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`),
+          ),
+          // All doctors (with hospital/lab name)
+          ...doctors.map((d) => {
+            const refCode = d.doctorCode || d._id.slice(-4).toUpperCase();
+            const hospName =
+              (typeof d.hospitalId === "object"
+                ? d.hospitalId?.hospitalName
+                : d.hospitalId) || "Independent";
+            if (
+              d.affiliationType === "LAB" &&
+              d.labId &&
+              typeof d.labId === "object"
+            ) {
+              return `${d.doctorName} (Ref: ${refCode}) (${d.labId.labName})`;
             }
-        } catch (err) {
-            console.error("Failed to fetch registrations", err);
-        } finally {
-            setIsLoadingRegistrations(false);
+            return `${d.doctorName} (Ref: ${refCode}) (${hospName})`;
+          }),
+        ]),
+  ];
+
+  const currentReferredBy = (() => {
+    if ((formData.referralMode || "Self") === "Self") {
+      if (
+        (formData.selectedLab || "Medoraa Labs (Our Lab)") ===
+        "Medoraa Labs (Our Lab)"
+      ) {
+        return formData.selectedHospital === "Self"
+          ? "Self"
+          : "Medoraa Labs (Our Lab)";
+      }
+      if (formData.selectedHospital && formData.selectedHospital !== "Self") {
+        const suffix = ` (${formData.selectedHospital})`;
+        if (formData.selectedLab && formData.selectedLab.endsWith(suffix)) {
+          return formData.selectedLab.slice(0, -suffix.length);
         }
-    };
+      }
+      return formData.selectedLab || "";
+    }
+    if (formData.selectedHospital && formData.selectedHospital !== "Self") {
+      return formData.selectedDoctor || "";
+    } else {
+      const doc = doctors.find(
+        (d) =>
+          `${d.doctorName} (Ref: ${d.doctorCode || d._id.slice(-4).toUpperCase()})` ===
+          formData.selectedDoctor,
+      );
+      if (doc) {
+        return `${doc.doctorName} (Ref: ${doc.doctorCode || doc._id.slice(-4).toUpperCase()}) (${doc.hospitalId?.hospitalName || "Independent"})`;
+      }
+      return formData.selectedDoctor || "";
+    }
+  })();
 
-    const fetchSamples = async () => {
-        setIsLoadingSamples(true);
-        try {
-            const token = localStorage.getItem("adminToken");
-            const res = await fetch(getApiUrl("/api/admin/samples"), {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            const data = await res.json();
-            if (data.success) {
-                setAvailableSamples(data.data);
-            }
-        } catch (err) {
-            console.error("Failed to load samples for selection", err);
-        } finally {
-            setIsLoadingSamples(false);
-        }
-
-        // Fetch UPI QR code from settings
-        try {
-            const token = localStorage.getItem("adminToken");
-            const setRes = await fetch(getApiUrl("/api/admin/settings"), {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            const setData = await setRes.json();
-            if (setData.success && setData.data?.upiQrCode) {
-                setAdminQrCode(setData.data.upiQrCode);
-            }
-        } catch (err) {
-            console.error("Failed to fetch lab settings", err);
-        }
-    };
-
-    const handleSaveTests = async () => {
-        if (!savedRecord) return;
-        setIsSavingTests(true);
-        try {
-            const token = localStorage.getItem("adminToken");
-            const subtotal = availableSamples
-                .filter(s => selectedTestIds.includes(s._id))
-                .reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0);
-            const rawDiscount = parseFloat(discountVal) || 0;
-            const calculatedDiscount = (subtotal * rawDiscount) / 100;
-            const finalDiscount = Math.min(subtotal, Math.max(0, calculatedDiscount));
-            const totalAmount = Math.max(0, subtotal - finalDiscount);
-            const finalPaymentMethod = paymentMethod === "Other" ? (customPaymentMethod.trim() || "Other") : paymentMethod;
-
-            const res = await fetch(getApiUrl(`/api/admin/registrations/${savedRecord._id}/tests`), {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    testIds: selectedTestIds,
-                    subtotal,
-                    discount: finalDiscount,
-                    discountType,
-                    totalAmount,
-                    paidAmount: totalAmount,
-                    paymentMethod: finalPaymentMethod
-                })
-            });
-            const data = await res.json();
-            if (data.success) {
-                setSavedRecord(data.data);
-                setShowTestSelection(false);
-                setShowReceipt(true);
-
-                if (triggerPrintOnComplete) {
-                    setPrintType("receipt");
-                    setTimeout(() => {
-                        window.print();
-                    }, 500);
-                }
-            } else {
-                alert(data.message || "Failed to save tests");
-            }
-        } catch (err) {
-            console.error("Failed to save tests", err);
-            alert("An error occurred while saving test selections");
-        } finally {
-            setIsSavingTests(false);
-        }
-    };
-
-    const handlePrintReceipt = () => {
-        if (savedRecord?._id) {
-            window.open(getApiUrl(`/api/admin/registrations/${savedRecord._id}/receipt-pdf`), "_blank");
-        }
-    };
-
-
-    const handlePrintLabels = () => {
-        setPrintType("label");
-        setTimeout(() => {
-            window.print();
-        }, 150);
-    };
-
-    const toggleTestSelection = (id: string) => {
-        setSelectedTestIds(prev =>
-            prev.includes(id) ? prev.filter(tId => tId !== id) : [...prev, id]
+  const handleReferredByChange = (val: string) => {
+    if (val === "Self" || val === "Medoraa Labs (Our Lab)") {
+      setFormData((prev) => ({
+        ...prev,
+        selectedHospital: val === "Self" ? "Self" : "",
+        selectedDoctor: "Self",
+        referralMode: "Self",
+        selectedLab: "Medoraa Labs (Our Lab)",
+      }));
+    } else {
+      if (formData.selectedHospital && formData.selectedHospital !== "Self") {
+        const selectedHospRecord = hospitals.find(
+          (h) => h.hospitalName === formData.selectedHospital,
         );
-    };
+        const isLab = (selectedHospRecord?.labs || []).some(
+          (l: any) => l.labName === val,
+        );
 
-    const handleExportRegistrations = () => {
-        const filtered = registrations.filter(reg => {
-            const query = patientSearchQuery.toLowerCase().trim();
-            if (!query) return true;
-            let isSampleMatch = false;
-            if (query.startsWith("s") && query.length >= 10) {
-                const sampleBody = query.substring(1, query.length - 1);
-                const regDigitsClean = reg.registrationNumber ? reg.registrationNumber.replace(/[^0-9]/g, "") : "";
-                if (regDigitsClean.includes(sampleBody)) {
-                    isSampleMatch = true;
-                }
-            }
-            return (
-                reg.patientName?.toLowerCase().includes(query) ||
-                reg.registrationNumber?.toLowerCase().includes(query) ||
-                reg.mobileNumber?.includes(query) ||
-                reg.referredBy?.toLowerCase().includes(query) ||
-                isSampleMatch
-            );
-        });
-
-        if (filtered.length === 0) {
-            alert("No registration records match the search query to export");
-            return;
-        }
-
-        const exportData = filtered.map(reg => {
-            const testNames = reg.tests && reg.tests.length > 0
-                ? reg.tests.map((t: any) => typeof t === "string" ? t : t.testName || t.name).join(", ")
-                : "No tests";
-
-            return {
-                "Registration No": reg.registrationNumber || "",
-                "Date": reg.registrationDate || "",
-                "Time": reg.registrationTime || "",
-                "Patient Name": reg.patientName || "",
-                "Age": reg.age ? `${reg.age.value} ${reg.age.type}` : "",
-                "Gender": reg.gender || "",
-                "Mobile Number": reg.mobileNumber || "",
-                "Address": reg.address || "",
-                "State": reg.location?.state || "",
-                "District": reg.location?.district || "",
-                "City/Area": reg.location?.city || "",
-                "Referred By": reg.referredBy || "",
-                "Sample Drawn By": reg.sampleDrawnBy || "",
-                "Referral Mode": reg.referralMode || "",
-                "Selected Lab": reg.selectedLab || "",
-                "Tests Prescribed": testNames
-            };
-        });
-
-        const worksheet = XLSX.utils.json_to_sheet(exportData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Registrations");
-
-        // Write to browser
-        XLSX.writeFile(workbook, "patient_registrations.xlsx");
-    };
-
-    // Fetch doctors and staff
-    useEffect(() => {
-        const fetchMaster = async () => {
-            try {
-                const token = localStorage.getItem("adminToken");
-                const docRes = await fetch(getApiUrl("/api/admin/doctors"), {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                const docData = await docRes.json();
-                if (docData.success) setDoctors(docData.data);
-
-                const staffRes = await fetch(getApiUrl("/api/admin/admins"), {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                const staffData = await staffRes.json();
-                if (staffData.success) setStaff(staffData.data);
-
-                const hospRes = await fetch(getApiUrl("/api/admin/hospitals"), {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                const hospData = await hospRes.json();
-                if (hospData.success) setHospitals(hospData.data);
-            } catch (err) {
-                console.error("Failed to load master records", err);
-            } finally {
-                setIsLoadingMaster(false);
-            }
-        };
-        fetchMaster();
-        fetchRegistrations();
-        fetchSamples();
-
-        // Fetch user role
-        const storedUser = localStorage.getItem("adminUser");
-        if (storedUser) {
-            try {
-                const parsed = JSON.parse(storedUser);
-                setUserRole(parsed.role || "admin");
-            } catch (e) {
-                console.error(e);
-            }
-        }
-    }, []);
-
-    // Live date-time updates
-    useEffect(() => {
-        const updateClock = () => {
-            const now = new Date();
-            const d = String(now.getDate()).padStart(2, '0');
-            const m = String(now.getMonth() + 1).padStart(2, '0');
-            const y = now.getFullYear();
-            setLiveDate(`${d}-${m}-${y}`);
-
-            let h = now.getHours();
-            const min = String(now.getMinutes()).padStart(2, '0');
-            const sec = String(now.getSeconds()).padStart(2, '0');
-            const ampm = h >= 12 ? 'PM' : 'AM';
-            h = h % 12 || 12;
-            setLiveTime(`${String(h).padStart(2, '0')}:${min}:${sec} ${ampm}`);
-        };
-        updateClock();
-        const timer = setInterval(updateClock, 1000);
-        return () => clearInterval(timer);
-    }, []);
-
-    // Global barcode scanner listener
-    useEffect(() => {
-        let buffer = "";
-        let lastKeyTime = Date.now();
-
-        const handleGlobalKeyDown = (e: KeyboardEvent) => {
-            const target = e.target as HTMLElement;
-            if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
-                if (target.id === "patient-search-input") {
-                    return;
-                }
-            }
-
-            const currentTime = Date.now();
-            if (currentTime - lastKeyTime > 50) {
-                buffer = "";
-            }
-            lastKeyTime = currentTime;
-
-            if (e.key === "Enter") {
-                if (buffer.length >= 6) {
-                    const cleaned = buffer.trim();
-                    if (cleaned.toUpperCase().startsWith("REG-") || cleaned.toUpperCase().startsWith("S0")) {
-                        e.preventDefault();
-                        setPatientSearchQuery(cleaned);
-                        setShowForm(false);
-                        const searchInput = document.getElementById("patient-search-input");
-                        if (searchInput) {
-                            searchInput.focus();
-                        }
-                        buffer = "";
-                    }
-                }
-                buffer = "";
-            } else if (e.key.length === 1) {
-                buffer += e.key;
-            }
-        };
-
-        window.addEventListener("keydown", handleGlobalKeyDown);
-        return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-    }, []);
-
-    // Auto-save draft check
-    useEffect(() => {
-        const draft = localStorage.getItem("medoraa_registration_draft");
-        if (draft) {
-            try {
-                const parsed = JSON.parse(draft);
-                setFormData(parsed);
-                setIsDraftRestored(true);
-            } catch (e) {
-                console.error("Failed to parse local draft", e);
-            }
-        }
-    }, []);
-
-    // Auto-save form changes
-    const isFirstRun = useRef(true);
-    useEffect(() => {
-        if (isFirstRun.current) {
-            isFirstRun.current = false;
-            return;
-        }
-        localStorage.setItem("medoraa_registration_draft", JSON.stringify(formData));
-    }, [formData]);
-
-
-
-    // Validation checks
-    const isMobileValid = /^\d{10}$/.test(formData.mobileNumber);
-    const isAgeValid = formData.age.value !== "" && Number(formData.age.value) > 0;
-    const isNameValid = formData.patientName.trim() !== "";
-    const isAddressValid = formData.address.trim() !== "";
-
-    const isReferralValid = (formData.referralMode || "Self") === "Self"
-        ? true
-        : ((formData.selectedHospital || "").trim() !== "" && (formData.selectedDoctor || "").trim() !== "");
-
-    const transport = formData.sampleReceived;
-    const isTransportValid = (() => {
-        if (!transport) return false;
-        if (transport.receivedThrough === "None") return true;
-        if (transport.receivedThrough === "Employee") {
-            const emp = transport.employee || {};
-            const isEmpMobileValid = !emp.mobileNumber || /^\d{10}$/.test(emp.mobileNumber);
-            return (emp.name || "").trim() !== "" && (emp.id || "").trim() !== "" && isEmpMobileValid;
-        }
-        if (transport.receivedThrough === "Person") {
-            const per = transport.person || {};
-            return (per.name || "").trim() !== "" &&
-                /^\d{10}$/.test(per.mobileNumber || "") &&
-                (per.relationship || "").trim() !== "";
-        }
-        if (transport.receivedThrough === "Courier") {
-            const cour = transport.courier || {};
-            return (cour.companyName || "").trim() !== "";
-        }
-        if (transport.receivedThrough === "Transfer") {
-            const tr = transport.transfer || {};
-            return (tr.labName || "").trim() !== "";
-        }
-        if (transport.receivedThrough === "Bus") {
-            const b = transport.bus || {};
-            const isCondMobileValid = !b.conductorMobileNumber || /^\d{10}$/.test(b.conductorMobileNumber);
-            return (b.busNumber || "").trim() !== "" &&
-                (b.busServiceName || "").trim() !== "" &&
-                /^\d{10}$/.test(b.driverMobileNumber || "") &&
-                isCondMobileValid;
-        }
-        return false;
-    })();
-
-    const isFormValid = isNameValid && isAgeValid && isMobileValid && isAddressValid && isReferralValid && isTransportValid;
-
-    // Populate form fields from a saved registration record
-    const populateFormFromRecord = (record: any) => {
-        if (!record) return;
-
-        const refVal = record.referredBy || "Self";
-        let referralMode: "Self" | "Hospital" = "Self";
-        let selectedLab = "Medoraa Labs (Our Lab)";
-        let selectedHospital = "";
-        let selectedDoctor = "";
-
-        if (refVal.startsWith("Self")) {
-            referralMode = "Self";
-            const startIndex = refVal.indexOf("(");
-            const endIndex = refVal.lastIndexOf(")");
-            if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-                selectedLab = refVal.slice(startIndex + 1, endIndex);
-
-                // Parse hospital name if present in the lab name, e.g. "Apollo Lab (Apollo Hospital)"
-                const labOpenParen = selectedLab.lastIndexOf(" (");
-                const labCloseParen = selectedLab.lastIndexOf(")");
-                if (labOpenParen !== -1 && labCloseParen !== -1 && labCloseParen > labOpenParen) {
-                    selectedHospital = selectedLab.slice(labOpenParen + 2, labCloseParen).trim();
-                }
-            }
+        if (isLab) {
+          setFormData((prev) => ({
+            ...prev,
+            selectedDoctor: "Self",
+            referralMode: "Self",
+            selectedLab: `${val} (${prev.selectedHospital})`,
+          }));
         } else {
-            referralMode = "Hospital";
-            const lastOpenParen = refVal.lastIndexOf(" (");
-            const lastCloseParen = refVal.lastIndexOf(")");
-            if (lastOpenParen !== -1 && lastCloseParen !== -1 && lastCloseParen > lastOpenParen) {
-                selectedDoctor = refVal.slice(0, lastOpenParen).trim();
-                selectedHospital = refVal.slice(lastOpenParen + 2, lastCloseParen).trim();
-            } else {
-                selectedDoctor = refVal;
-            }
+          setFormData((prev) => ({
+            ...prev,
+            selectedDoctor: val,
+            referralMode: "Hospital",
+            selectedLab: "",
+          }));
         }
-
-        setFormData({
-            location: record.location || { state: "", district: "", city: "" },
-            patientName: record.patientName || "",
-            age: record.age || { value: "", type: "Years" },
-            gender: record.gender || "Male",
-            mobileNumber: record.mobileNumber || "",
-            address: record.address || "",
-            referredBy: record.referredBy || "Self",
-            sampleDrawnBy: record.sampleDrawnBy || "",
-            referralMode: referralMode,
-            selectedLab: selectedLab,
-            selectedHospital: selectedHospital,
-            selectedDoctor: selectedDoctor,
-            sampleReceived: record.sampleReceived || {
-                receivedThrough: "None",
-                transfer: { labName: "None" },
-                employee: { name: "", id: "", mobileNumber: "", department: "", designation: "", dateReceived: "", timeReceived: "", remarks: "" },
-                person: { name: "", mobileNumber: "", relationship: "", address: "", idProofType: "Aadhaar", idProofNumber: "", dateReceived: "", timeReceived: "", remarks: "" },
-                courier: { companyName: "", trackingNumber: "", orderNumber: "", contactNumber: "", pickupLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good", remarks: "" },
-                bus: { busNumber: "", busServiceName: "", driverName: "", driverMobileNumber: "", conductorName: "", conductorMobileNumber: "", originLocation: "", destinationLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good", remarks: "" }
-            }
-        });
-    };
-
-    // Reset handler
-    const handleReset = () => {
-        if (confirm("Are you sure you want to reset the form? This will discard your current inputs and draft.")) {
-            setFormData({
-                location: { state: "", district: "", city: "" },
-                patientName: "",
-                age: { value: "", type: "Years" },
-                gender: "Male",
-                mobileNumber: "",
-                address: "",
-                referredBy: "Self",
-                sampleDrawnBy: "",
-                referralMode: "Self",
-                selectedLab: "Medoraa Labs (Our Lab)",
-                selectedHospital: "",
-                selectedDoctor: "",
-                sampleReceived: {
-                    receivedThrough: "None",
-                    transfer: { labName: "None" },
-                    employee: { name: "", id: "", mobileNumber: "", department: "", designation: "", dateReceived: "", timeReceived: "", remarks: "" },
-                    person: { name: "", mobileNumber: "", relationship: "", address: "", idProofType: "Aadhaar", idProofNumber: "", dateReceived: "", timeReceived: "", remarks: "" },
-                    courier: { companyName: "", trackingNumber: "", orderNumber: "", contactNumber: "", pickupLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good", remarks: "" },
-                    bus: { busNumber: "", busServiceName: "", driverName: "", driverMobileNumber: "", conductorName: "", conductorMobileNumber: "", originLocation: "", destinationLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good", remarks: "" }
-                }
-            });
-            localStorage.removeItem("medoraa_registration_draft");
-            setIsDraftRestored(false);
-            setSavedRecord(null);
-        }
-    };
-
-    // Save Registration logic
-    const handleSave = async (printOnSuccess = false) => {
-        if (!isFormValid) return;
-        setIsSaving(true);
-        setTriggerPrintOnComplete(printOnSuccess);
-        setSelectedTestIds([]);
-        try {
-            const token = localStorage.getItem("adminToken");
-
-            const referredByValue = (formData.referralMode || "Self") === "Hospital"
-                ? `${formData.selectedDoctor || ""} (${formData.selectedHospital || ""})`
-                : `Self (${formData.selectedLab || "Medoraa Labs (Our Lab)"})`;
-
-            // Clean up sampleReceived depending on what is selected
-            const cleanedSampleReceived = { ...formData.sampleReceived };
-            if (cleanedSampleReceived.receivedThrough === "Transfer") {
-                delete (cleanedSampleReceived as any).employee;
-                delete (cleanedSampleReceived as any).person;
-                delete (cleanedSampleReceived as any).courier;
-                delete (cleanedSampleReceived as any).bus;
-            } else {
-                delete (cleanedSampleReceived as any).transfer;
-                if (cleanedSampleReceived.receivedThrough === "None") {
-                    delete (cleanedSampleReceived as any).employee;
-                    delete (cleanedSampleReceived as any).person;
-                    delete (cleanedSampleReceived as any).courier;
-                    delete (cleanedSampleReceived as any).bus;
-                } else if (cleanedSampleReceived.receivedThrough === "Courier") {
-                    delete (cleanedSampleReceived as any).employee;
-                    delete (cleanedSampleReceived as any).person;
-                    delete (cleanedSampleReceived as any).bus;
-                }
-            }
-
-            const payload = {
-                ...formData,
-                referredBy: referredByValue,
-                sampleReceived: cleanedSampleReceived
-            };
-
-            const res = await fetch(getApiUrl("/api/admin/registrations"), {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if (data.success) {
-                // Clear draft
-                localStorage.removeItem("medoraa_registration_draft");
-                setIsDraftRestored(false);
-                setSavedRecord(data.data);
-
-                // Fetch samples and open test selection step
-                await fetchSamples();
-                setShowTestSelection(true);
-            } else {
-                alert(data.message || "Failed to save registration");
-            }
-        } catch (err) {
-            console.error("Save registration failed", err);
-            alert("An error occurred while saving the registration");
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleAddNewStaff = async () => {
-        if (!newStaffData.name.trim()) {
-            alert("Name is required");
-            return;
-        }
-        if (!newStaffData.email.trim()) {
-            alert("Email is required");
-            return;
-        }
-        if (!newStaffData.password.trim()) {
-            alert("Password is required");
-            return;
-        }
-        if (newStaffData.mobileNumber && newStaffData.mobileNumber.replace(/\D/g, "").length !== 10) {
-            alert("Mobile number must be exactly 10 digits");
-            return;
-        }
-
-        setIsSavingStaff(true);
-        try {
-            const token = localStorage.getItem("adminToken");
-            const res = await fetch(getApiUrl("/api/admin/admins"), {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    name: newStaffData.name,
-                    role: newStaffData.role,
-                    email: newStaffData.email,
-                    mobileNumber: newStaffData.mobileNumber,
-                    password: newStaffData.password,
-                    status: "active"
-                })
-            });
-            const data = await res.json();
-            if (data.success) {
-                const newlyAdded = data.data;
-                setStaff(prev => [...prev, newlyAdded]);
-                const label = `${newlyAdded.name} (${newlyAdded.role || "Staff"})`;
-                setFormData(prev => ({ ...prev, sampleDrawnBy: label }));
-                setIsAddingStaff(false);
-                setNewStaffData({
-                    name: "",
-                    role: "registration",
-                    email: "",
-                    mobileNumber: "",
-                    password: ""
-                });
-            } else {
-                alert(data.message || "Failed to add staff");
-            }
-        } catch (err: any) {
-            console.error("Add staff failed", err);
-            alert(err.message || "An error occurred while adding staff");
-        } finally {
-            setIsSavingStaff(false);
-        }
-    };
-
-    // Doctor options helper
-    const doctorOptions = ["Self", ...doctors.map(d => `${d.doctorName} (Ref: ${d.doctorCode || d._id.slice(-4).toUpperCase()})`)];
-    const staffOptions = staff.map(s => `${s.name} (${s.role || "Staff"})`);
-    const labOptions = [
-        "Medoraa Labs (Our Lab)",
-        ...hospitals.flatMap(h => (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`))
-    ];
-    const referredByOptions = [
-        "Self",
-        "Medoraa Labs (Our Lab)",
-        ...(formData.selectedHospital && formData.selectedHospital !== "Self"
-            ? [
-                // Filtered labs (without hospital name)
-                ...hospitals
-                    .filter(h => h.hospitalName === formData.selectedHospital)
-                    .flatMap(h => (h.labs || []).map((l: any) => l.labName)),
-                // Filtered doctors (without hospital name)
-                ...doctors
-                    .filter(d => {
-                        const docHosp = typeof d.hospitalId === 'object' ? d.hospitalId?.hospitalName : d.hospitalId;
-                        return docHosp === formData.selectedHospital;
-                    })
-                    .map(d => {
-                        const refCode = d.doctorCode || d._id.slice(-4).toUpperCase();
-                        if (d.affiliationType === "LAB" && d.labId && typeof d.labId === 'object') {
-                            return `${d.doctorName} (Ref: ${refCode}) (Lab: ${d.labId.labName})`;
-                        }
-                        return `${d.doctorName} (Ref: ${refCode})`;
-                    })
-            ]
-            : [
-                // All labs (with hospital name)
-                ...hospitals.flatMap(h => (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`)),
-                // All doctors (with hospital/lab name)
-                ...doctors.map(d => {
-                    const refCode = d.doctorCode || d._id.slice(-4).toUpperCase();
-                    const hospName = (typeof d.hospitalId === 'object' ? d.hospitalId?.hospitalName : d.hospitalId) || "Independent";
-                    if (d.affiliationType === "LAB" && d.labId && typeof d.labId === 'object') {
-                        return `${d.doctorName} (Ref: ${refCode}) (${d.labId.labName})`;
-                    }
-                    return `${d.doctorName} (Ref: ${refCode}) (${hospName})`;
-                })
-            ]
-        )
-    ];
-
-    const currentReferredBy = (() => {
-        if ((formData.referralMode || "Self") === "Self") {
-            if ((formData.selectedLab || "Medoraa Labs (Our Lab)") === "Medoraa Labs (Our Lab)") {
-                return formData.selectedHospital === "Self" ? "Self" : "Medoraa Labs (Our Lab)";
-            }
-            if (formData.selectedHospital && formData.selectedHospital !== "Self") {
-                const suffix = ` (${formData.selectedHospital})`;
-                if (formData.selectedLab && formData.selectedLab.endsWith(suffix)) {
-                    return formData.selectedLab.slice(0, -suffix.length);
-                }
-            }
-            return formData.selectedLab || "";
-        }
-        if (formData.selectedHospital && formData.selectedHospital !== "Self") {
-            return formData.selectedDoctor || "";
+      } else {
+        if (val.includes("(") && val.endsWith(")") && !val.includes("(Ref:")) {
+          const startIndex = val.indexOf("(");
+          const endIndex = val.lastIndexOf(")");
+          let hospitalName = "";
+          if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            hospitalName = val.slice(startIndex + 1, endIndex).trim();
+          }
+          setFormData((prev) => ({
+            ...prev,
+            selectedHospital: hospitalName,
+            selectedDoctor: "Self",
+            referralMode: "Self",
+            selectedLab: val,
+          }));
         } else {
-            const doc = doctors.find(d => `${d.doctorName} (Ref: ${d.doctorCode || d._id.slice(-4).toUpperCase()})` === formData.selectedDoctor);
-            if (doc) {
-                return `${doc.doctorName} (Ref: ${doc.doctorCode || doc._id.slice(-4).toUpperCase()}) (${doc.hospitalId?.hospitalName || "Independent"})`;
-            }
-            return formData.selectedDoctor || "";
+          const doc = doctors.find(
+            (d) =>
+              `${d.doctorName} (Ref: ${d.doctorCode || d._id.slice(-4).toUpperCase()}) (${d.hospitalId?.hospitalName || "Independent"})` ===
+              val,
+          );
+          const docFormatted = doc
+            ? `${doc.doctorName} (Ref: ${doc.doctorCode || doc._id.slice(-4).toUpperCase()})`
+            : val;
+          const hospitalName = doc?.hospitalId?.hospitalName || "";
+          setFormData((prev) => ({
+            ...prev,
+            selectedHospital: hospitalName,
+            selectedDoctor: docFormatted,
+            referralMode: "Hospital",
+            selectedLab: "",
+          }));
         }
-    })();
+      }
+    }
+  };
 
-    const handleReferredByChange = (val: string) => {
-        if (val === "Self" || val === "Medoraa Labs (Our Lab)") {
-            setFormData(prev => ({
-                ...prev,
-                selectedHospital: val === "Self" ? "Self" : "",
-                selectedDoctor: "Self",
-                referralMode: "Self",
-                selectedLab: "Medoraa Labs (Our Lab)"
-            }));
-        } else {
-            if (formData.selectedHospital && formData.selectedHospital !== "Self") {
-                const selectedHospRecord = hospitals.find(h => h.hospitalName === formData.selectedHospital);
-                const isLab = (selectedHospRecord?.labs || []).some((l: any) => l.labName === val);
-
-                if (isLab) {
-                    setFormData(prev => ({
-                        ...prev,
-                        selectedDoctor: "Self",
-                        referralMode: "Self",
-                        selectedLab: `${val} (${prev.selectedHospital})`
-                    }));
-                } else {
-                    setFormData(prev => ({
-                        ...prev,
-                        selectedDoctor: val,
-                        referralMode: "Hospital",
-                        selectedLab: ""
-                    }));
-                }
-            } else {
-                if (val.includes("(") && val.endsWith(")") && !val.includes("(Ref:")) {
-                    const startIndex = val.indexOf("(");
-                    const endIndex = val.lastIndexOf(")");
-                    let hospitalName = "";
-                    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-                        hospitalName = val.slice(startIndex + 1, endIndex).trim();
-                    }
-                    setFormData(prev => ({
-                        ...prev,
-                        selectedHospital: hospitalName,
-                        selectedDoctor: "Self",
-                        referralMode: "Self",
-                        selectedLab: val
-                    }));
-                } else {
-                    const doc = doctors.find(d =>
-                        `${d.doctorName} (Ref: ${d.doctorCode || d._id.slice(-4).toUpperCase()}) (${d.hospitalId?.hospitalName || "Independent"})` === val
-                    );
-                    const docFormatted = doc
-                        ? `${doc.doctorName} (Ref: ${doc.doctorCode || doc._id.slice(-4).toUpperCase()})`
-                        : val;
-                    const hospitalName = doc?.hospitalId?.hospitalName || "";
-                    setFormData(prev => ({
-                        ...prev,
-                        selectedHospital: hospitalName,
-                        selectedDoctor: docFormatted,
-                        referralMode: "Hospital",
-                        selectedLab: ""
-                    }));
-                }
-            }
-        }
-    };
-
-    return (
-        <div className="font-sans pb-6 dark:text-slate-100">
-            {showTestSelection && savedRecord ? (
-                <div className="-mx-8 -my-8 print:hidden animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 w-full overflow-hidden flex flex-col h-screen">
-
-                        {/* Header */}
-                        <div className="flex items-center justify-between px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 shrink-0">
-                            <div>
-                                <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                                    <Activity className="w-5 h-5 text-blue-600" />
-                                    Select Tests / Samples for {savedRecord.patientName}
-                                </h3>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                                    Registration No: {savedRecord.registrationNumber} | Referrer: {savedRecord.referredBy}
-                                </p>
-                            </div>
-                            <button 
-                                onClick={() => {
-                                    populateFormFromRecord(savedRecord);
-                                    setShowTestSelection(false);
-                                    setShowForm(true);
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-655 dark:text-slate-355 cursor-pointer text-xs font-bold shadow-sm"
-                            >
-                                <ArrowLeft className="w-3.5 h-3.5" />
-                                Back to Form
-                            </button>
-                        </div>
-
-                        {/* Content Area */}
-                        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-
-                            {/* Left Sidebar: Categories / Organs */}
-                            <div className="w-full lg:w-52 bg-slate-50 dark:bg-slate-950/40 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800 flex flex-col shrink-0">
-                                <div className="p-3 border-b border-slate-100 dark:border-slate-800 space-y-2">
-                                    <div className="flex bg-slate-200/60 dark:bg-slate-800/80 p-0.5 rounded-lg border border-slate-200/40 dark:border-slate-700/50">
-                                        <button
-                                            onClick={() => {
-                                                setSidebarView("category");
-                                                setSelectedCategory("All");
-                                                setSelectedOrgan("All");
-                                            }}
-                                            className={cn(
-                                                "flex-1 py-1.5 text-[9px] font-black uppercase rounded-md transition-all cursor-pointer",
-                                                sidebarView === "category"
-                                                    ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-sm font-bold"
-                                                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-350"
-                                            )}
-                                        >
-                                            Categories
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setSidebarView("organ");
-                                                setSelectedCategory("All");
-                                                setSelectedOrgan("All");
-                                            }}
-                                            className={cn(
-                                                "flex-1 py-1.5 text-[9px] font-black uppercase rounded-md transition-all cursor-pointer",
-                                                sidebarView === "organ"
-                                                    ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-sm font-bold"
-                                                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-350"
-                                            )}
-                                        >
-                                            Organs
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="flex-1 overflow-x-auto lg:overflow-y-auto p-2 flex flex-row lg:flex-col gap-1.5 lg:space-y-1 no-scrollbar shrink-0 lg:shrink">
-                                    {sidebarView === "category" ? (
-                                        ["All", ...Array.from(new Set(availableSamples.map(s => s.category || "General").filter(c => c && c !== "-")))].map((cat) => {
-                                            const catCount = availableSamples.filter(s => (s.category || "General") === cat && cat !== "All").length;
-                                            const isSelected = selectedCategory === cat;
-                                            return (
-                                                <button
-                                                    key={cat}
-                                                    onClick={() => setSelectedCategory(cat)}
-                                                    className={cn(
-                                                        "w-auto lg:w-full shrink-0 text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer whitespace-nowrap gap-1.5",
-                                                        isSelected
-                                                            ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
-                                                            : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400"
-                                                    )}
-                                                >
-                                                    <span className="truncate text-left">{cat}</span>
-                                                    {cat !== "All" && (
-                                                        <span className={cn(
-                                                            "text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ml-1.5",
-                                                            isSelected ? "bg-blue-700 text-white" : "bg-slate-200 dark:bg-slate-850 text-slate-500"
-                                                        )}>
-                                                            {catCount}
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            );
-                                        })
-                                    ) : (
-                                        ["All", ...Array.from(new Set(availableSamples.map(s => s.organ).filter(Boolean).filter(o => o && o !== "-")))].map((org) => {
-                                            const orgCount = availableSamples.filter(s => s.organ === org && org !== "All").length;
-                                            const isSelected = selectedOrgan === org;
-                                            return (
-                                                <button
-                                                    key={org}
-                                                    onClick={() => setSelectedOrgan(org)}
-                                                    className={cn(
-                                                        "w-auto lg:w-full shrink-0 text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer whitespace-nowrap gap-1.5",
-                                                        isSelected
-                                                            ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
-                                                            : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400"
-                                                    )}
-                                                >
-                                                    <span className="truncate text-left">{org}</span>
-                                                    {org !== "All" && (
-                                                        <span className={cn(
-                                                            "text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ml-1.5",
-                                                            isSelected ? "bg-blue-700 text-white" : "bg-slate-200 dark:bg-slate-850 text-slate-500"
-                                                        )}>
-                                                            {orgCount}
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            );
-                                        })
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Middle Content: Test Catalog Grid */}
-                            <div className="flex-1 flex flex-col min-w-0">
-                                {/* Search Bar */}
-                                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3 bg-white dark:bg-slate-900 shrink-0">
-                                    <div className="relative flex-1">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search test names, organ, method or container..."
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-all font-medium text-slate-800 dark:text-slate-100"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Tests Grid list */}
-                                <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                                    {isLoadingSamples ? (
-                                        <div className="flex flex-col items-center justify-center h-full gap-2">
-                                            <div className="w-6 h-6 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loading Catalog...</span>
-                                        </div>
-                                    ) : availableSamples.filter(sample => {
-                                        const matchesSearch = (sample.testName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                            (sample.organ || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                            (sample.category || "").toLowerCase().includes(searchQuery.toLowerCase());
-                                        const matchesCategory = selectedCategory === "All" || (sample.category || "General") === selectedCategory;
-                                        const matchesOrgan = selectedOrgan === "All" || sample.organ === selectedOrgan;
-                                        return matchesSearch && matchesCategory && matchesOrgan;
-                                    }).length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center h-full text-center p-6">
-                                            <Activity className="w-10 h-10 text-slate-300 mb-2" />
-                                            <p className="text-xs font-bold text-slate-500">No tests found matching search criteria.</p>
-                                        </div>
-                                    ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            {availableSamples.filter(sample => {
-                                                const matchesSearch = (sample.testName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                    (sample.organ || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                    (sample.category || "").toLowerCase().includes(searchQuery.toLowerCase());
-                                                const matchesCategory = selectedCategory === "All" || (sample.category || "General") === selectedCategory;
-                                                const matchesOrgan = selectedOrgan === "All" || sample.organ === selectedOrgan;
-                                                return matchesSearch && matchesCategory && matchesOrgan;
-                                            }).map((sample) => {
-                                                const isSelected = selectedTestIds.includes(sample._id);
-                                                return (
-                                                    <div
-                                                        key={sample._id}
-                                                        onClick={() => toggleTestSelection(sample._id)}
-                                                        className={cn(
-                                                            "p-4 bg-white dark:bg-slate-900 border rounded-2xl cursor-pointer hover:shadow-md transition-all flex justify-between items-start gap-4 select-none group relative overflow-hidden",
-                                                            isSelected
-                                                                ? "border-blue-500 ring-2 ring-blue-500/10 dark:bg-slate-900"
-                                                                : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
-                                                        )}
-                                                    >
-                                                        <div className="space-y-1.5 flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-black uppercase tracking-wider rounded border border-blue-100/50 dark:border-blue-900/50">
-                                                                    {sample.category || "General"}
-                                                                </span>
-                                                                {sample.organ && sample.organ !== "-" && (
-                                                                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[8px] font-bold uppercase tracking-wide rounded">
-                                                                        {sample.organ}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight truncate font-bold">
-                                                                {sample.testName}
-                                                            </h4>
-                                                            <div className="flex items-center gap-3 text-[9px] text-slate-400 font-bold uppercase tracking-wide">
-                                                                <span>Method: {sample.method || "-"}</span>
-                                                                <span>•</span>
-                                                                <span>Specimen: {sample.sampleUsedForTest || "-"}</span>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="text-right shrink-0 flex flex-col items-end justify-between h-full min-h-[50px]">
-                                                            <span className="text-xs font-black text-slate-900 dark:text-white">
-                                                                ₹{parseFloat(sample.patientPrice) || 0}
-                                                            </span>
-                                                            <div className={cn(
-                                                                "w-4 h-4 rounded-full border flex items-center justify-center transition-all",
-                                                                isSelected
-                                                                    ? "bg-blue-600 border-blue-600 text-white"
-                                                                    : "border-slate-300 dark:border-slate-600 group-hover:border-blue-400"
-                                                            )}>
-                                                                {isSelected && <Check className="w-2.5 h-2.5" />}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Right Sidebar: Selected Tests Summary */}
-                            <div className="w-full lg:w-72 h-48 lg:h-auto bg-white dark:bg-slate-950/20 border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-slate-800 flex flex-col shrink-0 overflow-hidden">
-                                <div className="p-4 border-b border-slate-100 dark:border-slate-800">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Selected Investigations</span>
-                                    <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mt-1 uppercase truncate">
-                                        {availableSamples.filter(s => selectedTestIds.includes(s._id)).length} tests added
-                                    </p>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-                                    {availableSamples.filter(s => selectedTestIds.includes(s._id)).length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 py-12">
-                                            <ShoppingCart className="w-8 h-8 text-slate-300 mb-2" />
-                                            <p className="text-[10px] font-bold uppercase tracking-wider">No tests selected yet</p>
-                                        </div>
-                                    ) : (
-                                        availableSamples.filter(s => selectedTestIds.includes(s._id)).map((t) => (
-                                            <div key={t._id} className="p-2.5 bg-slate-50 dark:bg-slate-850/50 border border-slate-100 dark:border-slate-800 rounded-xl flex items-center justify-between gap-3 text-xs">
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="font-bold text-slate-800 dark:text-slate-200 truncate uppercase tracking-tight">{t.testName}</p>
-                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{t.category}</p>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                    <span className="font-extrabold text-slate-900 dark:text-white">₹{t.patientPrice}</span>
-                                                    <button
-                                                        onClick={() => toggleTestSelection(t._id)}
-                                                        className="text-slate-400 hover:text-rose-600 transition-colors p-0.5 cursor-pointer"
-                                                    >
-                                                        <X className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-
-                                <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 space-y-3.5 shrink-0">
-                                    {(() => {
-                                        const subtotal = availableSamples
-                                            .filter(s => selectedTestIds.includes(s._id))
-                                            .reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0);
-                                        const rawDiscount = parseFloat(discountVal) || 0;
-                                        const calculatedDiscount = discountType === "percentage" ? (subtotal * rawDiscount) / 100 : rawDiscount;
-                                        const finalDiscount = Math.min(subtotal, Math.max(0, calculatedDiscount));
-                                        const totalPayable = Math.max(0, subtotal - finalDiscount);
-                                        const isUpi = paymentMethod === "UPI";
-
-                                        return (
-                                            <div className="space-y-3 font-sans">
-                                                {/* Subtotal */}
-                                                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-                                                    <span>Subtotal</span>
-                                                    <span className="text-slate-800 dark:text-slate-200">₹{subtotal}</span>
-                                                </div>
-
-                                                {/* Discount Input */}
-                                                <div className="space-y-1.5">
-                                                    <div className="flex items-center justify-between">
-                                                        <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                                            Discount (%)
-                                                        </label>
-                                                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded">
-                                                            % Off
-                                                        </span>
-                                                    </div>
-                                                    <div className="relative flex items-center">
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            max="100"
-                                                            placeholder="e.g. 10"
-                                                            value={discountVal}
-                                                            onChange={(e) => setDiscountVal(e.target.value)}
-                                                            className="w-full px-2.5 py-1 pr-7 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
-                                                        />
-                                                        <span className="absolute right-2.5 text-xs font-black text-slate-400 pointer-events-none">%</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Total Payable */}
-                                                <div className="flex items-center justify-between text-sm font-black border-t border-dashed border-slate-200 dark:border-slate-800 pt-2">
-                                                    <span className="text-slate-900 dark:text-white uppercase tracking-wider">Total Payable</span>
-                                                    <span className="text-blue-600 dark:text-blue-400 text-lg font-black">
-                                                        ₹{totalPayable.toFixed(0)}
-                                                    </span>
-                                                </div>
-
-                                                {/* Payment Method Section */}
-                                                <div className="space-y-1.5 pt-1">
-                                                    <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                                                        Payment Method
-                                                    </label>
-                                                    <select
-                                                        value={paymentMethod}
-                                                        onChange={(e) => setPaymentMethod(e.target.value)}
-                                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                                                    >
-                                                        <option value="Cash">Cash</option>
-                                                        <option value="UPI">UPI</option>
-                                                        <option value="Self">Self</option>
-                                                        <option value="Other">Other / Custom</option>
-                                                    </select>
-
-                                                    {/* If Other selected, custom input field */}
-                                                    {paymentMethod === "Other" && (
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Enter payment method..."
-                                                            value={customPaymentMethod}
-                                                            onChange={(e) => setCustomPaymentMethod(e.target.value)}
-                                                            className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-800 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500 mt-1"
-                                                        />
-                                                    )}
-                                                </div>
-
-                                                {/* Display UPI QR Code when UPI selected */}
-                                                {isUpi && (
-                                                    <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
-                                                        <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center gap-2 text-center shadow-xs">
-                                                            <div className="flex items-center justify-between w-full">
-                                                                <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1">
-                                                                    <QrCode className="w-3.5 h-3.5" />
-                                                                    Scan UPI QR to Pay
-                                                                </span>
-                                                                {adminQrCode && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setIsQrModalOpen(true)}
-                                                                        className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                                                                        title="Open QR in Popup"
-                                                                    >
-                                                                        <Maximize2 className="w-3 h-3" />
-                                                                        Popup
-                                                                    </button>
-                                                                )}
-                                                            </div>
-
-                                                            {adminQrCode ? (
-                                                                <div
-                                                                    onClick={() => setIsQrModalOpen(true)}
-                                                                    className="group relative cursor-pointer overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800 hover:ring-2 hover:ring-blue-500 transition-all"
-                                                                >
-                                                                    <img
-                                                                        src={adminQrCode}
-                                                                        alt="UPI QR Code"
-                                                                        className="w-36 h-36 object-contain"
-                                                                    />
-                                                                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-[10px] gap-1">
-                                                                        <Maximize2 className="w-3.5 h-3.5" /> Click to Enlarge
-                                                                    </div>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="py-3 px-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                                                                    No QR Code uploaded by Admin yet. Admin can upload QR in Payment QR Code settings.
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                            </div>
-
-                        </div>
-
-                        {/* Footer */}
-                        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
-                            <button
-                                onClick={() => {
-                                    if (confirm("Skip test selection? You can print receipt without tests.")) {
-                                        setShowTestSelection(false);
-                                        setShowReceipt(true);
-                                    }
-                                }}
-                                className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold rounded-xl text-xs transition-all active:scale-95 cursor-pointer"
-                            >
-                                Skip & Print Receipt
-                            </button>
-                            <button
-                                onClick={handleSaveTests}
-                                disabled={selectedTestIds.length === 0 || isSavingTests}
-                                className={cn(
-                                    "px-6 py-2 font-bold rounded-xl text-xs transition-all active:scale-95 flex items-center gap-1.5 border shadow-md",
-                                    selectedTestIds.length > 0 && !isSavingTests
-                                        ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 border-transparent cursor-pointer"
-                                        : "bg-transparent text-slate-300 dark:text-slate-700 border-slate-200 dark:border-slate-800 cursor-not-allowed"
-                                )}
-                            >
-                                {isSavingTests ? (
-                                    <>
-                                        <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-white rounded-full animate-spin" />
-                                        Saving...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Printer className="w-4 h-4" />
-                                        Confirm & Save Tests
-                                    </>
-                                )}
-                            </button>
-                        </div>
-
-                    </div>
-                </div>
-            ) : !showForm ? (
-                <div className="space-y-5 print:hidden">
-                    {/* Header */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-3">
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <span className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
-                                    <UserPlus className="w-4 h-4" />
-                                </span>
-                                <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-                                    Patient Registrations Directory
-                                </h1>
-                            </div>
-                            <p className="text-slate-500 dark:text-slate-400 text-xs mt-1 font-medium">
-                                Manage registered patients, investigations, barcodes, and billing slips.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            {userRole === "admin" && (
-                                <button
-                                    onClick={handleExportRegistrations}
-                                    className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-lg text-xs text-slate-700 dark:text-slate-350 transition-all active:scale-95 cursor-pointer shadow-sm"
-                                >
-                                    <FileSpreadsheet className="w-4 h-4" />
-                                    <span>Export Excel</span>
-                                </button>
-                            )}
-                            <button
-                                onClick={() => {
-                                    setSavedRecord(null);
-                                    setFormData({
-                                        location: { state: "", district: "", city: "" },
-                                        patientName: "",
-                                        age: { value: "", type: "Years" },
-                                        gender: "Male",
-                                        mobileNumber: "",
-                                        address: "",
-                                        referredBy: "Self",
-                                        sampleDrawnBy: "",
-                                        referralMode: "Self",
-                                        selectedLab: "Medoraa Labs (Our Lab)",
-                                        selectedHospital: "",
-                                        selectedDoctor: "",
-                                        sampleReceived: {
-                                            receivedThrough: "Employee",
-                                            transfer: { labName: "None" },
-                                            employee: { name: "", id: "", mobileNumber: "", department: "", designation: "", dateReceived: "", timeReceived: "", remarks: "" },
-                                            person: { name: "", mobileNumber: "", relationship: "", address: "", idProofType: "Aadhaar", idProofNumber: "", dateReceived: "", timeReceived: "", remarks: "" },
-                                            courier: { companyName: "", trackingNumber: "", orderNumber: "", contactNumber: "", pickupLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good", remarks: "" },
-                                            bus: { busNumber: "", busServiceName: "", driverName: "", driverMobileNumber: "", conductorName: "", conductorMobileNumber: "", originLocation: "", destinationLocation: "", arrivalDate: "", arrivalTime: "", receivedByEmployee: "", packageCondition: "Good", remarks: "" }
-                                        }
-                                    });
-                                    setShowForm(true);
-                                }}
-                                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-lg text-xs transition-all active:scale-95 shadow-md cursor-pointer"
-                            >
-                                <UserPlus className="w-4 h-4" />
-                                <span>+ New Registration</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Search & Statistics */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 border border-slate-200/60 dark:border-slate-800 rounded-xl shadow-sm">
-                        <div className="relative flex-1 max-w-md">
-                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                                <Search className="w-4 h-4" />
-                            </span>
-                            <input
-                                id="patient-search-input"
-                                type="text"
-                                placeholder="Search by name, registration no, phone..."
-                                value={patientSearchQuery}
-                                onChange={(e) => setPatientSearchQuery(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 text-slate-800 dark:text-slate-100"
-                            />
-                        </div>
-                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            Total Registrations: <span className="text-slate-850 dark:text-slate-250 font-extrabold">{registrations.length}</span>
-                        </div>
-                    </div>
-
-                    {/* Table Container */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
-                        {isLoadingRegistrations ? (
-                            <div className="p-12 flex flex-col items-center justify-center gap-2">
-                                <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
-                                <span className="text-xs font-extrabold text-slate-400 uppercase tracking-widest animate-pulse">Loading Directory...</span>
-                            </div>
-                        ) : registrations.length === 0 ? (
-                            <div className="p-12 flex flex-col items-center justify-center gap-2 text-center">
-                                <span className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full text-slate-400">
-                                    <User className="w-8 h-8" />
-                                </span>
-                                <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 uppercase mt-2">No Registrations Found</h3>
-                                <p className="text-xs text-slate-400 font-semibold max-w-xs mt-1">
-                                    No patients registered yet. Click "+ New Registration" to onboard your first patient.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50/75 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                            <th className="px-6 py-3.5">Reg No &amp; Date</th>
-                                            <th className="px-6 py-3.5">Patient Info</th>
-                                            <th className="px-6 py-3.5">Contact</th>
-                                            <th className="px-6 py-3.5">Referred By</th>
-                                            <th className="px-6 py-3.5">Tests</th>
-                                            <th className="px-6 py-3.5 text-right">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                                        {registrations
-                                            .filter(reg => {
-                                                const query = patientSearchQuery.toLowerCase().trim();
-                                                let isSampleMatch = false;
-                                                if (query.startsWith("s") && query.length >= 10) {
-                                                    const sampleBody = query.substring(1, query.length - 1);
-                                                    const regDigitsClean = reg.registrationNumber ? reg.registrationNumber.replace(/[^0-9]/g, "") : "";
-                                                    if (regDigitsClean.includes(sampleBody)) {
-                                                        isSampleMatch = true;
-                                                    }
-                                                }
-                                                return (
-                                                    reg.patientName?.toLowerCase().includes(query) ||
-                                                    reg.registrationNumber?.toLowerCase().includes(query) ||
-                                                    reg.mobileNumber?.includes(query) ||
-                                                    reg.referredBy?.toLowerCase().includes(query) ||
-                                                    isSampleMatch
-                                                );
-                                            })
-                                            .map((reg) => (
-                                                <tr key={reg._id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/20 transition-colors">
-                                                    <td className="px-6 py-4">
-                                                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200 block">{reg.registrationNumber}</span>
-                                                        <span className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 block">{reg.registrationDate} {reg.registrationTime}</span>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <span className="font-extrabold text-slate-800 dark:text-slate-100">{reg.patientName}</span>
-                                                            <div className="flex items-center gap-1.5 mt-0.5">
-                                                                <span className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[9px] font-black rounded uppercase">{reg.age?.value} {reg.age?.type}</span>
-                                                                <span className="px-1.5 py-0.5 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-[9px] font-black rounded uppercase">{reg.gender}</span>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <span className="font-semibold text-slate-700 dark:text-slate-300 block">{reg.mobileNumber}</span>
-                                                        <span className="text-[10px] text-slate-400 truncate max-w-[150px] block" title={`${reg.address}${reg.location?.city ? `, ${reg.location.city}, ${reg.location.district}, ${reg.location.state}` : ""}`}>{reg.address}</span>
-                                                        {reg.location?.state && (
-                                                            <span className="text-[9px] text-slate-500 font-medium block mt-0.5">
-                                                                {[reg.location.city, reg.location.district, reg.location.state].filter(Boolean).join(", ")}
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <span className="font-bold text-slate-750 dark:text-slate-250">{reg.referredBy}</span>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex flex-wrap gap-1 max-w-[200px]">
-                                                            {reg.tests && reg.tests.length > 0 ? (
-                                                                reg.tests.map((test: any, tIdx: number) => (
-                                                                    <span key={tIdx} className="px-2 py-0.5 bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 text-[9px] font-black rounded uppercase">
-                                                                        {typeof test === "string" ? test : test.testName || test.name}
-                                                                    </span>
-                                                                ))
-                                                            ) : (
-                                                                <span className="text-[10px] text-amber-500 font-black uppercase">No tests added</span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        <div className="flex items-center justify-end gap-1.5">
-                                                            <button
-                                                                type="button"
-                                                                disabled={reg.authorizationStatus !== "AUTHORIZED"}
-                                                                onClick={() => {
-                                                                    if (reg.authorizationStatus === "AUTHORIZED") {
-                                                                        setReportModalRecord(reg);
-                                                                        setIsReportModalOpen(true);
-                                                                    }
-                                                                }}
-                                                                className={cn(
-                                                                    "p-1.5 rounded-full transition-all cursor-pointer",
-                                                                    reg.authorizationStatus === "AUTHORIZED"
-                                                                        ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:scale-105 active:scale-95"
-                                                                        : "bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600 opacity-40 cursor-not-allowed"
-                                                                )}
-                                                                title={
-                                                                    reg.authorizationStatus === "AUTHORIZED"
-                                                                        ? "Download / Print Official Pathology Report"
-                                                                        : "Download disabled — Awaiting Pathologist Authorization"
-                                                                }
-                                                            >
-                                                                <Download className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setSavedRecord(reg);
-                                                                    setPrintType("receipt");
-                                                                    setShowReceipt(true);
-                                                                }}
-                                                                className="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                                                                title="Print Receipt"
-                                                            >
-                                                                <Printer className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            {reg.tests && reg.tests.length > 0 && (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setSavedRecord(reg);
-                                                                        setPrintType("label");
-                                                                        setTimeout(() => {
-                                                                            window.print();
-                                                                        }, 150);
-                                                                    }}
-                                                                    className="p-1.5 bg-teal-50 dark:bg-teal-900/30 text-teal-650 dark:text-teal-400 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                                                                    title="Print Bottle Labels"
-                                                                >
-                                                                    <Activity className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            ) : (
-                <div className="space-y-5 print:hidden">
-                    {/* Header */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-3">
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <span className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
-                                    <UserPlus className="w-4 h-4" />
-                                </span>
-                                <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-                                    Patient Registration Form
-                                </h1>
-                            </div>
-                            <p className="text-slate-500 dark:text-slate-400 text-xs mt-1 font-medium">
-                                Onboard new diagnostics patients, track referring physicians, and record sample transport sources.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setShowForm(false)}
-                                className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-lg text-xs text-slate-700 dark:text-slate-300 transition-all active:scale-95 shadow-sm cursor-pointer"
-                            >
-                                Back to Patients List
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Restored Draft Alert Banner */}
-                    {isDraftRestored && (
-                        <div className="flex items-center justify-between px-4 py-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-900/30 rounded-xl animate-in slide-in-from-top-2 duration-300">
-                            <div className="flex items-center gap-2">
-                                <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
-                                    We found and restored a pending patient registration draft.
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    localStorage.removeItem("medoraa_registration_draft");
-                                    setIsDraftRestored(false);
-                                }}
-                                className="text-[10px] font-black uppercase text-amber-700 hover:text-amber-900 dark:text-amber-400 hover:underline px-2 py-1 rounded"
-                            >
-                                Dismiss Draft
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Form grid layout */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Main Form Fields */}
-                        <div className="lg:col-span-2 space-y-4">
-                            {/* SECTION 2: Patient Information */}
-                            <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-4 md:p-5 shadow-sm space-y-3">
-                                <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                                    <span className="p-1 bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 rounded-md">
-                                        <User className="w-3.5 h-3.5" />
-                                    </span>
-                                    <h2 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
-                                        Patient Information
-                                    </h2>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {/* Patient Name */}
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                            Patient Name <span className="text-rose-500 font-bold">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.patientName}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, patientName: e.target.value }))}
-                                            placeholder="Enter full name"
-                                            className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
-                                        />
-                                    </div>
-
-                                    {/* Mobile Number */}
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                            Mobile Number <span className="text-rose-500 font-bold">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            maxLength={10}
-                                            value={formData.mobileNumber}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, mobileNumber: e.target.value.replace(/\D/g, "") }))}
-                                            placeholder="10-digit number"
-                                            className={cn(
-                                                "px-3 py-1.5 bg-white dark:bg-slate-800 border rounded-lg text-xs outline-none font-semibold focus:ring-1",
-                                                formData.mobileNumber && !isMobileValid ? "border-rose-400 dark:border-rose-900 focus:ring-rose-500 focus:border-rose-500" : "border-slate-200 dark:border-slate-700 focus:ring-blue-550 focus:border-blue-550"
-                                            )}
-                                        />
-                                        {formData.mobileNumber && !isMobileValid && (
-                                            <span className="text-[10px] text-rose-500 font-bold tracking-tight">Mobile number must be exactly 10 digits.</span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {/* Age */}
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                            Age <span className="text-rose-500 font-bold">*</span>
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="number"
-                                                min={1}
-                                                value={formData.age.value}
-                                                onChange={(e) => setFormData(prev => ({ ...prev, age: { ...prev.age, value: e.target.value } }))}
-                                                placeholder="Value"
-                                                className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
-                                            />
-                                            <select
-                                                value={formData.age.type}
-                                                onChange={(e) => setFormData(prev => ({ ...prev, age: { ...prev.age, type: e.target.value as any } }))}
-                                                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none font-bold"
-                                            >
-                                                <option value="Years">Years</option>
-                                                <option value="Months">Months</option>
-                                                <option value="Days">Days</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    {/* Gender */}
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                            Sex / Gender <span className="text-rose-500 font-bold">*</span>
-                                        </label>
-                                        <div className="flex gap-4 items-center h-[34px]">
-                                            {["Male", "Female", "Other"].map(g => (
-                                                <label key={g} className="flex items-center gap-1.5 cursor-pointer font-semibold text-xs text-slate-700 dark:text-slate-300">
-                                                    <input
-                                                        type="radio"
-                                                        name="gender"
-                                                        value={g}
-                                                        checked={formData.gender === g}
-                                                        onChange={() => setFormData(prev => ({ ...prev, gender: g as any }))}
-                                                        className="w-3.5 h-3.5 text-blue-600 border-slate-300 dark:border-slate-700"
-                                                    />
-                                                    {g}
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Complete Address */}
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                        Complete Address <span className="text-rose-500 font-bold">*</span>
-                                    </label>
-                                    <textarea
-                                        rows={1}
-                                        value={formData.address}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                                        placeholder="Enter patient complete street address details"
-                                        className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold resize-none"
-                                    />
-                                </div>
-
-                                {/* State, District, City text inputs */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> State
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.location.state}
-                                            onChange={(e) => setFormData(prev => ({
-                                                ...prev,
-                                                location: { ...prev.location, state: e.target.value }
-                                            }))}
-                                            placeholder="Enter State"
-                                            className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> District
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.location.district}
-                                            onChange={(e) => setFormData(prev => ({
-                                                ...prev,
-                                                location: { ...prev.location, district: e.target.value }
-                                            }))}
-                                            placeholder="Enter District"
-                                            className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> City / Area
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.location.city}
-                                            onChange={(e) => setFormData(prev => ({
-                                                ...prev,
-                                                location: { ...prev.location, city: e.target.value }
-                                            }))}
-                                            placeholder="Enter City / Area"
-                                            className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Split Grid for Referral and Transport Side-by-Side to save screen height */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* SECTION 3: Referral Information */}
-                                <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-4 md:p-5 shadow-sm space-y-3 flex flex-col justify-between">
-                                    <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                                        <span className="p-1 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-md">
-                                            <Share2 className="w-3.5 h-3.5" />
-                                        </span>
-                                        <h2 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
-                                            Referral Information
-                                        </h2>
-                                    </div>
-
-                                    <div className="space-y-3 text-left">
-                                        <SearchableSelect
-                                            label="Select Hospital (Optional)"
-                                            options={hospitals.map(h => h.hospitalName)}
-                                            value={formData.selectedHospital === "Self" ? "" : (formData.selectedHospital || "")}
-                                            onChange={(val) => setFormData(prev => ({ ...prev, selectedHospital: val, selectedDoctor: "" }))}
-                                            placeholder="Search hospital to filter doctors..."
-                                        />
-
-                                        <SearchableSelect
-                                            label="Referred By (Doctor / Referral Source)"
-                                            options={referredByOptions}
-                                            value={currentReferredBy}
-                                            onChange={handleReferredByChange}
-                                            mandatory
-                                            placeholder="Search Self, Lab or Doctor..."
-                                        />
-
-                                        {(formData.referralMode || "Self") === "Self" && (formData.selectedLab || "Medoraa Labs (Our Lab)") !== "Medoraa Labs (Our Lab)" ? (
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                                    Sample Drawn By (Phlebotomist)
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.sampleDrawnBy}
-                                                    onChange={(e) => setFormData(prev => ({ ...prev, sampleDrawnBy: e.target.value }))}
-                                                    placeholder="Enter phlebotomist name"
-                                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
-                                                />
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between items-center">
-                                                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                                        Sample Drawn By
-                                                    </label>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setIsAddingStaff(prev => !prev)}
-                                                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 uppercase tracking-wider flex items-center gap-1 transition-all"
-                                                    >
-                                                        {isAddingStaff ? "× Cancel Add" : "+ Add Staff"}
-                                                    </button>
-                                                </div>
-                                                
-                                                {isAddingStaff ? (
-                                                    <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-xl space-y-4 animate-in fade-in duration-200">
-                                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] border-b border-slate-100 dark:border-slate-800 pb-1.5">Add New Staff Member</h4>
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-[9px] font-bold text-slate-500 uppercase">Full Name *</label>
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="Staff Name"
-                                                                    value={newStaffData.name}
-                                                                    onChange={(e) => setNewStaffData(prev => ({ ...prev, name: e.target.value }))}
-                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-850 dark:text-slate-200"
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-[9px] font-bold text-slate-500 uppercase">Role *</label>
-                                                                <select
-                                                                    value={newStaffData.role}
-                                                                    onChange={(e) => setNewStaffData(prev => ({ ...prev, role: e.target.value }))}
-                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-blue-500 outline-none"
-                                                                >
-                                                                    <option value="registration">Registration</option>
-                                                                    <option value="authorization">Authorization</option>
-                                                                    <option value="inventory">Inventory</option>
-                                                                    <option value="admin">Admin</option>
-                                                                </select>
-                                                            </div>
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-[9px] font-bold text-slate-500 uppercase">Email Address *</label>
-                                                                <input
-                                                                    type="email"
-                                                                    placeholder="email@example.com"
-                                                                    value={newStaffData.email}
-                                                                    onChange={(e) => setNewStaffData(prev => ({ ...prev, email: e.target.value }))}
-                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-850 dark:text-slate-200"
-                                                                />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1">
-                                                                <label className="text-[9px] font-bold text-slate-500 uppercase">Mobile Number</label>
-                                                                <input
-                                                                    type="tel"
-                                                                    placeholder="10-digit mobile"
-                                                                    value={newStaffData.mobileNumber}
-                                                                    onChange={(e) => setNewStaffData(prev => ({ ...prev, mobileNumber: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
-                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-850 dark:text-slate-200"
-                                                                />
-                                                            </div>
-                                                            <div className="sm:col-span-2 flex flex-col gap-1">
-                                                                <label className="text-[9px] font-bold text-slate-500 uppercase">Password *</label>
-                                                                <input
-                                                                    type="password"
-                                                                    placeholder="Password"
-                                                                    value={newStaffData.password}
-                                                                    onChange={(e) => setNewStaffData(prev => ({ ...prev, password: e.target.value }))}
-                                                                    className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-850 dark:text-slate-200"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                                                            <button
-                                                                type="button"
-                                                                disabled={isSavingStaff}
-                                                                onClick={handleAddNewStaff}
-                                                                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-md shadow-blue-600/10"
-                                                            >
-                                                                {isSavingStaff ? (
-                                                                    <>
-                                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                                        Adding...
-                                                                    </>
-                                                                ) : (
-                                                                    "Save Staff"
-                                                                )}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <SearchableSelect
-                                                        label=""
-                                                        options={staffOptions}
-                                                        value={formData.sampleDrawnBy}
-                                                        onChange={(val) => setFormData(prev => ({ ...prev, sampleDrawnBy: val }))}
-                                                        placeholder="Select employee"
-                                                    />
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* SECTION 4: Sample Received By / Transport */}
-                                <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-4 md:p-5 shadow-sm space-y-3">
-                                    <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                                        <span className="p-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-md">
-                                            <Truck className="w-3.5 h-3.5" />
-                                        </span>
-                                        <h2 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
-                                            Sample Transport Details
-                                        </h2>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <div className="flex flex-col gap-1">
-                                            <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                                Received Through <span className="text-rose-500 font-bold">*</span>
-                                            </label>
-                                            <select
-                                                value={formData.sampleReceived.receivedThrough === "None" ? "None" : "Courier"}
-                                                onChange={(e) => {
-                                                    const type = e.target.value;
-                                                    setFormData(prev => {
-                                                        const updated = {
-                                                            ...prev,
-                                                            sampleReceived: { ...prev.sampleReceived, receivedThrough: type as any }
-                                                        };
-                                                        if (type === "Courier") {
-                                                            const now = new Date();
-                                                            const localDate = now.toISOString().split('T')[0];
-                                                            const localTime = now.toTimeString().split(' ')[0].slice(0, 5);
-                                                            if (!updated.sampleReceived.courier.arrivalDate) {
-                                                                updated.sampleReceived.courier.arrivalDate = localDate;
-                                                            }
-                                                            if (!updated.sampleReceived.courier.arrivalTime) {
-                                                                updated.sampleReceived.courier.arrivalTime = localTime;
-                                                            }
-                                                        }
-                                                        return updated;
-                                                    });
-                                                }}
-                                                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none font-bold shadow-sm"
-                                            >
-                                                <option value="None">Sample Drawn at Lab</option>
-                                                <option value="Courier">Other (Collected from Outside)</option>
-                                            </select>
-                                        </div>
-
-                                        {formData.sampleReceived.receivedThrough === "Courier" && (
-                                            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-3 animate-in fade-in duration-200">
-                                                <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-100 dark:border-slate-800">Outside Collection Details</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
-                                                    <div className="flex flex-col gap-1">
-                                                        <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                                            Mode of Transport <span className="text-rose-500 font-bold">*</span>
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={formData.sampleReceived.courier.companyName}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, companyName: e.target.value } } }))}
-                                                            placeholder="e.g. Courier, Employee, Person, Bus, etc."
-                                                            className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-1">
-                                                        <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                                            Docket Number / Tracking ID
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={formData.sampleReceived.courier.trackingNumber}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, trackingNumber: e.target.value } } }))}
-                                                            placeholder="Tracking ID (Optional)"
-                                                            className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-1">
-                                                        <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                                            Date Received
-                                                        </label>
-                                                        <input
-                                                            type="date"
-                                                            value={formData.sampleReceived.courier.arrivalDate}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, arrivalDate: e.target.value } } }))}
-                                                            className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-1">
-                                                        <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                                            Time Received
-                                                        </label>
-                                                        <input
-                                                            type="time"
-                                                            value={formData.sampleReceived.courier.arrivalTime}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, arrivalTime: e.target.value } } }))}
-                                                            className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-1 col-span-1 md:col-span-2">
-                                                        <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                                            Remarks
-                                                        </label>
-                                                        <textarea
-                                                            rows={2}
-                                                            value={formData.sampleReceived.courier.remarks}
-                                                            onChange={(e) => setFormData(prev => ({ ...prev, sampleReceived: { ...prev.sampleReceived, courier: { ...prev.sampleReceived.courier, remarks: e.target.value } } }))}
-                                                            placeholder="Enter any transport/package remarks..."
-                                                            className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all resize-none text-slate-850 dark:text-slate-200"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Right Sidebar */}
-                        <div className="space-y-4">
-                            {/* SECTION 5: REGISTRATION INFO */}
-                            <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-4 md:p-5 shadow-sm space-y-4">
-                                <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
-                                    <span className="p-1 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-md">
-                                        <FileText className="w-3.5 h-3.5" />
-                                    </span>
-                                    <h2 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
-                                        Registration Info
-                                    </h2>
-                                </div>
-
-                                <div className="space-y-3 text-xs font-bold text-slate-600 dark:text-slate-400">
-                                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/40 pb-2">
-                                        <span className="text-slate-400 font-medium flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> System Date:</span>
-                                        <span className="text-slate-800 dark:text-slate-200">{liveDate}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/40 pb-2">
-                                        <span className="text-slate-400 font-medium flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> System Time:</span>
-                                        <span className="text-slate-800 dark:text-slate-200">{liveTime}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-slate-400 font-medium">ID Sequence:</span>
-                                        <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded text-[10px] font-black tracking-widest uppercase">
-                                            Pending Save
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Form Completeness Checklist */}
-                            <div className="bg-slate-50 dark:bg-slate-800/20 border border-slate-200/50 dark:border-slate-800/60 rounded-xl p-4 space-y-3">
-                                <h3 className="text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                                    <ShieldAlert className="w-3.5 h-3.5 text-slate-400" />
-                                    Validation Checklist
-                                </h3>
-
-                                <ul className="space-y-2 text-xs font-bold text-slate-500">
-                                    <li className="flex items-center gap-2">
-                                        <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isNameValid ? "bg-emerald-500" : "bg-slate-350")} />
-                                        <span className={isNameValid ? "text-emerald-700 dark:text-emerald-500" : ""}>Patient Full Name</span>
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isAgeValid ? "bg-emerald-500" : "bg-slate-350")} />
-                                        <span className={isAgeValid ? "text-emerald-700 dark:text-emerald-500" : ""}>Valid Age (&gt; 0)</span>
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isMobileValid ? "bg-emerald-500" : "bg-slate-350")} />
-                                        <span className={isMobileValid ? "text-emerald-700 dark:text-emerald-500" : ""}>10-Digit Mobile Number</span>
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isAddressValid ? "bg-emerald-500" : "bg-slate-350")} />
-                                        <span className={isAddressValid ? "text-emerald-700 dark:text-emerald-500" : ""}>Street Address Details</span>
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isReferralValid ? "bg-emerald-500" : "bg-slate-350")} />
-                                        <span className={isReferralValid ? "text-emerald-700 dark:text-emerald-500" : ""}>Referred By Doctor</span>
-                                    </li>
-                                    <li className="flex items-center gap-2">
-                                        <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isTransportValid ? "bg-emerald-500" : "bg-slate-350")} />
-                                        <span className={isTransportValid ? "text-emerald-700 dark:text-emerald-500" : ""}>Sample Transport Details</span>
-                                    </li>
-                                </ul>
-                            </div>
-
-                            {/* Actions Panel */}
-                            <div className="space-y-2.5">
-                                <button
-                                    disabled={!isFormValid || isSaving}
-                                    onClick={() => handleSave(false)}
-                                    className={cn(
-                                        "w-full py-2.5 text-white font-bold rounded-xl text-xs transition-all active:scale-95 shadow-md flex items-center justify-center gap-2",
-                                        isFormValid && !isSaving ? "bg-blue-600 hover:bg-blue-700 shadow-blue-500/10 cursor-pointer" : "bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed shadow-none"
-                                    )}
-                                >
-                                    {isSaving ? (
-                                        <>
-                                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                            Saving Record...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Plus className="w-3.5 h-3.5" />
-                                            Add Test
-                                        </>
-                                    )}
-                                </button>
-
-                                <div className="grid grid-cols-2 gap-2.5 pt-1.5">
-                                    <button
-                                        onClick={handleReset}
-                                        className="py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-xl text-xs text-slate-600 dark:text-slate-400 transition-all active:scale-95 cursor-pointer"
-                                    >
-                                        Reset Form
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            if (confirm("Discard draft changes and cancel?")) {
-                                                setShowForm(false);
-                                                setSavedRecord(null);
-                                            }
-                                        }}
-                                        className="py-2 border border-rose-200 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-bold rounded-xl text-xs text-rose-600 dark:text-rose-400 transition-all active:scale-95 cursor-pointer"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* QR CODE ENLARGED POPUP MODAL */}
-            {isQrModalOpen && adminQrCode && (
-                <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-in fade-in duration-200">
-                    <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center text-center space-y-4 font-sans">
-                        {/* Header */}
-                        <div className="w-full flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                            <div className="flex items-center gap-2.5">
-                                <div className="p-2 bg-blue-50 dark:bg-blue-950/60 rounded-xl text-blue-600 dark:text-blue-400">
-                                    <QrCode className="w-5 h-5" />
-                                </div>
-                                <div className="text-left">
-                                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Scan QR to Pay</h3>
-                                    <p className="text-[10px] font-bold text-slate-400">Scan via PhonePe, GPay, Paytm or UPI</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setIsQrModalOpen(false)}
-                                className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {/* Amount Box */}
-                        {(() => {
-                            const subtotal = availableSamples
-                                .filter(s => selectedTestIds.includes(s._id))
-                                .reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0);
-                            const rawDiscount = parseFloat(discountVal) || 0;
-                            const calculatedDiscount = discountType === "percentage" ? (subtotal * rawDiscount) / 100 : rawDiscount;
-                            const finalDiscount = Math.min(subtotal, Math.max(0, calculatedDiscount));
-                            const totalPayable = Math.max(0, subtotal - finalDiscount);
-                            return (
-                                <div className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl p-3 flex items-center justify-between">
-                                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Amount</span>
-                                    <span className="text-xl font-black text-blue-600 dark:text-blue-400">₹{totalPayable.toFixed(0)}</span>
-                                </div>
-                            );
-                        })()}
-
-                        {/* QR Code Image */}
-                        <div className="p-4 bg-white rounded-2xl border-2 border-dashed border-blue-200 dark:border-slate-700 shadow-md inline-block">
-                            <img
-                                src={adminQrCode}
-                                alt="Payment UPI QR Code"
-                                className="w-64 h-64 object-contain rounded-lg"
-                            />
-                        </div>
-
-                        <button
-                            onClick={() => setIsQrModalOpen(false)}
-                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
-                        >
-                            Close Popup
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* RECEIPT MODAL OVERLAY (Printable Acknowledgement Receipt) */}
-            {showReceipt && savedRecord && (
-                <div className={cn(
-                    "fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-300",
-                    printType === "receipt" ? "print:p-0 print:bg-white print:relative print:z-0 print:flex" : "print:hidden"
-                )}>
-                    <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white rounded-2xl shadow-2xl w-full max-w-3xl lg:max-w-4xl overflow-hidden print:shadow-none print:w-full print:max-w-none flex flex-col h-[88vh] max-h-[90vh] print:max-h-none border border-slate-200 dark:border-slate-800">
-
-                        {/* Modal Header Controls - hidden in print */}
-                        <div className="flex items-center justify-between px-5 py-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 print:hidden shrink-0">
-                            <div className="flex items-center gap-2.5">
-                                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                                <div>
-                                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                                        Patient Registered Successfully!
-                                    </h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                                        Receipt ID: <span className="font-bold text-slate-700 dark:text-slate-200">{savedRecord.registrationNumber}</span>
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <button
-                                    onClick={() => window.open(getApiUrl(`/api/admin/registrations/${savedRecord._id}/receipt-pdf`), "_blank")}
-                                    className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-slate-300 cursor-pointer"
-                                    title="Open Bill in Full Screen (New Tab)"
-                                >
-                                    <ExternalLink className="w-4.5 h-4.5" />
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowReceipt(false);
-                                        fetchRegistrations();
-                                    }}
-                                    className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-500 dark:text-slate-400 cursor-pointer"
-                                    title="Close Popup"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* 2-Column Layout: Left Side = Options Panel, Right Side = PDF Preview */}
-                        <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-100 dark:bg-slate-950">
-                            
-                            {/* LEFT PANEL: Options & Action Cards (No Scrollbar) */}
-                            <div className="w-full md:w-[310px] lg:w-[330px] p-4 sm:p-5 bg-slate-50/90 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 print:hidden flex flex-col justify-between overflow-hidden space-y-4 shrink-0">
-                                <div className="space-y-4">
-                                    {/* Section Title */}
-                                    <div>
-                                        <div className="text-xs font-black tracking-wider text-slate-500 uppercase">
-                                            PRINT & LOGISTICS OPTIONS
-                                        </div>
-                                        <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
-                                            Select an option below to process receipt or dispatch
-                                        </p>
-                                    </div>
-
-                                    {/* Vertical Stack of Action Cards */}
-                                    <div className="space-y-2.5">
-                                        {/* Option 1: Print Receipt */}
-                                        <button
-                                            onClick={handlePrintReceipt}
-                                            className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-blue-50/70 dark:hover:bg-blue-950/30 border-2 border-blue-400/80 hover:border-blue-500 rounded-xl text-blue-600 dark:text-blue-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
-                                        >
-                                            <Printer className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
-                                            <div className="text-left">
-                                                <div className="font-bold text-xs sm:text-sm">Print Receipt</div>
-                                                <div className="text-[11px] font-normal text-slate-400">Generate A4 patient receipt copy</div>
-                                            </div>
-                                        </button>
-
-                                        {/* Option 2: Print Bottle Labels */}
-                                        <button
-                                            onClick={handlePrintLabels}
-                                            className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 border-2 border-emerald-400/80 hover:border-emerald-500 rounded-xl text-emerald-600 dark:text-emerald-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
-                                        >
-                                            <Printer className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                                            <div className="text-left">
-                                                <div className="font-bold text-xs sm:text-sm">Print Bottle Labels</div>
-                                                <div className="text-[11px] font-normal text-slate-400">Barcode labels for specimen bottles</div>
-                                            </div>
-                                        </button>
-
-                                        {/* Option 3: Thermal Transfer Label */}
-                                        <button
-                                            onClick={() => {
-                                                if (savedRecord.sampleTransfer) {
-                                                    window.open(getApiUrl(`/api/admin/registrations/${savedRecord._id}/transfer-label-pdf`), "_blank");
-                                                } else {
-                                                    setIsTransferModalOpen(true);
-                                                }
-                                            }}
-                                            className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-amber-50/70 dark:hover:bg-amber-950/30 border-2 border-amber-400/80 hover:border-amber-500 rounded-xl text-amber-600 dark:text-amber-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
-                                        >
-                                            <Printer className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
-                                            <div className="text-left">
-                                                <div className="font-bold text-xs sm:text-sm">Thermal Transfer Label</div>
-                                                <div className="text-[11px] font-normal text-slate-400">Outsource dispatch barcode label</div>
-                                            </div>
-                                        </button>
-
-                                        {/* Option 4: Edit Transfer / Transfer Sample */}
-                                        <button
-                                            onClick={() => setIsTransferModalOpen(true)}
-                                            className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-purple-50/70 dark:hover:bg-purple-950/30 border-2 border-purple-400/80 hover:border-purple-500 rounded-xl text-purple-600 dark:text-purple-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
-                                        >
-                                            <Truck className="w-5 h-5 text-purple-600 dark:text-purple-400 shrink-0" />
-                                            <div className="text-left">
-                                                <div className="font-bold text-xs sm:text-sm">{savedRecord.sampleTransfer ? "Edit Transfer" : "Transfer Sample"}</div>
-                                                <div className="text-[11px] font-normal text-slate-400">Logistics dispatch details</div>
-                                            </div>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3 pt-2">
-                                    {/* Divider OR */}
-                                    <div className="relative flex items-center">
-                                        <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-                                        <span className="shrink mx-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
-                                            OR
-                                        </span>
-                                        <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-                                    </div>
-
-                                    {/* Done / Complete Registration */}
-                                    <button
-                                        onClick={() => {
-                                            setShowReceipt(false);
-                                            fetchRegistrations();
-                                        }}
-                                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl transition-all active:scale-[0.99] shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                                    >
-                                        <CheckCircle2 className="w-4 h-4 text-white" />
-                                        <span>Done / Complete Registration</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* RIGHT PANEL: PDF Preview (No Scrollbar) */}
-                            <div className="flex-1 p-2.5 sm:p-3 bg-slate-100 dark:bg-slate-950 flex flex-col overflow-hidden h-full">
-                                <iframe
-                                    src={getApiUrl(`/api/admin/registrations/${savedRecord._id}/receipt-pdf#toolbar=0&navpanes=0&scrollbar=0&view=FitH`)}
-                                    scrolling="no"
-                                    className="w-full h-full rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden bg-white"
-                                    title="Patient Receipt Classic PDF"
-                                />
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* OUTSOURCE SAMPLE TRANSFER LOGISTICS MODAL */}
-            <SampleTransferModal
-                record={savedRecord}
-                isOpen={isTransferModalOpen}
-                onClose={() => setIsTransferModalOpen(false)}
-                onSuccess={(updatedRec) => {
-                    setSavedRecord(updatedRec);
-                    fetchRegistrations();
+  return (
+    <div className="font-sans pb-6 dark:text-slate-100">
+      {showTestSelection && savedRecord ? (
+        <div className="-mx-8 -my-8 print:hidden animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 w-full overflow-hidden flex flex-col h-screen">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 shrink-0">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-blue-600" />
+                  Select Tests / Samples for {savedRecord.patientName}
+                </h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                  Registration No: {savedRecord.registrationNumber} | Referrer:{" "}
+                  {savedRecord.referredBy}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  populateFormFromRecord(savedRecord);
+                  setShowTestSelection(false);
+                  setShowForm(true);
                 }}
-            />
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-655 dark:text-slate-355 cursor-pointer text-xs font-bold shadow-sm"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Back to Form
+              </button>
+            </div>
 
-            {/* PRINT LABELS SECTION (Hidden on screen, visible only when printing labels) */}
-            {savedRecord && (
-                <div
-                    id={printType === "label" ? "print-active-section" : "print-labels-section"}
-                    className={cn("hidden", printType === "label" ? "print:block" : "print:hidden")}
-                >
-                    {(savedRecord.tests || []).map((test: any, index: number) => {
-                        const currentDate = savedRecord.registrationDate || "";
-                        const currentTime = savedRecord.registrationTime || "";
-                        const formattedDateTime = `${currentDate} ${currentTime}`;
-
-                        const regDigits = savedRecord.registrationNumber ? savedRecord.registrationNumber.replace(/[^0-9]/g, "") : "";
-                        const sampleDigits = regDigits.slice(-8);
-                        const sampleId = `S${sampleDigits}${index + 1}`;
-
-                        const badgeInfo = getContainerBadgeInfo(test, availableSamples);
-
-                        return (
-                            <div key={test._id || index} className="vial-label-card" style={{ pageBreakAfter: "always", breakAfter: "page" }}>
-                                {/* Logo Column */}
-                                <div className="label-logo-col">
-                                    <svg className="label-logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                                    </svg>
-                                    <div className="label-brand-name">Medoraa</div>
-                                    <div className="label-brand-sub">DIAGNOSTICS</div>
-                                </div>
-
-                                {/* Divider */}
-                                <div className="label-divider" />
-
-                                {/* Patient Info Column */}
-                                <div className="label-info-col">
-                                    <div className="label-field-group">
-                                        <span className="label-field-title">PATIENT ID:</span>
-                                        <span className="label-field-value-lg">{savedRecord.registrationNumber}</span>
-                                    </div>
-                                    <div className="label-field-group" style={{ marginTop: "3px" }}>
-                                        <span className="label-field-title">NAME:</span>
-                                        <span className="label-field-value-lg uppercase truncate-name">{savedRecord.patientName}</span>
-                                    </div>
-                                    <div className="label-grid" style={{ marginTop: "3px" }}>
-                                        <div>
-                                            <span className="label-field-title">AGE:</span>
-                                            <span className="label-field-value">{savedRecord.age?.value} {savedRecord.age?.type?.substring(0, 1)}</span>
-                                        </div>
-                                        <div>
-                                            <span className="label-field-title">GENDER:</span>
-                                            <span className="label-field-value">{savedRecord.gender?.substring(0, 1)}</span>
-                                        </div>
-                                        <div>
-                                            <span className="label-field-title">PHONE:</span>
-                                            <span className="label-field-value">{savedRecord.mobileNumber}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* QR Column */}
-                                <div className="label-qr-col">
-                                    <div className="label-field-group">
-                                        <span className="label-field-title">SAMPLE ID:</span>
-                                        <span className="label-field-value-md">{sampleId}</span>
-                                    </div>
-                                    <div className="label-qr-wrapper">
-                                        <img
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`Patient:${savedRecord.patientName}|ID:${savedRecord.registrationNumber}|Sample:${sampleId}|Test:${typeof test === 'object' ? (test.testName || test.name) : test}`)}`}
-                                            alt="QR Code"
-                                            className="label-qr-img"
-                                        />
-                                    </div>
-                                    <div
-                                        className="label-test-badge"
-                                        style={{
-                                            backgroundColor: badgeInfo.bgColor,
-                                            color: badgeInfo.textColor
-                                        }}
-                                    >
-                                        {badgeInfo.text}
-                                    </div>
-                                </div>
-
-                                {/* Barcode Column */}
-                                <div className="label-barcode-col">
-                                    <div className="label-barcode-wrapper">
-                                        <Barcode value={sampleId} width={1.1} height={24} displayValue={false} />
-                                    </div>
-                                    <div className="label-timestamp-wrapper">
-                                        {formattedDateTime}
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
+            {/* Content Area */}
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+              {/* Left Sidebar: Categories / Organs */}
+              <div className="w-full lg:w-52 bg-slate-50 dark:bg-slate-950/40 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800 flex flex-col shrink-0">
+                <div className="p-3 border-b border-slate-100 dark:border-slate-800 space-y-2">
+                  <div className="flex bg-slate-200/60 dark:bg-slate-800/80 p-0.5 rounded-lg border border-slate-200/40 dark:border-slate-700/50">
+                    <button
+                      onClick={() => {
+                        setSidebarView("category");
+                        setSelectedCategory("All");
+                        setSelectedOrgan("All");
+                      }}
+                      className={cn(
+                        "flex-1 py-1.5 text-[9px] font-black uppercase rounded-md transition-all cursor-pointer",
+                        sidebarView === "category"
+                          ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-sm font-bold"
+                          : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-350",
+                      )}
+                    >
+                      Categories
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSidebarView("organ");
+                        setSelectedCategory("All");
+                        setSelectedOrgan("All");
+                      }}
+                      className={cn(
+                        "flex-1 py-1.5 text-[9px] font-black uppercase rounded-md transition-all cursor-pointer",
+                        sidebarView === "organ"
+                          ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-sm font-bold"
+                          : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-350",
+                      )}
+                    >
+                      Organs
+                    </button>
+                  </div>
                 </div>
-            )}
+                <div className="flex-1 overflow-x-auto lg:overflow-y-auto p-2 flex flex-row lg:flex-col gap-1.5 lg:space-y-1 no-scrollbar shrink-0 lg:shrink">
+                  {sidebarView === "category"
+                    ? [
+                        "All",
+                        ...Array.from(
+                          new Set(
+                            availableSamples
+                              .map((s) => s.category || "General")
+                              .filter((c) => c && c !== "-"),
+                          ),
+                        ),
+                      ].map((cat) => {
+                        const catCount = availableSamples.filter(
+                          (s) =>
+                            (s.category || "General") === cat && cat !== "All",
+                        ).length;
+                        const isSelected = selectedCategory === cat;
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => setSelectedCategory(cat)}
+                            className={cn(
+                              "w-auto lg:w-full shrink-0 text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer whitespace-nowrap gap-1.5",
+                              isSelected
+                                ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
+                                : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400",
+                            )}
+                          >
+                            <span className="truncate text-left">{cat}</span>
+                            {cat !== "All" && (
+                              <span
+                                className={cn(
+                                  "text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ml-1.5",
+                                  isSelected
+                                    ? "bg-blue-700 text-white"
+                                    : "bg-slate-200 dark:bg-slate-850 text-slate-500",
+                                )}
+                              >
+                                {catCount}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })
+                    : [
+                        "All",
+                        ...Array.from(
+                          new Set(
+                            availableSamples
+                              .map((s) => s.organ)
+                              .filter(Boolean)
+                              .filter((o) => o && o !== "-"),
+                          ),
+                        ),
+                      ].map((org) => {
+                        const orgCount = availableSamples.filter(
+                          (s) => s.organ === org && org !== "All",
+                        ).length;
+                        const isSelected = selectedOrgan === org;
+                        return (
+                          <button
+                            key={org}
+                            onClick={() => setSelectedOrgan(org)}
+                            className={cn(
+                              "w-auto lg:w-full shrink-0 text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer whitespace-nowrap gap-1.5",
+                              isSelected
+                                ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
+                                : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400",
+                            )}
+                          >
+                            <span className="truncate text-left">{org}</span>
+                            {org !== "All" && (
+                              <span
+                                className={cn(
+                                  "text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ml-1.5",
+                                  isSelected
+                                    ? "bg-blue-700 text-white"
+                                    : "bg-slate-200 dark:bg-slate-850 text-slate-500",
+                                )}
+                              >
+                                {orgCount}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                </div>
+              </div>
 
-            {/* Conditional Page Print Setup */}
-            {printType === "label" ? (
-                <style jsx global>{`
-                    @media print {
-                        @page {
-                            size: 100mm 35mm;
-                            margin: 0;
-                        }
-                        body * {
-                            visibility: hidden;
-                        }
-                        #print-active-section, #print-active-section * {
-                            visibility: visible;
-                        }
-                        #print-active-section {
-                            position: absolute !important;
-                            left: 0 !important;
-                            top: 0 !important;
-                            width: 100mm !important;
-                            height: auto !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            background: white !important;
-                            z-index: 9999999 !important;
-                        }
-                        
-                        /* Vial Label Container Styling */
-                        .vial-label-card {
-                            width: 100mm;
-                            height: 35mm;
-                            box-sizing: border-box;
-                            padding: 1.5mm 2.5mm;
-                            display: flex;
-                            align-items: stretch;
-                            background: white !important;
-                            color: black !important;
-                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                            page-break-after: always;
-                            break-after: page;
-                            overflow: hidden;
-                        }
-                        
-                        /* Column 1: Logo & Brand */
-                        .label-logo-col {
-                            width: 18mm;
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: center;
-                            text-align: center;
-                            flex-shrink: 0;
-                        }
-                        .label-logo-icon {
-                            width: 6mm;
-                            height: 6mm;
-                            color: #1a365d !important;
-                        }
-                        .label-brand-name {
-                            font-size: 10px;
-                            font-weight: 800;
-                            color: #1a365d !important;
-                            line-height: 1;
-                            margin-top: 1mm;
-                            letter-spacing: -0.2px;
-                        }
-                        .label-brand-sub {
-                            font-size: 5px;
-                            font-weight: 700;
-                            color: #0d9488 !important;
-                            letter-spacing: 0.8px;
-                            line-height: 1;
-                            margin-top: 0.5mm;
-                        }
-                        
-                        /* Divider */
-                        .label-divider {
-                            width: 0.2mm;
-                            background-color: #cbd5e1 !important;
-                            margin: 0 1.5mm;
-                            flex-shrink: 0;
-                        }
-                        
-                        /* Column 2: Patient Info */
-                        .label-info-col {
-                            flex: 1;
-                            display: flex;
-                            flex-direction: column;
-                            justify-content: center;
-                            min-width: 0;
-                        }
-                        .label-field-group {
-                            display: flex;
-                            flex-direction: column;
-                            line-height: 1.1;
-                        }
-                        .label-field-title {
-                            font-size: 7px;
-                            font-weight: 700;
-                            color: #64748b !important;
-                            letter-spacing: 0.2px;
-                        }
-                        .label-field-value-lg {
-                            font-size: 10px;
-                            font-weight: 800;
-                            color: #0f172a !important;
-                        }
-                        .truncate-name {
-                            white-space: nowrap;
-                            overflow: hidden;
-                            text-overflow: ellipsis;
-                            display: block;
-                        }
-                        .label-grid {
-                            display: grid;
-                            grid-template-columns: 1fr 1fr 1.3fr;
-                            gap: 1mm;
-                        }
-                        .label-field-value {
-                            font-size: 8px;
-                            font-weight: 800;
-                            color: #0f172a !important;
-                            display: block;
-                        }
-                        
-                        /* Column 3: QR & Badge */
-                        .label-qr-col {
-                            width: 22mm;
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: space-between;
-                            flex-shrink: 0;
-                            padding-top: 0.5mm;
-                        }
-                        .label-field-value-md {
-                            font-size: 8px;
-                            font-weight: 800;
-                            color: #0f172a !important;
-                        }
-                        .label-qr-wrapper {
-                            width: 14mm;
-                            height: 14mm;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                        }
-                        .label-qr-img {
-                            width: 14mm;
-                            height: 14mm;
-                        }
-                        .label-test-badge {
-                            width: 100%;
-                            font-size: 8px;
-                            font-weight: 800;
-                            text-align: center;
-                            padding: 0.5mm 0;
-                            border-radius: 0.5mm;
-                            text-transform: uppercase;
-                            white-space: nowrap;
-                            overflow: hidden;
-                            text-overflow: ellipsis;
-                        }
-                        
-                        /* Column 4: Barcode & Time */
-                        .label-barcode-col {
-                            width: 18mm;
-                            display: flex;
-                            flex-direction: row;
-                            align-items: center;
-                            justify-content: center;
-                            flex-shrink: 0;
-                            border-left: 0.2mm dashed #e2e8f0 !important;
-                            position: relative;
-                            margin-left: 1mm;
-                            height: 100%;
-                        }
-                        .label-barcode-wrapper {
-                            transform: rotate(90deg);
-                            transform-origin: center;
-                            white-space: nowrap;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            position: absolute;
-                            left: 0;
-                            top: 50%;
-                            margin-top: -15px;
-                        }
+              {/* Middle Content: Test Catalog Grid */}
+              <div className="flex-1 flex flex-col min-w-0">
+                {/* Search Bar */}
+                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3 bg-white dark:bg-slate-900 shrink-0">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search test names, organ, method or container..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-all font-medium text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
 
-                        .label-timestamp-wrapper {
-                            transform: rotate(90deg);
-                            transform-origin: center;
-                            white-space: nowrap;
-                            font-size: 6px;
-                            font-weight: 700;
-                            color: #64748b !important;
-                            position: absolute;
-                            right: 0;
-                            top: 50%;
-                            margin-top: -15px;
-                        }
-                    }
-                `}</style>
-            ) : (
-                <style jsx global>{`
-                    @media print {
-                        html, body {
-                            height: auto !important;
-                            overflow: visible !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                        }
-                        body * {
-                            visibility: hidden;
-                        }
-                        #print-active-section, #print-active-section * {
-                            visibility: visible;
-                        }
-                        #print-active-section {
-                            position: absolute !important;
-                            left: 0 !important;
-                            top: 0 !important;
-                            width: 100% !important;
-                            height: auto !important;
-                            display: block !important;
-                            overflow: visible !important;
-                            padding: 0 !important;
-                            margin: 0 !important;
-                            box-shadow: none !important;
-                            border: none !important;
-                            background: white !important;
-                            color: black !important;
-                            z-index: 9999999 !important;
-                        }
-                        @page {
-                            size: A4;
-                            margin: 10mm;
-                        }
-                    }
-                `}</style>
-            )}
-            {/* Official Pathology Report Modal */}
-            <PathologyReportModal
-                record={reportModalRecord}
-                isOpen={isReportModalOpen}
-                onClose={() => setIsReportModalOpen(false)}
-            />
+                {/* Tests Grid list */}
+                <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 dark:bg-slate-900/30">
+                  {isLoadingSamples ? (
+                    <div className="flex flex-col items-center justify-center h-full gap-2">
+                      <div className="w-6 h-6 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Loading Catalog...
+                      </span>
+                    </div>
+                  ) : availableSamples.filter((sample) => {
+                      const matchesSearch =
+                        (sample.testName || "")
+                          .toLowerCase()
+                          .includes(searchQuery.toLowerCase()) ||
+                        (sample.organ || "")
+                          .toLowerCase()
+                          .includes(searchQuery.toLowerCase()) ||
+                        (sample.category || "")
+                          .toLowerCase()
+                          .includes(searchQuery.toLowerCase());
+                      const matchesCategory =
+                        selectedCategory === "All" ||
+                        (sample.category || "General") === selectedCategory;
+                      const matchesOrgan =
+                        selectedOrgan === "All" ||
+                        sample.organ === selectedOrgan;
+                      return matchesSearch && matchesCategory && matchesOrgan;
+                    }).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                      <Activity className="w-10 h-10 text-slate-300 mb-2" />
+                      <p className="text-xs font-bold text-slate-500">
+                        No tests found matching search criteria.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {availableSamples
+                        .filter((sample) => {
+                          const matchesSearch =
+                            (sample.testName || "")
+                              .toLowerCase()
+                              .includes(searchQuery.toLowerCase()) ||
+                            (sample.organ || "")
+                              .toLowerCase()
+                              .includes(searchQuery.toLowerCase()) ||
+                            (sample.category || "")
+                              .toLowerCase()
+                              .includes(searchQuery.toLowerCase());
+                          const matchesCategory =
+                            selectedCategory === "All" ||
+                            (sample.category || "General") === selectedCategory;
+                          const matchesOrgan =
+                            selectedOrgan === "All" ||
+                            sample.organ === selectedOrgan;
+                          return (
+                            matchesSearch && matchesCategory && matchesOrgan
+                          );
+                        })
+                        .map((sample) => {
+                          const isSelected = selectedTestIds.includes(
+                            sample._id,
+                          );
+                          return (
+                            <div
+                              key={sample._id}
+                              onClick={() => toggleTestSelection(sample._id)}
+                              className={cn(
+                                "p-4 bg-white dark:bg-slate-900 border rounded-2xl cursor-pointer hover:shadow-md transition-all flex justify-between items-start gap-4 select-none group relative overflow-hidden",
+                                isSelected
+                                  ? "border-blue-500 ring-2 ring-blue-500/10 dark:bg-slate-900"
+                                  : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700",
+                              )}
+                            >
+                              <div className="space-y-1.5 flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-black uppercase tracking-wider rounded border border-blue-100/50 dark:border-blue-900/50">
+                                    {sample.category || "General"}
+                                  </span>
+                                  {sample.organ && sample.organ !== "-" && (
+                                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[8px] font-bold uppercase tracking-wide rounded">
+                                      {sample.organ}
+                                    </span>
+                                  )}
+                                </div>
+                                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight truncate font-bold">
+                                  {sample.testName}
+                                </h4>
+                                <div className="flex items-center gap-3 text-[9px] text-slate-400 font-bold uppercase tracking-wide">
+                                  <span>Method: {sample.method || "-"}</span>
+                                  <span>•</span>
+                                  <span>
+                                    Specimen: {sample.sampleUsedForTest || "-"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="text-right shrink-0 flex flex-col items-end justify-between h-full min-h-[50px]">
+                                <span className="text-xs font-black text-slate-900 dark:text-white">
+                                  ₹{parseFloat(sample.patientPrice) || 0}
+                                </span>
+                                <div
+                                  className={cn(
+                                    "w-4 h-4 rounded-full border flex items-center justify-center transition-all",
+                                    isSelected
+                                      ? "bg-blue-600 border-blue-600 text-white"
+                                      : "border-slate-300 dark:border-slate-600 group-hover:border-blue-400",
+                                  )}
+                                >
+                                  {isSelected && (
+                                    <Check className="w-2.5 h-2.5" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Sidebar: Selected Tests Summary */}
+              <div className="w-full lg:w-72 h-48 lg:h-auto bg-white dark:bg-slate-950/20 border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-slate-800 flex flex-col shrink-0 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-800">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                    Selected Investigations
+                  </span>
+                  <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mt-1 uppercase truncate">
+                    {
+                      availableSamples.filter((s) =>
+                        selectedTestIds.includes(s._id),
+                      ).length
+                    }{" "}
+                    tests added
+                  </p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+                  {availableSamples.filter((s) =>
+                    selectedTestIds.includes(s._id),
+                  ).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 py-12">
+                      <ShoppingCart className="w-8 h-8 text-slate-300 mb-2" />
+                      <p className="text-[10px] font-bold uppercase tracking-wider">
+                        No tests selected yet
+                      </p>
+                    </div>
+                  ) : (
+                    availableSamples
+                      .filter((s) => selectedTestIds.includes(s._id))
+                      .map((t) => (
+                        <div
+                          key={t._id}
+                          className="p-2.5 bg-slate-50 dark:bg-slate-850/50 border border-slate-100 dark:border-slate-800 rounded-xl flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-slate-800 dark:text-slate-200 truncate uppercase tracking-tight">
+                              {t.testName}
+                            </p>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                              {t.category}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="font-extrabold text-slate-900 dark:text-white">
+                              ₹{t.patientPrice}
+                            </span>
+                            <button
+                              onClick={() => toggleTestSelection(t._id)}
+                              className="text-slate-400 hover:text-rose-600 transition-colors p-0.5 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
+
+                <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 space-y-3.5 shrink-0">
+                  {(() => {
+                    const subtotal = availableSamples
+                      .filter((s) => selectedTestIds.includes(s._id))
+                      .reduce(
+                        (sum, s) => sum + (parseFloat(s.patientPrice) || 0),
+                        0,
+                      );
+                    const rawDiscount = parseFloat(discountVal) || 0;
+                    const calculatedDiscount =
+                      discountType === "percentage"
+                        ? (subtotal * rawDiscount) / 100
+                        : rawDiscount;
+                    const finalDiscount = Math.min(
+                      subtotal,
+                      Math.max(0, calculatedDiscount),
+                    );
+                    const totalPayable = Math.max(0, subtotal - finalDiscount);
+                    const isUpi = paymentMethod === "UPI";
+
+                    return (
+                      <div className="space-y-3 font-sans">
+                        {/* Subtotal */}
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                          <span>Subtotal</span>
+                          <span className="text-slate-800 dark:text-slate-200">
+                            ₹{subtotal}
+                          </span>
+                        </div>
+
+                        {/* Discount Input */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                              Discount (%)
+                            </label>
+                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded">
+                              % Off
+                            </span>
+                          </div>
+                          <div className="relative flex items-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              placeholder="e.g. 10"
+                              value={discountVal}
+                              onChange={(e) => setDiscountVal(e.target.value)}
+                              className="w-full px-2.5 py-1 pr-7 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <span className="absolute right-2.5 text-xs font-black text-slate-400 pointer-events-none">
+                              %
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Total Payable */}
+                        <div className="flex items-center justify-between text-sm font-black border-t border-dashed border-slate-200 dark:border-slate-800 pt-2">
+                          <span className="text-slate-900 dark:text-white uppercase tracking-wider">
+                            Total Payable
+                          </span>
+                          <span className="text-blue-600 dark:text-blue-400 text-lg font-black">
+                            ₹{totalPayable.toFixed(0)}
+                          </span>
+                        </div>
+
+                        {/* Payment Method Section */}
+                        <div className="space-y-1.5 pt-1">
+                          <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                            Payment Method
+                          </label>
+                          <select
+                            value={paymentMethod}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                          >
+                            <option value="Cash">Cash</option>
+                            <option value="UPI">UPI</option>
+                            <option value="Self">Self</option>
+                            <option value="Other">Other / Custom</option>
+                          </select>
+
+                          {/* If Other selected, custom input field */}
+                          {paymentMethod === "Other" && (
+                            <input
+                              type="text"
+                              placeholder="Enter payment method..."
+                              value={customPaymentMethod}
+                              onChange={(e) =>
+                                setCustomPaymentMethod(e.target.value)
+                              }
+                              className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-800 dark:text-slate-100 outline-none focus:ring-1 focus:ring-blue-500 mt-1"
+                            />
+                          )}
+                        </div>
+
+                        {/* Display UPI QR Code when UPI selected */}
+                        {isUpi && (
+                          <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+                            <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center gap-2 text-center shadow-xs">
+                              <div className="flex items-center justify-between w-full">
+                                <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1">
+                                  <QrCode className="w-3.5 h-3.5" />
+                                  Scan UPI QR to Pay
+                                </span>
+                                {adminQrCode && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsQrModalOpen(true)}
+                                    className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                                    title="Open QR in Popup"
+                                  >
+                                    <Maximize2 className="w-3 h-3" />
+                                    Popup
+                                  </button>
+                                )}
+                              </div>
+
+                              {adminQrCode ? (
+                                <div
+                                  onClick={() => setIsQrModalOpen(true)}
+                                  className="group relative cursor-pointer overflow-hidden rounded-lg border border-slate-100 dark:border-slate-800 hover:ring-2 hover:ring-blue-500 transition-all"
+                                >
+                                  <img
+                                    src={adminQrCode}
+                                    alt="UPI QR Code"
+                                    className="w-36 h-36 object-contain"
+                                  />
+                                  <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-[10px] gap-1">
+                                    <Maximize2 className="w-3.5 h-3.5" /> Click
+                                    to Enlarge
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="py-3 px-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                                  No QR Code uploaded by Admin yet. Admin can
+                                  upload QR in Payment QR Code settings.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
+              <button
+                onClick={() => {
+                  if (
+                    confirm(
+                      "Skip test selection? You can print receipt without tests.",
+                    )
+                  ) {
+                    setShowTestSelection(false);
+                    setShowReceipt(true);
+                  }
+                }}
+                className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold rounded-xl text-xs transition-all active:scale-95 cursor-pointer"
+              >
+                Skip & Print Receipt
+              </button>
+              <button
+                onClick={handleSaveTests}
+                disabled={selectedTestIds.length === 0 || isSavingTests}
+                className={cn(
+                  "px-6 py-2 font-bold rounded-xl text-xs transition-all active:scale-95 flex items-center gap-1.5 border shadow-md",
+                  selectedTestIds.length > 0 && !isSavingTests
+                    ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 border-transparent cursor-pointer"
+                    : "bg-transparent text-slate-300 dark:text-slate-700 border-slate-200 dark:border-slate-800 cursor-not-allowed",
+                )}
+              >
+                {isSavingTests ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-white rounded-full animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Printer className="w-4 h-4" />
+                    Confirm & Save Tests
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
-    );
+      ) : !showForm ? (
+        <div className="space-y-5 print:hidden">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
+                  <UserPlus className="w-4 h-4" />
+                </span>
+                <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+                  Patient Registrations Directory
+                </h1>
+              </div>
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-1 font-medium">
+                Manage registered patients, investigations, barcodes, and
+                billing slips.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {userRole === "admin" && (
+                <button
+                  onClick={handleExportRegistrations}
+                  className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-lg text-xs text-slate-700 dark:text-slate-350 transition-all active:scale-95 cursor-pointer shadow-sm"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Export Excel</span>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setSavedRecord(null);
+                  setFormData({
+                    location: { state: "", district: "", city: "" },
+                    patientName: "",
+                    age: { value: "", type: "Years" },
+                    gender: "Male",
+                    mobileNumber: "",
+                    address: "",
+                    referredBy: "Self",
+                    sampleDrawnBy: "",
+                    referralMode: "Self",
+                    selectedLab: "Medoraa Labs (Our Lab)",
+                    selectedHospital: "",
+                    selectedDoctor: "",
+                    sampleReceived: {
+                      receivedThrough: "Employee",
+                      transfer: { labName: "None" },
+                      employee: {
+                        name: "",
+                        id: "",
+                        mobileNumber: "",
+                        department: "",
+                        designation: "",
+                        dateReceived: "",
+                        timeReceived: "",
+                        remarks: "",
+                      },
+                      person: {
+                        name: "",
+                        mobileNumber: "",
+                        relationship: "",
+                        address: "",
+                        idProofType: "Aadhaar",
+                        idProofNumber: "",
+                        dateReceived: "",
+                        timeReceived: "",
+                        remarks: "",
+                      },
+                      courier: {
+                        companyName: "",
+                        trackingNumber: "",
+                        orderNumber: "",
+                        contactNumber: "",
+                        pickupLocation: "",
+                        arrivalDate: "",
+                        arrivalTime: "",
+                        receivedByEmployee: "",
+                        packageCondition: "Good",
+                        remarks: "",
+                      },
+                      bus: {
+                        busNumber: "",
+                        busServiceName: "",
+                        driverName: "",
+                        driverMobileNumber: "",
+                        conductorName: "",
+                        conductorMobileNumber: "",
+                        originLocation: "",
+                        destinationLocation: "",
+                        arrivalDate: "",
+                        arrivalTime: "",
+                        receivedByEmployee: "",
+                        packageCondition: "Good",
+                        remarks: "",
+                      },
+                    },
+                  });
+                  setShowForm(true);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-lg text-xs transition-all active:scale-95 shadow-md cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>+ New Registration</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Search & Statistics */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 border border-slate-200/60 dark:border-slate-800 rounded-xl shadow-sm">
+            <div className="relative flex-1 max-w-md">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <Search className="w-4 h-4" />
+              </span>
+              <input
+                id="patient-search-input"
+                type="text"
+                placeholder="Search by name, registration no, phone..."
+                value={patientSearchQuery}
+                onChange={(e) => setPatientSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 text-slate-800 dark:text-slate-100"
+              />
+            </div>
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Total Registrations:{" "}
+              <span className="text-slate-850 dark:text-slate-250 font-extrabold">
+                {registrations.length}
+              </span>
+            </div>
+          </div>
+
+          {/* Table Container */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+            {isLoadingRegistrations ? (
+              <div className="p-12 flex flex-col items-center justify-center gap-2">
+                <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+                <span className="text-xs font-extrabold text-slate-400 uppercase tracking-widest animate-pulse">
+                  Loading Directory...
+                </span>
+              </div>
+            ) : registrations.length === 0 ? (
+              <div className="p-12 flex flex-col items-center justify-center gap-2 text-center">
+                <span className="p-3 bg-slate-50 dark:bg-slate-800 rounded-full text-slate-400">
+                  <User className="w-8 h-8" />
+                </span>
+                <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 uppercase mt-2">
+                  No Registrations Found
+                </h3>
+                <p className="text-xs text-slate-400 font-semibold max-w-xs mt-1">
+                  No patients registered yet. Click "+ New Registration" to
+                  onboard your first patient.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/75 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      <th className="px-6 py-3.5">Reg No &amp; Date</th>
+                      <th className="px-6 py-3.5">Patient Info</th>
+                      <th className="px-6 py-3.5">Contact</th>
+                      <th className="px-6 py-3.5">Referred By</th>
+                      <th className="px-6 py-3.5">Tests</th>
+                      <th className="px-6 py-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                    {registrations
+                      .filter((reg) => {
+                        const query = patientSearchQuery.toLowerCase().trim();
+                        let isSampleMatch = false;
+                        if (query.startsWith("s") && query.length >= 10) {
+                          const sampleBody = query.substring(
+                            1,
+                            query.length - 1,
+                          );
+                          const regDigitsClean = reg.registrationNumber
+                            ? reg.registrationNumber.replace(/[^0-9]/g, "")
+                            : "";
+                          if (regDigitsClean.includes(sampleBody)) {
+                            isSampleMatch = true;
+                          }
+                        }
+                        return (
+                          reg.patientName?.toLowerCase().includes(query) ||
+                          reg.registrationNumber
+                            ?.toLowerCase()
+                            .includes(query) ||
+                          reg.mobileNumber?.includes(query) ||
+                          reg.referredBy?.toLowerCase().includes(query) ||
+                          isSampleMatch
+                        );
+                      })
+                      .map((reg) => (
+                        <tr
+                          key={reg._id}
+                          className="hover:bg-slate-50/40 dark:hover:bg-slate-800/20 transition-colors"
+                        >
+                          <td className="px-6 py-4">
+                            <span className="font-mono font-bold text-slate-800 dark:text-slate-200 block">
+                              {reg.registrationNumber}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 block">
+                              {reg.registrationDate} {reg.registrationTime}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-extrabold text-slate-800 dark:text-slate-100">
+                                {reg.patientName}
+                              </span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[9px] font-black rounded uppercase">
+                                  {reg.age?.value} {reg.age?.type}
+                                </span>
+                                <span className="px-1.5 py-0.5 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-[9px] font-black rounded uppercase">
+                                  {reg.gender}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300 block">
+                              {reg.mobileNumber}
+                            </span>
+                            <span
+                              className="text-[10px] text-slate-400 truncate max-w-[150px] block"
+                              title={`${reg.address}${reg.location?.city ? `, ${reg.location.city}, ${reg.location.district}, ${reg.location.state}` : ""}`}
+                            >
+                              {reg.address}
+                            </span>
+                            {reg.location?.state && (
+                              <span className="text-[9px] text-slate-500 font-medium block mt-0.5">
+                                {[
+                                  reg.location.city,
+                                  reg.location.district,
+                                  reg.location.state,
+                                ]
+                                  .filter(Boolean)
+                                  .join(", ")}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="font-bold text-slate-750 dark:text-slate-250">
+                              {reg.referredBy}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                              {reg.tests && reg.tests.length > 0 ? (
+                                reg.tests.map((test: any, tIdx: number) => (
+                                  <span
+                                    key={tIdx}
+                                    className="px-2 py-0.5 bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 text-[9px] font-black rounded uppercase"
+                                  >
+                                    {typeof test === "string"
+                                      ? test
+                                      : test.testName || test.name}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-[10px] text-amber-500 font-black uppercase">
+                                  No tests added
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                disabled={
+                                  reg.authorizationStatus !== "AUTHORIZED"
+                                }
+                                onClick={() => {
+                                  if (
+                                    reg.authorizationStatus === "AUTHORIZED"
+                                  ) {
+                                    setReportModalRecord(reg);
+                                    setIsReportModalOpen(true);
+                                  }
+                                }}
+                                className={cn(
+                                  "p-1.5 rounded-full transition-all cursor-pointer",
+                                  reg.authorizationStatus === "AUTHORIZED"
+                                    ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:scale-105 active:scale-95"
+                                    : "bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600 opacity-40 cursor-not-allowed",
+                                )}
+                                title={
+                                  reg.authorizationStatus === "AUTHORIZED"
+                                    ? "Download / Print Official Pathology Report"
+                                    : "Download disabled — Awaiting Pathologist Authorization"
+                                }
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSavedRecord(reg);
+                                  setPrintType("receipt");
+                                  setShowReceipt(true);
+                                }}
+                                className="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                title="Print Receipt"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+                              {reg.tests && reg.tests.length > 0 && (
+                                <button
+                                  onClick={() => {
+                                    setSavedRecord(reg);
+                                    setPrintType("label");
+                                    setTimeout(() => {
+                                      window.print();
+                                    }, 150);
+                                  }}
+                                  className="p-1.5 bg-teal-50 dark:bg-teal-900/30 text-teal-650 dark:text-teal-400 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                  title="Print Bottle Labels"
+                                >
+                                  <Activity className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-5 print:hidden">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
+                  <UserPlus className="w-4 h-4" />
+                </span>
+                <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+                  Patient Registration Form
+                </h1>
+              </div>
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-1 font-medium">
+                Onboard new diagnostics patients, track referring physicians,
+                and record sample transport sources.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-lg text-xs text-slate-700 dark:text-slate-300 transition-all active:scale-95 shadow-sm cursor-pointer"
+              >
+                Back to Patients List
+              </button>
+            </div>
+          </div>
+
+          {/* Restored Draft Alert Banner */}
+          {isDraftRestored && (
+            <div className="flex items-center justify-between px-4 py-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-900/30 rounded-xl animate-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                  We found and restored a pending patient registration draft.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  localStorage.removeItem("medoraa_registration_draft");
+                  setIsDraftRestored(false);
+                }}
+                className="text-[10px] font-black uppercase text-amber-700 hover:text-amber-900 dark:text-amber-400 hover:underline px-2 py-1 rounded"
+              >
+                Dismiss Draft
+              </button>
+            </div>
+          )}
+
+          {/* Form grid layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Form Fields */}
+            <div className="lg:col-span-2 space-y-4">
+              {/* SECTION 2: Patient Information */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-4 md:p-5 shadow-sm space-y-3">
+                <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <span className="p-1 bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 rounded-md">
+                    <User className="w-3.5 h-3.5" />
+                  </span>
+                  <h2 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+                    Patient Information
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Patient Name */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      Patient Name{" "}
+                      <span className="text-rose-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.patientName}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          patientName: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter full name"
+                      className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
+                    />
+                  </div>
+
+                  {/* Mobile Number */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      Mobile Number{" "}
+                      <span className="text-rose-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={10}
+                      value={formData.mobileNumber}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          mobileNumber: e.target.value.replace(/\D/g, ""),
+                        }))
+                      }
+                      placeholder="10-digit number"
+                      className={cn(
+                        "px-3 py-1.5 bg-white dark:bg-slate-800 border rounded-lg text-xs outline-none font-semibold focus:ring-1",
+                        formData.mobileNumber && !isMobileValid
+                          ? "border-rose-400 dark:border-rose-900 focus:ring-rose-500 focus:border-rose-500"
+                          : "border-slate-200 dark:border-slate-700 focus:ring-blue-550 focus:border-blue-550",
+                      )}
+                    />
+                    {formData.mobileNumber && !isMobileValid && (
+                      <span className="text-[10px] text-rose-500 font-bold tracking-tight">
+                        Mobile number must be exactly 10 digits.
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Age */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      Age <span className="text-rose-500 font-bold">*</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        value={formData.age.value}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            age: { ...prev.age, value: e.target.value },
+                          }))
+                        }
+                        placeholder="Value"
+                        className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
+                      />
+                      <select
+                        value={formData.age.type}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            age: { ...prev.age, type: e.target.value as any },
+                          }))
+                        }
+                        className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none font-bold"
+                      >
+                        <option value="Years">Years</option>
+                        <option value="Months">Months</option>
+                        <option value="Days">Days</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Gender */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      Sex / Gender{" "}
+                      <span className="text-rose-500 font-bold">*</span>
+                    </label>
+                    <div className="flex gap-4 items-center h-[34px]">
+                      {["Male", "Female", "Other"].map((g) => (
+                        <label
+                          key={g}
+                          className="flex items-center gap-1.5 cursor-pointer font-semibold text-xs text-slate-700 dark:text-slate-300"
+                        >
+                          <input
+                            type="radio"
+                            name="gender"
+                            value={g}
+                            checked={formData.gender === g}
+                            onChange={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                gender: g as any,
+                              }))
+                            }
+                            className="w-3.5 h-3.5 text-blue-600 border-slate-300 dark:border-slate-700"
+                          />
+                          {g}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Complete Address */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    Complete Address{" "}
+                    <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <textarea
+                    rows={1}
+                    value={formData.address}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        address: e.target.value,
+                      }))
+                    }
+                    placeholder="Enter patient complete street address details"
+                    className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold resize-none"
+                  />
+                </div>
+
+                {/* State, District, City text inputs */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />{" "}
+                      State
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.location.state}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          location: { ...prev.location, state: e.target.value },
+                        }))
+                      }
+                      placeholder="Enter State"
+                      className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />{" "}
+                      District
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.location.district}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          location: {
+                            ...prev.location,
+                            district: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Enter District"
+                      className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />{" "}
+                      City / Area
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.location.city}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          location: { ...prev.location, city: e.target.value },
+                        }))
+                      }
+                      placeholder="Enter City / Area"
+                      className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Split Grid for Referral and Transport Side-by-Side to save screen height */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* SECTION 3: Referral Information */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-4 md:p-5 shadow-sm space-y-3 flex flex-col justify-between">
+                  <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+                    <span className="p-1 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-md">
+                      <Share2 className="w-3.5 h-3.5" />
+                    </span>
+                    <h2 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+                      Referral Information
+                    </h2>
+                  </div>
+
+                  <div className="space-y-3 text-left">
+                    <SearchableSelect
+                      label="Select Hospital (Optional)"
+                      options={hospitals.map((h) => h.hospitalName)}
+                      value={
+                        formData.selectedHospital === "Self"
+                          ? ""
+                          : formData.selectedHospital || ""
+                      }
+                      onChange={(val) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          selectedHospital: val,
+                          selectedDoctor: "",
+                        }))
+                      }
+                      placeholder="Search hospital to filter doctors..."
+                    />
+
+                    <SearchableSelect
+                      label="Referred By (Doctor / Referral Source)"
+                      options={referredByOptions}
+                      value={currentReferredBy}
+                      onChange={handleReferredByChange}
+                      mandatory
+                      placeholder="Search Self, Lab or Doctor..."
+                    />
+
+                    {(formData.referralMode || "Self") === "Self" &&
+                    (formData.selectedLab || "Medoraa Labs (Our Lab)") !==
+                      "Medoraa Labs (Our Lab)" ? (
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                          Sample Drawn By (Phlebotomist)
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.sampleDrawnBy}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              sampleDrawnBy: e.target.value,
+                            }))
+                          }
+                          placeholder="Enter phlebotomist name"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                            Sample Drawn By
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingStaff((prev) => !prev)}
+                            className="text-[10px] font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 uppercase tracking-wider flex items-center gap-1 transition-all"
+                          >
+                            {isAddingStaff ? "× Cancel Add" : "+ Add Staff"}
+                          </button>
+                        </div>
+
+                        {isAddingStaff ? (
+                          <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-xl space-y-4 animate-in fade-in duration-200">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                              Add New Staff Member
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="flex flex-col gap-1">
+                                <label className="text-[9px] font-bold text-slate-500 uppercase">
+                                  Full Name *
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="Staff Name"
+                                  value={newStaffData.name}
+                                  onChange={(e) =>
+                                    setNewStaffData((prev) => ({
+                                      ...prev,
+                                      name: e.target.value,
+                                    }))
+                                  }
+                                  className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-850 dark:text-slate-200"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-[9px] font-bold text-slate-500 uppercase">
+                                  Role *
+                                </label>
+                                <select
+                                  value={newStaffData.role}
+                                  onChange={(e) =>
+                                    setNewStaffData((prev) => ({
+                                      ...prev,
+                                      role: e.target.value,
+                                    }))
+                                  }
+                                  className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-blue-500 outline-none"
+                                >
+                                  <option value="registration">
+                                    Registration
+                                  </option>
+                                  <option value="authorization">
+                                    Authorization
+                                  </option>
+                                  <option value="inventory">Inventory</option>
+                                  <option value="admin">Admin</option>
+                                </select>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-[9px] font-bold text-slate-500 uppercase">
+                                  Email Address *
+                                </label>
+                                <input
+                                  type="email"
+                                  placeholder="email@example.com"
+                                  value={newStaffData.email}
+                                  onChange={(e) =>
+                                    setNewStaffData((prev) => ({
+                                      ...prev,
+                                      email: e.target.value,
+                                    }))
+                                  }
+                                  className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-850 dark:text-slate-200"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-[9px] font-bold text-slate-500 uppercase">
+                                  Mobile Number
+                                </label>
+                                <input
+                                  type="tel"
+                                  placeholder="10-digit mobile"
+                                  value={newStaffData.mobileNumber}
+                                  onChange={(e) =>
+                                    setNewStaffData((prev) => ({
+                                      ...prev,
+                                      mobileNumber: e.target.value
+                                        .replace(/\D/g, "")
+                                        .slice(0, 10),
+                                    }))
+                                  }
+                                  className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-850 dark:text-slate-200"
+                                />
+                              </div>
+                              <div className="sm:col-span-2 flex flex-col gap-1">
+                                <label className="text-[9px] font-bold text-slate-500 uppercase">
+                                  Password *
+                                </label>
+                                <input
+                                  type="password"
+                                  placeholder="Password"
+                                  value={newStaffData.password}
+                                  onChange={(e) =>
+                                    setNewStaffData((prev) => ({
+                                      ...prev,
+                                      password: e.target.value,
+                                    }))
+                                  }
+                                  className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-850 dark:text-slate-200"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                              <button
+                                type="button"
+                                disabled={isSavingStaff}
+                                onClick={handleAddNewStaff}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-lg text-[10px] uppercase tracking-wider transition-all active:scale-95 shadow-md shadow-blue-600/10"
+                              >
+                                {isSavingStaff ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    Adding...
+                                  </>
+                                ) : (
+                                  "Save Staff"
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <SearchableSelect
+                            label=""
+                            options={staffOptions}
+                            value={formData.sampleDrawnBy}
+                            onChange={(val) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                sampleDrawnBy: val,
+                              }))
+                            }
+                            placeholder="Select employee"
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* SECTION 4: Sample Received By / Transport */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-4 md:p-5 shadow-sm space-y-3">
+                  <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+                    <span className="p-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-md">
+                      <Truck className="w-3.5 h-3.5" />
+                    </span>
+                    <h2 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+                      Sample Transport Details
+                    </h2>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                        Received Through{" "}
+                        <span className="text-rose-500 font-bold">*</span>
+                      </label>
+                      <select
+                        value={
+                          formData.sampleReceived.receivedThrough === "None"
+                            ? "None"
+                            : "Courier"
+                        }
+                        onChange={(e) => {
+                          const type = e.target.value;
+                          setFormData((prev) => {
+                            const updated = {
+                              ...prev,
+                              sampleReceived: {
+                                ...prev.sampleReceived,
+                                receivedThrough: type as any,
+                              },
+                            };
+                            if (type === "Courier") {
+                              const now = new Date();
+                              const localDate = now.toISOString().split("T")[0];
+                              const localTime = now
+                                .toTimeString()
+                                .split(" ")[0]
+                                .slice(0, 5);
+                              if (!updated.sampleReceived.courier.arrivalDate) {
+                                updated.sampleReceived.courier.arrivalDate =
+                                  localDate;
+                              }
+                              if (!updated.sampleReceived.courier.arrivalTime) {
+                                updated.sampleReceived.courier.arrivalTime =
+                                  localTime;
+                              }
+                            }
+                            return updated;
+                          });
+                        }}
+                        className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none font-bold shadow-sm"
+                      >
+                        <option value="None">Sample Drawn at Lab</option>
+                        <option value="Courier">
+                          Other (Collected from Outside)
+                        </option>
+                      </select>
+                    </div>
+
+                    {formData.sampleReceived.receivedThrough === "Courier" && (
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-3 animate-in fade-in duration-200">
+                        <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-100 dark:border-slate-800">
+                          Outside Collection Details
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                              Mode of Transport{" "}
+                              <span className="text-rose-500 font-bold">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={
+                                formData.sampleReceived.courier.companyName
+                              }
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  sampleReceived: {
+                                    ...prev.sampleReceived,
+                                    courier: {
+                                      ...prev.sampleReceived.courier,
+                                      companyName: e.target.value,
+                                    },
+                                  },
+                                }))
+                              }
+                              placeholder="e.g. Courier, Employee, Person, Bus, etc."
+                              className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                              Docket Number / Tracking ID
+                            </label>
+                            <input
+                              type="text"
+                              value={
+                                formData.sampleReceived.courier.trackingNumber
+                              }
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  sampleReceived: {
+                                    ...prev.sampleReceived,
+                                    courier: {
+                                      ...prev.sampleReceived.courier,
+                                      trackingNumber: e.target.value,
+                                    },
+                                  },
+                                }))
+                              }
+                              placeholder="Tracking ID (Optional)"
+                              className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                              Date Received
+                            </label>
+                            <input
+                              type="date"
+                              value={
+                                formData.sampleReceived.courier.arrivalDate
+                              }
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  sampleReceived: {
+                                    ...prev.sampleReceived,
+                                    courier: {
+                                      ...prev.sampleReceived.courier,
+                                      arrivalDate: e.target.value,
+                                    },
+                                  },
+                                }))
+                              }
+                              className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                              Time Received
+                            </label>
+                            <input
+                              type="time"
+                              value={
+                                formData.sampleReceived.courier.arrivalTime
+                              }
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  sampleReceived: {
+                                    ...prev.sampleReceived,
+                                    courier: {
+                                      ...prev.sampleReceived.courier,
+                                      arrivalTime: e.target.value,
+                                    },
+                                  },
+                                }))
+                              }
+                              className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all text-slate-850 dark:text-slate-200"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 col-span-1 md:col-span-2">
+                            <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                              Remarks
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={formData.sampleReceived.courier.remarks}
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  sampleReceived: {
+                                    ...prev.sampleReceived,
+                                    courier: {
+                                      ...prev.sampleReceived.courier,
+                                      remarks: e.target.value,
+                                    },
+                                  },
+                                }))
+                              }
+                              placeholder="Enter any transport/package remarks..."
+                              className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 transition-all resize-none text-slate-850 dark:text-slate-200"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Sidebar */}
+            <div className="space-y-4">
+              {/* SECTION 5: REGISTRATION INFO */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-4 md:p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                  <span className="p-1 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-md">
+                    <FileText className="w-3.5 h-3.5" />
+                  </span>
+                  <h2 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+                    Registration Info
+                  </h2>
+                </div>
+
+                <div className="space-y-3 text-xs font-bold text-slate-600 dark:text-slate-400">
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/40 pb-2">
+                    <span className="text-slate-400 font-medium flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5" /> System Date:
+                    </span>
+                    <span className="text-slate-800 dark:text-slate-200">
+                      {liveDate}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/40 pb-2">
+                    <span className="text-slate-400 font-medium flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" /> System Time:
+                    </span>
+                    <span className="text-slate-800 dark:text-slate-200">
+                      {liveTime}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">
+                      ID Sequence:
+                    </span>
+                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded text-[10px] font-black tracking-widest uppercase">
+                      Pending Save
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Completeness Checklist */}
+              <div className="bg-slate-50 dark:bg-slate-800/20 border border-slate-200/50 dark:border-slate-800/60 rounded-xl p-4 space-y-3">
+                <h3 className="text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-slate-400" />
+                  Validation Checklist
+                </h3>
+
+                <ul className="space-y-2 text-xs font-bold text-slate-500">
+                  <li className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        isNameValid ? "bg-emerald-500" : "bg-slate-350",
+                      )}
+                    />
+                    <span
+                      className={
+                        isNameValid
+                          ? "text-emerald-700 dark:text-emerald-500"
+                          : ""
+                      }
+                    >
+                      Patient Full Name
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        isAgeValid ? "bg-emerald-500" : "bg-slate-350",
+                      )}
+                    />
+                    <span
+                      className={
+                        isAgeValid
+                          ? "text-emerald-700 dark:text-emerald-500"
+                          : ""
+                      }
+                    >
+                      Valid Age (&gt; 0)
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        isMobileValid ? "bg-emerald-500" : "bg-slate-350",
+                      )}
+                    />
+                    <span
+                      className={
+                        isMobileValid
+                          ? "text-emerald-700 dark:text-emerald-500"
+                          : ""
+                      }
+                    >
+                      10-Digit Mobile Number
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        isAddressValid ? "bg-emerald-500" : "bg-slate-350",
+                      )}
+                    />
+                    <span
+                      className={
+                        isAddressValid
+                          ? "text-emerald-700 dark:text-emerald-500"
+                          : ""
+                      }
+                    >
+                      Street Address Details
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        isReferralValid ? "bg-emerald-500" : "bg-slate-350",
+                      )}
+                    />
+                    <span
+                      className={
+                        isReferralValid
+                          ? "text-emerald-700 dark:text-emerald-500"
+                          : ""
+                      }
+                    >
+                      Referred By Doctor
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        isTransportValid ? "bg-emerald-500" : "bg-slate-350",
+                      )}
+                    />
+                    <span
+                      className={
+                        isTransportValid
+                          ? "text-emerald-700 dark:text-emerald-500"
+                          : ""
+                      }
+                    >
+                      Sample Transport Details
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Actions Panel */}
+              <div className="space-y-2.5">
+                <button
+                  disabled={!isFormValid || isSaving}
+                  onClick={() => handleSave(false)}
+                  className={cn(
+                    "w-full py-2.5 text-white font-bold rounded-xl text-xs transition-all active:scale-95 shadow-md flex items-center justify-center gap-2",
+                    isFormValid && !isSaving
+                      ? "bg-blue-600 hover:bg-blue-700 shadow-blue-500/10 cursor-pointer"
+                      : "bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed shadow-none",
+                  )}
+                >
+                  {isSaving ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Saving Record...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      Add Test
+                    </>
+                  )}
+                </button>
+
+                <div className="grid grid-cols-2 gap-2.5 pt-1.5">
+                  <button
+                    onClick={handleReset}
+                    className="py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-xl text-xs text-slate-600 dark:text-slate-400 transition-all active:scale-95 cursor-pointer"
+                  >
+                    Reset Form
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm("Discard draft changes and cancel?")) {
+                        setShowForm(false);
+                        setSavedRecord(null);
+                      }
+                    }}
+                    className="py-2 border border-rose-200 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-bold rounded-xl text-xs text-rose-600 dark:text-rose-400 transition-all active:scale-95 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* QR CODE ENLARGED POPUP MODAL */}
+      {isQrModalOpen && adminQrCode && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center text-center space-y-4 font-sans">
+            {/* Header */}
+            <div className="w-full flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-50 dark:bg-blue-950/60 rounded-xl text-blue-600 dark:text-blue-400">
+                  <QrCode className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                    Scan QR to Pay
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-400">
+                    Scan via PhonePe, GPay, Paytm or UPI
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsQrModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Amount Box */}
+            {(() => {
+              const subtotal = availableSamples
+                .filter((s) => selectedTestIds.includes(s._id))
+                .reduce((sum, s) => sum + (parseFloat(s.patientPrice) || 0), 0);
+              const rawDiscount = parseFloat(discountVal) || 0;
+              const calculatedDiscount =
+                discountType === "percentage"
+                  ? (subtotal * rawDiscount) / 100
+                  : rawDiscount;
+              const finalDiscount = Math.min(
+                subtotal,
+                Math.max(0, calculatedDiscount),
+              );
+              const totalPayable = Math.max(0, subtotal - finalDiscount);
+              return (
+                <div className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl p-3 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    Total Amount
+                  </span>
+                  <span className="text-xl font-black text-blue-600 dark:text-blue-400">
+                    ₹{totalPayable.toFixed(0)}
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* QR Code Image */}
+            <div className="p-4 bg-white rounded-2xl border-2 border-dashed border-blue-200 dark:border-slate-700 shadow-md inline-block">
+              <img
+                src={adminQrCode}
+                alt="Payment UPI QR Code"
+                className="w-64 h-64 object-contain rounded-lg"
+              />
+            </div>
+
+            <button
+              onClick={() => setIsQrModalOpen(false)}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
+            >
+              Close Popup
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* RECEIPT MODAL OVERLAY (Printable Acknowledgement Receipt) */}
+      {showReceipt && savedRecord && (
+        <div
+          className={cn(
+            "fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-300",
+            printType === "receipt"
+              ? "print:p-0 print:bg-white print:relative print:z-0 print:flex"
+              : "print:hidden",
+          )}
+        >
+          <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white rounded-2xl shadow-2xl w-full max-w-3xl lg:max-w-4xl overflow-hidden print:shadow-none print:w-full print:max-w-none flex flex-col h-[88vh] max-h-[90vh] print:max-h-none border border-slate-200 dark:border-slate-800">
+            {/* Modal Header Controls - hidden in print */}
+            <div className="flex items-center justify-between px-5 py-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 print:hidden shrink-0">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    Patient Registered Successfully!
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Receipt ID:{" "}
+                    <span className="font-bold text-slate-700 dark:text-slate-200">
+                      {savedRecord.registrationNumber}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() =>
+                    window.open(
+                      getApiUrl(
+                        `/api/admin/registrations/${savedRecord._id}/receipt-pdf`,
+                      ),
+                      "_blank",
+                    )
+                  }
+                  className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-slate-300 cursor-pointer"
+                  title="Open Bill in Full Screen (New Tab)"
+                >
+                  <ExternalLink className="w-4.5 h-4.5" />
+                </button>
+                <button
+                  onClick={() => {
+                    setShowReceipt(false);
+                    fetchRegistrations();
+                  }}
+                  className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-500 dark:text-slate-400 cursor-pointer"
+                  title="Close Popup"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* 2-Column Layout: Left Side = Options Panel, Right Side = PDF Preview */}
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-100 dark:bg-slate-950">
+              {/* LEFT PANEL: Options & Action Cards (No Scrollbar) */}
+              <div className="w-full md:w-[310px] lg:w-[330px] p-4 sm:p-5 bg-slate-50/90 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 print:hidden flex flex-col justify-between overflow-hidden space-y-4 shrink-0">
+                <div className="space-y-4">
+                  {/* Section Title */}
+                  <div>
+                    <div className="text-xs font-black tracking-wider text-slate-500 uppercase">
+                      PRINT & LOGISTICS OPTIONS
+                    </div>
+                    <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                      Select an option below to process receipt or dispatch
+                    </p>
+                  </div>
+
+                  {/* Vertical Stack of Action Cards */}
+                  <div className="space-y-2.5">
+                    {/* Option 1: Print Receipt */}
+                    <button
+                      onClick={handlePrintReceipt}
+                      className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-blue-50/70 dark:hover:bg-blue-950/30 border-2 border-blue-400/80 hover:border-blue-500 rounded-xl text-blue-600 dark:text-blue-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
+                    >
+                      <Printer className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <div className="text-left">
+                        <div className="font-bold text-xs sm:text-sm">
+                          Print Receipt
+                        </div>
+                        <div className="text-[11px] font-normal text-slate-400">
+                          Generate A4 patient receipt copy
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Option 2: Print Bottle Labels */}
+                    <button
+                      onClick={handlePrintLabels}
+                      className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 border-2 border-emerald-400/80 hover:border-emerald-500 rounded-xl text-emerald-600 dark:text-emerald-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
+                    >
+                      <Printer className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <div className="text-left">
+                        <div className="font-bold text-xs sm:text-sm">
+                          Print Bottle Labels
+                        </div>
+                        <div className="text-[11px] font-normal text-slate-400">
+                          Barcode labels for specimen bottles
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Option 3: Thermal Transfer Label */}
+                    <button
+                      onClick={() => {
+                        if (savedRecord.sampleTransfer) {
+                          window.open(
+                            getApiUrl(
+                              `/api/admin/registrations/${savedRecord._id}/transfer-label-pdf`,
+                            ),
+                            "_blank",
+                          );
+                        } else {
+                          setIsTransferModalOpen(true);
+                        }
+                      }}
+                      className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-amber-50/70 dark:hover:bg-amber-950/30 border-2 border-amber-400/80 hover:border-amber-500 rounded-xl text-amber-600 dark:text-amber-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
+                    >
+                      <Printer className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div className="text-left">
+                        <div className="font-bold text-xs sm:text-sm">
+                          Thermal Transfer Label
+                        </div>
+                        <div className="text-[11px] font-normal text-slate-400">
+                          Outsource dispatch barcode label
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Option 4: Edit Transfer / Transfer Sample */}
+                    <button
+                      onClick={() => setIsTransferModalOpen(true)}
+                      className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-purple-50/70 dark:hover:bg-purple-950/30 border-2 border-purple-400/80 hover:border-purple-500 rounded-xl text-purple-600 dark:text-purple-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
+                    >
+                      <Truck className="w-5 h-5 text-purple-600 dark:text-purple-400 shrink-0" />
+                      <div className="text-left">
+                        <div className="font-bold text-xs sm:text-sm">
+                          {savedRecord.sampleTransfer
+                            ? "Edit Transfer"
+                            : "Transfer Sample"}
+                        </div>
+                        <div className="text-[11px] font-normal text-slate-400">
+                          Logistics dispatch details
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  {/* Divider OR */}
+                  <div className="relative flex items-center">
+                    <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+                    <span className="shrink mx-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
+                      OR
+                    </span>
+                    <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+                  </div>
+
+                  {/* Done / Complete Registration */}
+                  <button
+                    onClick={() => {
+                      setShowReceipt(false);
+                      fetchRegistrations();
+                    }}
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl transition-all active:scale-[0.99] shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-white" />
+                    <span>Done / Complete Registration</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* RIGHT PANEL: PDF Preview (No Scrollbar) */}
+              <div className="flex-1 p-2.5 sm:p-3 bg-slate-100 dark:bg-slate-950 flex flex-col overflow-hidden h-full">
+                <iframe
+                  src={getApiUrl(
+                    `/api/admin/registrations/${savedRecord._id}/receipt-pdf#toolbar=0&navpanes=0&scrollbar=0&view=FitH`,
+                  )}
+                  scrolling="no"
+                  className="w-full h-full rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden bg-white"
+                  title="Patient Receipt Classic PDF"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OUTSOURCE SAMPLE TRANSFER LOGISTICS MODAL */}
+      <SampleTransferModal
+        record={savedRecord}
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        onSuccess={(updatedRec) => {
+          setSavedRecord(updatedRec);
+          fetchRegistrations();
+        }}
+      />
+
+      {/* PRINT LABELS SECTION (Hidden on screen, visible only when printing labels) */}
+      {savedRecord && (
+        <div
+          id={
+            printType === "label"
+              ? "print-active-section"
+              : "print-labels-section"
+          }
+          className={cn(
+            "hidden",
+            printType === "label" ? "print:block" : "print:hidden",
+          )}
+        >
+          {(savedRecord.tests || []).map((test: any, index: number) => {
+            const currentDate = savedRecord.registrationDate || "";
+            const currentTime = savedRecord.registrationTime || "";
+            const formattedDateTime = `${currentDate} ${currentTime}`;
+
+            const regDigits = savedRecord.registrationNumber
+              ? savedRecord.registrationNumber.replace(/[^0-9]/g, "")
+              : "";
+            const sampleDigits = regDigits.slice(-8);
+            const sampleId = `S${sampleDigits}${index + 1}`;
+
+            const badgeInfo = getContainerBadgeInfo(test, availableSamples);
+
+            return (
+              <div
+                key={test._id || index}
+                className="vial-label-card"
+                style={{ pageBreakAfter: "always", breakAfter: "page" }}
+              >
+                {/* Logo Column */}
+                <div className="label-logo-col">
+                  <svg
+                    className="label-logo-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                  >
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                  </svg>
+                  <div className="label-brand-name">Medoraa</div>
+                  <div className="label-brand-sub">DIAGNOSTICS</div>
+                </div>
+
+                {/* Divider */}
+                <div className="label-divider" />
+
+                {/* Patient Info Column */}
+                <div className="label-info-col">
+                  <div className="label-field-group">
+                    <span className="label-field-title">PATIENT ID:</span>
+                    <span className="label-field-value-lg">
+                      {savedRecord.registrationNumber}
+                    </span>
+                  </div>
+                  <div
+                    className="label-field-group"
+                    style={{ marginTop: "3px" }}
+                  >
+                    <span className="label-field-title">NAME:</span>
+                    <span className="label-field-value-lg uppercase truncate-name">
+                      {savedRecord.patientName}
+                    </span>
+                  </div>
+                  <div className="label-grid" style={{ marginTop: "3px" }}>
+                    <div>
+                      <span className="label-field-title">AGE:</span>
+                      <span className="label-field-value">
+                        {savedRecord.age?.value}{" "}
+                        {savedRecord.age?.type?.substring(0, 1)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="label-field-title">GENDER:</span>
+                      <span className="label-field-value">
+                        {savedRecord.gender?.substring(0, 1)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="label-field-title">PHONE:</span>
+                      <span className="label-field-value">
+                        {savedRecord.mobileNumber}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* QR Column */}
+                <div className="label-qr-col">
+                  <div className="label-field-group">
+                    <span className="label-field-title">SAMPLE ID:</span>
+                    <span className="label-field-value-md">{sampleId}</span>
+                  </div>
+                  <div className="label-qr-wrapper">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`Patient:${savedRecord.patientName}|ID:${savedRecord.registrationNumber}|Sample:${sampleId}|Test:${typeof test === "object" ? test.testName || test.name : test}`)}`}
+                      alt="QR Code"
+                      className="label-qr-img"
+                    />
+                  </div>
+                  <div
+                    className="label-test-badge"
+                    style={{
+                      backgroundColor: badgeInfo.bgColor,
+                      color: badgeInfo.textColor,
+                    }}
+                  >
+                    {badgeInfo.text}
+                  </div>
+                </div>
+
+                {/* Barcode Column */}
+                <div className="label-barcode-col">
+                  <div className="label-barcode-wrapper">
+                    <Barcode
+                      value={sampleId}
+                      width={1.1}
+                      height={24}
+                      displayValue={false}
+                    />
+                  </div>
+                  <div className="label-timestamp-wrapper">
+                    {formattedDateTime}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Conditional Page Print Setup */}
+      {printType === "label" ? (
+        <style jsx global>{`
+          @media print {
+            @page {
+              size: 100mm 35mm;
+              margin: 0;
+            }
+            body * {
+              visibility: hidden;
+            }
+            #print-active-section,
+            #print-active-section * {
+              visibility: visible;
+            }
+            #print-active-section {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100mm !important;
+              height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: white !important;
+              z-index: 9999999 !important;
+            }
+
+            /* Vial Label Container Styling */
+            .vial-label-card {
+              width: 100mm;
+              height: 35mm;
+              box-sizing: border-box;
+              padding: 1.5mm 2.5mm;
+              display: flex;
+              align-items: stretch;
+              background: white !important;
+              color: black !important;
+              font-family:
+                -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                Helvetica, Arial, sans-serif;
+              page-break-after: always;
+              break-after: page;
+              overflow: hidden;
+            }
+
+            /* Column 1: Logo & Brand */
+            .label-logo-col {
+              width: 18mm;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              text-align: center;
+              flex-shrink: 0;
+            }
+            .label-logo-icon {
+              width: 6mm;
+              height: 6mm;
+              color: #1a365d !important;
+            }
+            .label-brand-name {
+              font-size: 10px;
+              font-weight: 800;
+              color: #1a365d !important;
+              line-height: 1;
+              margin-top: 1mm;
+              letter-spacing: -0.2px;
+            }
+            .label-brand-sub {
+              font-size: 5px;
+              font-weight: 700;
+              color: #0d9488 !important;
+              letter-spacing: 0.8px;
+              line-height: 1;
+              margin-top: 0.5mm;
+            }
+
+            /* Divider */
+            .label-divider {
+              width: 0.2mm;
+              background-color: #cbd5e1 !important;
+              margin: 0 1.5mm;
+              flex-shrink: 0;
+            }
+
+            /* Column 2: Patient Info */
+            .label-info-col {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              min-width: 0;
+            }
+            .label-field-group {
+              display: flex;
+              flex-direction: column;
+              line-height: 1.1;
+            }
+            .label-field-title {
+              font-size: 7px;
+              font-weight: 700;
+              color: #64748b !important;
+              letter-spacing: 0.2px;
+            }
+            .label-field-value-lg {
+              font-size: 10px;
+              font-weight: 800;
+              color: #0f172a !important;
+            }
+            .truncate-name {
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              display: block;
+            }
+            .label-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr 1.3fr;
+              gap: 1mm;
+            }
+            .label-field-value {
+              font-size: 8px;
+              font-weight: 800;
+              color: #0f172a !important;
+              display: block;
+            }
+
+            /* Column 3: QR & Badge */
+            .label-qr-col {
+              width: 22mm;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: space-between;
+              flex-shrink: 0;
+              padding-top: 0.5mm;
+            }
+            .label-field-value-md {
+              font-size: 8px;
+              font-weight: 800;
+              color: #0f172a !important;
+            }
+            .label-qr-wrapper {
+              width: 14mm;
+              height: 14mm;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .label-qr-img {
+              width: 14mm;
+              height: 14mm;
+            }
+            .label-test-badge {
+              width: 100%;
+              font-size: 8px;
+              font-weight: 800;
+              text-align: center;
+              padding: 0.5mm 0;
+              border-radius: 0.5mm;
+              text-transform: uppercase;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+
+            /* Column 4: Barcode & Time */
+            .label-barcode-col {
+              width: 18mm;
+              display: flex;
+              flex-direction: row;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+              border-left: 0.2mm dashed #e2e8f0 !important;
+              position: relative;
+              margin-left: 1mm;
+              height: 100%;
+            }
+            .label-barcode-wrapper {
+              transform: rotate(90deg);
+              transform-origin: center;
+              white-space: nowrap;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              position: absolute;
+              left: 0;
+              top: 50%;
+              margin-top: -15px;
+            }
+
+            .label-timestamp-wrapper {
+              transform: rotate(90deg);
+              transform-origin: center;
+              white-space: nowrap;
+              font-size: 6px;
+              font-weight: 700;
+              color: #64748b !important;
+              position: absolute;
+              right: 0;
+              top: 50%;
+              margin-top: -15px;
+            }
+          }
+        `}</style>
+      ) : (
+        <style jsx global>{`
+          @media print {
+            html,
+            body {
+              height: auto !important;
+              overflow: visible !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            body * {
+              visibility: hidden;
+            }
+            #print-active-section,
+            #print-active-section * {
+              visibility: visible;
+            }
+            #print-active-section {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              display: block !important;
+              overflow: visible !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              box-shadow: none !important;
+              border: none !important;
+              background: white !important;
+              color: black !important;
+              z-index: 9999999 !important;
+            }
+            @page {
+              size: A4;
+              margin: 10mm;
+            }
+          }
+        `}</style>
+      )}
+      {/* Official Pathology Report Modal */}
+      <PathologyReportModal
+        record={reportModalRecord}
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+      />
+    </div>
+  );
 };
 
 export default PatientRegistrationForm;
