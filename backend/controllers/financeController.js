@@ -169,7 +169,7 @@ exports.getTransactions = async (req, res) => {
         type: t.type,
         amount: t.amount,
         paymentMethod: t.paymentMethod,
-        source: "MANUAL",
+        source: t.sourceType || "MANUAL",
         sourceId: t._id,
         referenceNumber: t.referenceNumber || "-", // Manual entries can have references
       });

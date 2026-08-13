@@ -38,8 +38,12 @@ const financeTransactionSchema = new mongoose.Schema(
     },
     sourceType: {
       type: String,
-      enum: ["MANUAL"],
+      enum: ["MANUAL", "EXCEL_IMPORT"],
       default: "MANUAL",
+    },
+    importBatchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ImportBatch",
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

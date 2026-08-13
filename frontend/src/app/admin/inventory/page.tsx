@@ -18,9 +18,11 @@ import {
   Package,
   Trash,
   Ban,
+  Upload,
 } from "lucide-react";
 import AddProductModal from "./components/AddProductModal";
 import EditProductModal from "./components/EditProductModal";
+import ImportExcelModal from "./components/ImportExcelModal";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { Download } from "lucide-react";
@@ -30,6 +32,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [summary, setSummary] = useState({
     total: 0,
@@ -148,6 +151,29 @@ export default function InventoryPage() {
     XLSX.writeFile(workbook, `Inventory_Products_${new Date().getTime()}.xlsx`);
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const token = localStorage.getItem("adminToken");
+      const response = await fetch(getApiUrl("/api/admin/inventory/template"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Download failed");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Medoraa_Labs_Inventory_Template.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to download template", error);
+      alert("Failed to download template.");
+    }
+  };
+
   const StatusBadge = ({ status }: { status: string }) => {
     const statusConfig: Record<
       string,
@@ -211,7 +237,7 @@ export default function InventoryPage() {
               Manage laboratory products, stock, and suppliers.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center gap-3 flex-wrap justify-end">
             <button
               onClick={handleExportXLSX}
               className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg font-bold text-[11px] uppercase tracking-widest shadow-sm transition-colors mt-2 md:mt-0"
@@ -220,20 +246,38 @@ export default function InventoryPage() {
               Export
             </button>
             <Link
-              href="/admin/inventory/suppliers"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg font-bold text-[11px] uppercase tracking-widest shadow-sm transition-colors mt-2 md:mt-0"
-            >
-              Manage Suppliers
-            </Link>
-            <Link
               href="/admin/inventory/mappings"
               className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg font-bold text-[11px] uppercase tracking-widest shadow-sm transition-colors mt-2 md:mt-0"
             >
               Auto-Deductions
             </Link>
+
+            <div className="h-6 w-px bg-slate-200 hidden sm:block mx-1"></div>
+
+            <button
+              onClick={handleDownloadTemplate}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-md font-bold text-[11px] uppercase tracking-widest transition-colors w-full sm:w-auto"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Template
+            </button>
+            <Link
+              href="/admin/inventory/imports"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md font-bold text-[11px] uppercase tracking-widest transition-colors w-full sm:w-auto"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              History
+            </Link>
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold text-[11px] uppercase tracking-widest shadow-sm transition-colors w-full sm:w-auto"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Import Excel
+            </button>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[11px] uppercase tracking-widest shadow-sm transition-colors mt-2 md:mt-0"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-bold text-[11px] uppercase tracking-widest shadow-sm transition-colors mt-2 md:mt-0"
             >
               <PackagePlus className="w-4 h-4" />
               Add Inventory
@@ -495,6 +539,11 @@ export default function InventoryPage() {
           setEditingProduct(null);
           fetchProducts();
         }}
+      />
+
+      <ImportExcelModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
       />
     </div>
   );

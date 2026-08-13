@@ -30,6 +30,28 @@ router
   .put(inventoryController.updateProduct)
   .delete(inventoryController.deleteProduct);
 
+// --- Import Routes ---
+const inventoryImportController = require("../controllers/inventoryImportController");
+
+router.route("/template").get(inventoryImportController.downloadTemplate);
+router.post(
+  "/import/validate",
+  inventoryImportController.uploadExcel.single("file"),
+  inventoryImportController.validateImport,
+);
+router.post("/import/confirm", inventoryImportController.confirmImport);
+router.route("/imports").get(inventoryImportController.getImportHistory);
+
+// Draft endpoints
+router.route("/import/:batchId").get(inventoryImportController.getDraftBatch);
+router
+  .route("/import/row/:rowId")
+  .put(inventoryImportController.updateDraftRow)
+  .delete(inventoryImportController.deleteDraftRow);
+router
+  .route("/import/:batchId/row")
+  .post(inventoryImportController.addDraftRow);
+
 // --- Stocks / Batches ---
 router.route("/products/:id/stock").post(inventoryController.addStock);
 

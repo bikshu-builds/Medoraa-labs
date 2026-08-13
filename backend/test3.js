@@ -1,0 +1,1 @@
+const mongoose = require('mongoose'); require('dotenv').config(); mongoose.connect(process.env.MONGO_URI).then(async () => { const ImportBatch = require('./models/ImportBatch'); const all = await ImportBatch.find({}, '_id importBatchId fileName createdAt'); console.log(JSON.stringify(all, null, 2)); process.exit(0); });

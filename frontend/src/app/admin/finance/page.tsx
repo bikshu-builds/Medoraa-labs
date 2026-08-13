@@ -13,9 +13,11 @@ import {
   Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 import AddTransactionModal from "./components/AddTransactionModal";
+import ImportExcelModal from "./components/ImportExcelModal";
 import * as XLSX from "xlsx";
-import { Download } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 
 export default function FinanceDashboard() {
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,7 @@ export default function FinanceDashboard() {
 
   // Modals
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const fetchFinanceData = async () => {
     setLoading(true);
@@ -134,6 +137,29 @@ export default function FinanceDashboard() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Ledger");
     XLSX.writeFile(workbook, `Finance_Ledger_${new Date().getTime()}.xlsx`);
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const token = localStorage.getItem("adminToken");
+      const response = await fetch(getApiUrl("/api/admin/finance/template"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Download failed");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Medoraa_Finance_Import_Template.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to download template", error);
+      alert("Failed to download template.");
+    }
   };
 
   // Breakdown Visualizer Helper Component
@@ -239,6 +265,27 @@ export default function FinanceDashboard() {
             >
               <Download className="w-3.5 h-3.5" />
               Export
+            </button>
+            <button
+              onClick={handleDownloadTemplate}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-md font-bold text-[11px] uppercase tracking-widest transition-colors w-full sm:w-auto"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Template
+            </button>
+            <Link
+              href="/admin/finance/imports"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md font-bold text-[11px] uppercase tracking-widest transition-colors w-full sm:w-auto"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              History
+            </Link>
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-bold text-[11px] uppercase tracking-widest shadow-sm transition-colors w-full sm:w-auto"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Import Excel
             </button>
             <button
               onClick={() => setIsAddTransactionOpen(true)}
@@ -436,7 +483,9 @@ export default function FinanceDashboard() {
                                 ? "Doctor Referral"
                                 : tx.source === "INVENTORY"
                                   ? "Inventory"
-                                  : "Manual Entry"}
+                                  : tx.source === "EXCEL_IMPORT"
+                                    ? "Excel Import"
+                                    : "Manual Entry"}
                             {tx.referenceNumber &&
                               tx.referenceNumber !== "-" &&
                               ` • Ref: ${tx.referenceNumber}`}
@@ -496,6 +545,15 @@ export default function FinanceDashboard() {
         onClose={() => setIsAddTransactionOpen(false)}
         onSuccess={() => {
           setIsAddTransactionOpen(false);
+          fetchFinanceData();
+        }}
+      />
+
+      <ImportExcelModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          setIsImportModalOpen(false);
           fetchFinanceData();
         }}
       />
