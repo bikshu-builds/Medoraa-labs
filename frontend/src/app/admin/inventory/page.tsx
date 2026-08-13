@@ -225,6 +225,12 @@ export default function InventoryPage() {
             >
               Manage Suppliers
             </Link>
+            <Link
+              href="/admin/inventory/mappings"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg font-bold text-[11px] uppercase tracking-widest shadow-sm transition-colors mt-2 md:mt-0"
+            >
+              Auto-Deductions
+            </Link>
             <button
               onClick={() => setIsAddModalOpen(true)}
               className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[11px] uppercase tracking-widest shadow-sm transition-colors mt-2 md:mt-0"

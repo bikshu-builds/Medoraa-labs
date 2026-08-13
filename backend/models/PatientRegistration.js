@@ -49,7 +49,8 @@ const patientRegistrationSchema = new mongoose.Schema(
         validator: function (v) {
           return /^\d{10}$/.test(v);
         },
-        message: (props) => `${props.value} is not a valid 10-digit mobile number!`,
+        message: (props) =>
+          `${props.value} is not a valid 10-digit mobile number!`,
       },
     },
     address: {
@@ -153,10 +154,10 @@ const patientRegistrationSchema = new mongoose.Schema(
       testStatuses: [
         {
           testName: { type: String, trim: true },
-          status: { type: String, default: "At Lab" }
-        }
+          status: { type: String, default: "At Lab" },
+        },
       ],
-      transferredAt: { type: Date }
+      transferredAt: { type: Date },
     },
 
     // Section 5: Registration Details
@@ -182,7 +183,7 @@ const patientRegistrationSchema = new mongoose.Schema(
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Sample",
-      }
+      },
     ],
     testResults: [
       {
@@ -197,31 +198,52 @@ const patientRegistrationSchema = new mongoose.Schema(
         flag: {
           type: String,
           enum: ["Normal", "Abnormal", "Critical", ""],
-          default: "Normal"
-        }
-      }
+          default: "Normal",
+        },
+      },
     ],
     authorizationStatus: {
       type: String,
-      enum: ["PENDING", "RESULT_ENTERED", "PENDING_AUTHORIZATION", "AUTHORIZED", "FLAGGED", "REJECTED"],
-      default: "PENDING"
+      enum: [
+        "PENDING",
+        "RESULT_ENTERED",
+        "PENDING_AUTHORIZATION",
+        "AUTHORIZED",
+        "FLAGGED",
+        "REJECTED",
+      ],
+      default: "PENDING",
     },
     authorizedBy: { type: String, trim: true, default: "" },
     authorizedAt: { type: String, trim: true, default: "" },
     notes: { type: String, trim: true, default: "" },
-    
+
     // Section 6: Billing & Payment Information
     subtotal: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
-    discountType: { type: String, enum: ["fixed", "percentage"], default: "fixed" },
+    discountType: {
+      type: String,
+      enum: ["fixed", "percentage"],
+      default: "fixed",
+    },
     totalAmount: { type: Number, default: 0 },
     paidAmount: { type: Number, default: 0 },
     paymentMethod: { type: String, trim: true, default: "Cash" },
-    paymentStatus: { type: String, enum: ["PAID", "PENDING", "PARTIAL"], default: "PAID" }
+    paymentStatus: {
+      type: String,
+      enum: ["PAID", "PENDING", "PARTIAL"],
+      default: "PAID",
+    },
+
+    // Section 7: System Processing Flags
+    inventoryProcessed: { type: Boolean, default: false },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-module.exports = mongoose.model("PatientRegistration", patientRegistrationSchema);
+module.exports = mongoose.model(
+  "PatientRegistration",
+  patientRegistrationSchema,
+);

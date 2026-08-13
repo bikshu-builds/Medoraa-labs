@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { authenticate, authorize } = require("../config/roleauth");
 const inventoryController = require("../controllers/inventoryController");
+const mappingController = require("../controllers/mappingController");
 
 // All inventory routes require authentication and specific role
 router.use(authenticate);
@@ -37,5 +38,18 @@ router
   .route("/products/:id/batches/:batchId")
   .put(inventoryController.updateBatch)
   .delete(inventoryController.deleteBatch);
+
+// ============================
+// INVENTORY MAPPINGS
+// ============================
+router
+  .route("/mappings")
+  .get(mappingController.getMappings)
+  .post(mappingController.createMapping);
+
+router
+  .route("/mappings/:id")
+  .put(mappingController.updateMapping)
+  .delete(mappingController.deleteMapping);
 
 module.exports = router;
