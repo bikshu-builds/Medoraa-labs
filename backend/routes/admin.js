@@ -13,12 +13,14 @@ const {
 const {
     addRegistration,
     getRegistrations,
+    getNextRegistrationNumber,
     updateRegistrationTests,
     updateRegistrationAuthorization,
     transferRegistrationSample,
     downloadReportPDF,
     downloadTransferLabelPDF,
-    downloadReceiptPDF
+    downloadReceiptPDF,
+    downloadReceiptHTML
 } = require("../controllers/registration");
 
 // Samples Directory Routes
@@ -46,6 +48,7 @@ router.post("/login", login);
 router.get("/registrations/:id/pdf", downloadReportPDF);
 router.get("/registrations/:id/transfer-label-pdf", downloadTransferLabelPDF);
 router.get("/registrations/:id/receipt-pdf", downloadReceiptPDF);
+router.get("/registrations/:id/receipt-html", downloadReceiptHTML);
 
 
 // Protected Staff Routes (accessible by any logged in staff role)
@@ -57,6 +60,7 @@ router.get("/hospitals", getHospitals);
 router.get("/admins", getAdmins);
 
 // Registration Desk Routes
+router.get("/registrations/next-id", getNextRegistrationNumber);
 router.post("/registrations", addRegistration);
 router.get("/registrations", getRegistrations);
 router.put("/registrations/:id/tests", updateRegistrationTests);

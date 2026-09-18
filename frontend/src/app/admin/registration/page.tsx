@@ -33,6 +33,7 @@ import {
   QrCode,
   Maximize2,
   ExternalLink,
+  FlaskConical,
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -329,10 +330,25 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         >
           {value || placeholder}
         </span>
-        <ChevronDown
-          className="w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200"
-          style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0)" }}
-        />
+        <div className="flex items-center gap-1.5 shrink-0">
+          {value && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange("");
+              }}
+              className="p-0.5 text-slate-400 hover:text-rose-500 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              title="Clear selection"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <ChevronDown
+            className="w-4 h-4 text-slate-400 transition-transform duration-200"
+            style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0)" }}
+          />
+        </div>
       </div>
 
       {isOpen && !disabled && (
@@ -357,6 +373,19 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
             )}
           </div>
           <div className="overflow-y-auto flex-1 max-h-48 py-1 divide-y divide-slate-50 dark:divide-slate-700/50">
+            {value && (
+              <div
+                onClick={() => {
+                  onChange("");
+                  setIsOpen(false);
+                  setSearch("");
+                }}
+                className="px-4 py-2 text-xs text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer font-bold flex items-center gap-1.5 transition-colors border-b border-slate-100 dark:border-slate-700"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Clear Selection</span>
+              </div>
+            )}
             {filteredOptions.length > 0 ? (
               filteredOptions.map((opt) => (
                 <div
@@ -369,7 +398,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   className={cn(
                     "px-4 py-2.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700/50 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer font-bold flex items-center justify-between transition-colors",
                     opt === value &&
-                      "bg-blue-50/50 dark:bg-slate-700/30 text-blue-600 dark:text-blue-400 font-extrabold",
+                    "bg-blue-50/50 dark:bg-slate-700/30 text-blue-600 dark:text-blue-400 font-extrabold",
                   )}
                 >
                   <span>{opt}</span>
@@ -406,7 +435,74 @@ const PatientRegistrationForm: React.FC = () => {
   const [liveDate, setLiveDate] = useState("");
   const [liveTime, setLiveTime] = useState("");
 
-  // Form inputs state
+  // Next Patient ID state & auto-population states
+  const [nextPatientId, setNextPatientId] = useState<string>("");
+  const [patientIdInput, setPatientIdInput] = useState<string>("");
+  const [isExistingPatientLoaded, setIsExistingPatientLoaded] = useState<boolean>(false);
+
+  const fetchNextPatientId = async () => {
+    try {
+      const token = localStorage.getItem("adminToken");
+      const res = await fetch(getApiUrl("/api/admin/registrations/next-id"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.data?.nextRegistrationNumber) {
+        setNextPatientId(data.data.nextRegistrationNumber);
+        setPatientIdInput(data.data.nextRegistrationNumber);
+      }
+    } catch (err) {
+      console.error("Failed to fetch next patient ID", err);
+    }
+  };
+
+  // Patient directory states
+  const [showForm, setShowForm] = useState(false);
+  const [registrations, setRegistrations] = useState<any[]>([]);
+  const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(false);
+  const [patientSearchQuery, setPatientSearchQuery] = useState("");
+  const [userRole, setUserRole] = useState<string>("registration");
+
+  // Handle Patient ID change & auto-populate existing patient details
+  useEffect(() => {
+    const query = patientIdInput.trim();
+    if (!query) {
+      setIsExistingPatientLoaded(false);
+      return;
+    }
+
+    // Match by registrationNumber or ID
+    const found = registrations.find(
+      (r) =>
+        r.registrationNumber?.toLowerCase() === query.toLowerCase() ||
+        r._id?.toLowerCase() === query.toLowerCase(),
+    );
+
+    if (found) {
+      setIsExistingPatientLoaded(true);
+      setFormData((prev) => ({
+        ...prev,
+        patientName: found.patientName || "",
+        age: found.age
+          ? { value: String(found.age.value || ""), type: found.age.type || "Years" }
+          : prev.age,
+        gender: found.gender || "Male",
+        mobileNumber: found.mobileNumber || "",
+        address: found.address || "",
+        location: {
+          state: found.location?.state || "",
+          district: found.location?.district || "",
+          city: found.location?.city || "",
+        },
+        referredBy: found.referredBy || "Self",
+        sampleDrawnBy: found.sampleDrawnBy || "",
+        referralMode: found.referralMode || "Self",
+        selectedLab: found.selectedLab || "Medoraa Labs (Our Lab)",
+      }));
+    } else {
+      setIsExistingPatientLoaded(false);
+    }
+  }, [patientIdInput, registrations]);
   const [formData, setFormData] = useState({
     location: {
       state: "",
@@ -508,6 +604,7 @@ const PatientRegistrationForm: React.FC = () => {
   );
   const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
   const [customPaymentMethod, setCustomPaymentMethod] = useState<string>("");
+  const [paidAmountInput, setPaidAmountInput] = useState<string>("");
   const [adminQrCode, setAdminQrCode] = useState<string>("");
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
   const [isTransferModalOpen, setIsTransferModalOpen] =
@@ -535,13 +632,6 @@ const PatientRegistrationForm: React.FC = () => {
     mobileNumber: "",
     password: "",
   });
-
-  // Patient directory states
-  const [showForm, setShowForm] = useState(false);
-  const [registrations, setRegistrations] = useState<any[]>([]);
-  const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(false);
-  const [patientSearchQuery, setPatientSearchQuery] = useState("");
-  const [userRole, setUserRole] = useState<string>("registration");
 
   const fetchRegistrations = async () => {
     setIsLoadingRegistrations(true);
@@ -610,6 +700,17 @@ const PatientRegistrationForm: React.FC = () => {
           ? customPaymentMethod.trim() || "Other"
           : paymentMethod;
 
+      const finalPaidAmount =
+        paidAmountInput.trim() !== ""
+          ? Math.min(totalAmount, Math.max(0, parseFloat(paidAmountInput) || 0))
+          : totalAmount;
+      const paymentStatus =
+        finalPaidAmount >= totalAmount
+          ? "PAID"
+          : finalPaidAmount > 0
+            ? "PARTIAL"
+            : "PENDING";
+
       const res = await fetch(
         getApiUrl(`/api/admin/registrations/${savedRecord._id}/tests`),
         {
@@ -624,8 +725,9 @@ const PatientRegistrationForm: React.FC = () => {
             discount: finalDiscount,
             discountType,
             totalAmount,
-            paidAmount: totalAmount,
+            paidAmount: finalPaidAmount,
             paymentMethod: finalPaymentMethod,
+            paymentStatus,
           }),
         },
       );
@@ -654,10 +756,8 @@ const PatientRegistrationForm: React.FC = () => {
 
   const handlePrintReceipt = () => {
     if (savedRecord?._id) {
-      window.open(
-        getApiUrl(`/api/admin/registrations/${savedRecord._id}/receipt-pdf`),
-        "_blank",
-      );
+      const url = getApiUrl(`/api/admin/registrations/${savedRecord._id}/receipt-html?v=${savedRecord._id}&autoprint=true`);
+      window.open(url, "_blank");
     }
   };
 
@@ -706,10 +806,10 @@ const PatientRegistrationForm: React.FC = () => {
       const testNames =
         reg.tests && reg.tests.length > 0
           ? reg.tests
-              .map((t: any) =>
-                typeof t === "string" ? t : t.testName || t.name,
-              )
-              .join(", ")
+            .map((t: any) =>
+              typeof t === "string" ? t : t.testName || t.name,
+            )
+            .join(", ")
           : "No tests";
 
       return {
@@ -771,6 +871,7 @@ const PatientRegistrationForm: React.FC = () => {
     fetchMaster();
     fetchRegistrations();
     fetchSamples();
+    fetchNextPatientId();
 
     // Fetch user role
     const storedUser = localStorage.getItem("adminUser");
@@ -886,13 +987,11 @@ const PatientRegistrationForm: React.FC = () => {
   const isAgeValid =
     formData.age.value !== "" && Number(formData.age.value) > 0;
   const isNameValid = formData.patientName.trim() !== "";
-  const isAddressValid = formData.address.trim() !== "";
-
   const isReferralValid =
     (formData.referralMode || "Self") === "Self"
       ? true
       : (formData.selectedHospital || "").trim() !== "" &&
-        (formData.selectedDoctor || "").trim() !== "";
+      (formData.selectedDoctor || "").trim() !== "";
 
   const transport = formData.sampleReceived;
   const isTransportValid = (() => {
@@ -942,7 +1041,6 @@ const PatientRegistrationForm: React.FC = () => {
     isNameValid &&
     isAgeValid &&
     isMobileValid &&
-    isAddressValid &&
     isReferralValid &&
     isTransportValid;
 
@@ -1138,6 +1236,8 @@ const PatientRegistrationForm: React.FC = () => {
       localStorage.removeItem("medoraa_registration_draft");
       setIsDraftRestored(false);
       setSavedRecord(null);
+      setIsExistingPatientLoaded(false);
+      fetchNextPatientId();
     }
   };
 
@@ -1192,10 +1292,12 @@ const PatientRegistrationForm: React.FC = () => {
       });
       const data = await res.json();
       if (data.success) {
-        // Clear draft
+        // Clear draft & refresh patient list and next ID
         localStorage.removeItem("medoraa_registration_draft");
         setIsDraftRestored(false);
         setSavedRecord(data.data);
+        fetchRegistrations();
+        fetchNextPatientId();
 
         // Fetch samples and open test selection step
         await fetchSamples();
@@ -1283,66 +1385,70 @@ const PatientRegistrationForm: React.FC = () => {
         `${d.doctorName} (Ref: ${d.doctorCode || d._id.slice(-4).toUpperCase()})`,
     ),
   ];
-  const staffOptions = staff.map((s) => `${s.name} (${s.role || "Staff"})`);
+  const staffOptions = [
+    ...(formData.selectedHospital && formData.selectedHospital !== "Self"
+      ? [`Drawn at ${formData.selectedHospital}`]
+      : ["Drawn at Hospital / Outside Clinic"]),
+    ...staff.map((s) => `${s.name} (${s.role || "Staff"})`),
+  ];
   const labOptions = [
     "Medoraa Labs (Our Lab)",
     ...hospitals.flatMap((h) =>
       (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`),
     ),
   ];
-  const referredByOptions = [
-    "Self",
-    "Medoraa Labs (Our Lab)",
-    ...(formData.selectedHospital && formData.selectedHospital !== "Self"
+  const referredByOptions =
+    formData.selectedHospital && formData.selectedHospital !== "Self"
       ? [
-          // Filtered labs (without hospital name)
-          ...hospitals
-            .filter((h) => h.hospitalName === formData.selectedHospital)
-            .flatMap((h) => (h.labs || []).map((l: any) => l.labName)),
-          // Filtered doctors (without hospital name)
-          ...doctors
-            .filter((d) => {
-              const docHosp =
-                typeof d.hospitalId === "object"
-                  ? d.hospitalId?.hospitalName
-                  : d.hospitalId;
-              return docHosp === formData.selectedHospital;
-            })
-            .map((d) => {
-              const refCode = d.doctorCode || d._id.slice(-4).toUpperCase();
-              if (
-                d.affiliationType === "LAB" &&
-                d.labId &&
-                typeof d.labId === "object"
-              ) {
-                return `${d.doctorName} (Ref: ${refCode}) (Lab: ${d.labId.labName})`;
-              }
-              return `${d.doctorName} (Ref: ${refCode})`;
-            }),
-        ]
-      : [
-          // All labs (with hospital name)
-          ...hospitals.flatMap((h) =>
-            (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`),
-          ),
-          // All doctors (with hospital/lab name)
-          ...doctors.map((d) => {
-            const refCode = d.doctorCode || d._id.slice(-4).toUpperCase();
-            const hospName =
-              (typeof d.hospitalId === "object"
+        // Filtered labs (without hospital name)
+        ...hospitals
+          .filter((h) => h.hospitalName === formData.selectedHospital)
+          .flatMap((h) => (h.labs || []).map((l: any) => l.labName)),
+        // Filtered doctors (without hospital name)
+        ...doctors
+          .filter((d) => {
+            const docHosp =
+              typeof d.hospitalId === "object"
                 ? d.hospitalId?.hospitalName
-                : d.hospitalId) || "Independent";
+                : d.hospitalId;
+            return docHosp === formData.selectedHospital;
+          })
+          .map((d) => {
+            const refCode = d.doctorCode || d._id.slice(-4).toUpperCase();
             if (
               d.affiliationType === "LAB" &&
               d.labId &&
               typeof d.labId === "object"
             ) {
-              return `${d.doctorName} (Ref: ${refCode}) (${d.labId.labName})`;
+              return `${d.doctorName} (Ref: ${refCode}) (Lab: ${d.labId.labName})`;
             }
-            return `${d.doctorName} (Ref: ${refCode}) (${hospName})`;
+            return `${d.doctorName} (Ref: ${refCode})`;
           }),
-        ]),
-  ];
+      ]
+      : [
+        "Self",
+        "Medoraa Labs (Our Lab)",
+        // All labs (with hospital name)
+        ...hospitals.flatMap((h) =>
+          (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`),
+        ),
+        // All doctors (with hospital/lab name)
+        ...doctors.map((d) => {
+          const refCode = d.doctorCode || d._id.slice(-4).toUpperCase();
+          const hospName =
+            (typeof d.hospitalId === "object"
+              ? d.hospitalId?.hospitalName
+              : d.hospitalId) || "Independent";
+          if (
+            d.affiliationType === "LAB" &&
+            d.labId &&
+            typeof d.labId === "object"
+          ) {
+            return `${d.doctorName} (Ref: ${refCode}) (${d.labId.labName})`;
+          }
+          return `${d.doctorName} (Ref: ${refCode}) (${hospName})`;
+        }),
+      ];
 
   const currentReferredBy = (() => {
     if ((formData.referralMode || "Self") === "Self") {
@@ -1518,89 +1624,89 @@ const PatientRegistrationForm: React.FC = () => {
                 <div className="flex-1 overflow-x-auto lg:overflow-y-auto p-2 flex flex-row lg:flex-col gap-1.5 lg:space-y-1 no-scrollbar shrink-0 lg:shrink">
                   {sidebarView === "category"
                     ? [
-                        "All",
-                        ...Array.from(
-                          new Set(
-                            availableSamples
-                              .map((s) => s.category || "General")
-                              .filter((c) => c && c !== "-"),
-                          ),
+                      "All",
+                      ...Array.from(
+                        new Set(
+                          availableSamples
+                            .map((s) => s.category || "General")
+                            .filter((c) => c && c !== "-"),
                         ),
-                      ].map((cat) => {
-                        const catCount = availableSamples.filter(
-                          (s) =>
-                            (s.category || "General") === cat && cat !== "All",
-                        ).length;
-                        const isSelected = selectedCategory === cat;
-                        return (
-                          <button
-                            key={cat}
-                            onClick={() => setSelectedCategory(cat)}
-                            className={cn(
-                              "w-auto lg:w-full shrink-0 text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer whitespace-nowrap gap-1.5",
-                              isSelected
-                                ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
-                                : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400",
-                            )}
-                          >
-                            <span className="truncate text-left">{cat}</span>
-                            {cat !== "All" && (
-                              <span
-                                className={cn(
-                                  "text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ml-1.5",
-                                  isSelected
-                                    ? "bg-blue-700 text-white"
-                                    : "bg-slate-200 dark:bg-slate-850 text-slate-500",
-                                )}
-                              >
-                                {catCount}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })
+                      ),
+                    ].map((cat) => {
+                      const catCount = availableSamples.filter(
+                        (s) =>
+                          (s.category || "General") === cat && cat !== "All",
+                      ).length;
+                      const isSelected = selectedCategory === cat;
+                      return (
+                        <button
+                          key={cat}
+                          onClick={() => setSelectedCategory(cat)}
+                          className={cn(
+                            "w-auto lg:w-full shrink-0 text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer whitespace-nowrap gap-1.5",
+                            isSelected
+                              ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
+                              : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400",
+                          )}
+                        >
+                          <span className="truncate text-left">{cat}</span>
+                          {cat !== "All" && (
+                            <span
+                              className={cn(
+                                "text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ml-1.5",
+                                isSelected
+                                  ? "bg-blue-700 text-white"
+                                  : "bg-slate-200 dark:bg-slate-850 text-slate-500",
+                              )}
+                            >
+                              {catCount}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
                     : [
-                        "All",
-                        ...Array.from(
-                          new Set(
-                            availableSamples
-                              .map((s) => s.organ)
-                              .filter(Boolean)
-                              .filter((o) => o && o !== "-"),
-                          ),
+                      "All",
+                      ...Array.from(
+                        new Set(
+                          availableSamples
+                            .map((s) => s.organ)
+                            .filter(Boolean)
+                            .filter((o) => o && o !== "-"),
                         ),
-                      ].map((org) => {
-                        const orgCount = availableSamples.filter(
-                          (s) => s.organ === org && org !== "All",
-                        ).length;
-                        const isSelected = selectedOrgan === org;
-                        return (
-                          <button
-                            key={org}
-                            onClick={() => setSelectedOrgan(org)}
-                            className={cn(
-                              "w-auto lg:w-full shrink-0 text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer whitespace-nowrap gap-1.5",
-                              isSelected
-                                ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
-                                : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400",
-                            )}
-                          >
-                            <span className="truncate text-left">{org}</span>
-                            {org !== "All" && (
-                              <span
-                                className={cn(
-                                  "text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ml-1.5",
-                                  isSelected
-                                    ? "bg-blue-700 text-white"
-                                    : "bg-slate-200 dark:bg-slate-850 text-slate-500",
-                                )}
-                              >
-                                {orgCount}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
+                      ),
+                    ].map((org) => {
+                      const orgCount = availableSamples.filter(
+                        (s) => s.organ === org && org !== "All",
+                      ).length;
+                      const isSelected = selectedOrgan === org;
+                      return (
+                        <button
+                          key={org}
+                          onClick={() => setSelectedOrgan(org)}
+                          className={cn(
+                            "w-auto lg:w-full shrink-0 text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer whitespace-nowrap gap-1.5",
+                            isSelected
+                              ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
+                              : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400",
+                          )}
+                        >
+                          <span className="truncate text-left">{org}</span>
+                          {org !== "All" && (
+                            <span
+                              className={cn(
+                                "text-[9px] px-1.5 py-0.5 rounded-full shrink-0 font-bold ml-1.5",
+                                isSelected
+                                  ? "bg-blue-700 text-white"
+                                  : "bg-slate-200 dark:bg-slate-850 text-slate-500",
+                              )}
+                            >
+                              {orgCount}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                 </div>
               </div>
 
@@ -1630,24 +1736,24 @@ const PatientRegistrationForm: React.FC = () => {
                       </span>
                     </div>
                   ) : availableSamples.filter((sample) => {
-                      const matchesSearch =
-                        (sample.testName || "")
-                          .toLowerCase()
-                          .includes(searchQuery.toLowerCase()) ||
-                        (sample.organ || "")
-                          .toLowerCase()
-                          .includes(searchQuery.toLowerCase()) ||
-                        (sample.category || "")
-                          .toLowerCase()
-                          .includes(searchQuery.toLowerCase());
-                      const matchesCategory =
-                        selectedCategory === "All" ||
-                        (sample.category || "General") === selectedCategory;
-                      const matchesOrgan =
-                        selectedOrgan === "All" ||
-                        sample.organ === selectedOrgan;
-                      return matchesSearch && matchesCategory && matchesOrgan;
-                    }).length === 0 ? (
+                    const matchesSearch =
+                      (sample.testName || "")
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase()) ||
+                      (sample.organ || "")
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase()) ||
+                      (sample.category || "")
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase());
+                    const matchesCategory =
+                      selectedCategory === "All" ||
+                      (sample.category || "General") === selectedCategory;
+                    const matchesOrgan =
+                      selectedOrgan === "All" ||
+                      sample.organ === selectedOrgan;
+                    return matchesSearch && matchesCategory && matchesOrgan;
+                  }).length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center p-6">
                       <Activity className="w-10 h-10 text-slate-300 mb-2" />
                       <p className="text-xs font-bold text-slate-500">
@@ -1894,6 +2000,47 @@ const PatientRegistrationForm: React.FC = () => {
                             />
                           )}
                         </div>
+
+                        {/* Paid Amount and Due Amount (Auto-Calculated) */}
+                        {(() => {
+                          const currentPaid =
+                            paidAmountInput.trim() !== ""
+                              ? parseFloat(paidAmountInput) || 0
+                              : totalPayable;
+                          const calculatedDue = Math.max(0, totalPayable - currentPaid);
+
+                          return (
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
+                                  Paid (₹)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={totalPayable}
+                                  placeholder={totalPayable.toFixed(0)}
+                                  value={paidAmountInput}
+                                  onChange={(e) => setPaidAmountInput(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700/60 rounded-lg text-xs font-black text-emerald-600 dark:text-emerald-400 outline-none focus:ring-1 focus:ring-emerald-500"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-extrabold text-rose-500 dark:text-rose-400 uppercase tracking-wider block">
+                                  Due (₹)
+                                </label>
+                                <div className="w-full px-2.5 py-1.5 bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-black text-rose-600 dark:text-rose-400 flex items-center justify-between">
+                                  <span>₹{calculatedDue.toFixed(0)}</span>
+                                  {calculatedDue > 0 && (
+                                    <span className="text-[9px] bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 px-1 py-0.2 rounded font-extrabold">
+                                      DUE
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Display UPI QR Code when UPI selected */}
                         {isUpi && (
@@ -2152,6 +2299,7 @@ const PatientRegistrationForm: React.FC = () => {
                       <th className="px-6 py-3.5">Contact</th>
                       <th className="px-6 py-3.5">Referred By</th>
                       <th className="px-6 py-3.5">Tests</th>
+                      <th className="px-6 py-3.5">Payment / Due</th>
                       <th className="px-6 py-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -2182,11 +2330,24 @@ const PatientRegistrationForm: React.FC = () => {
                           isSampleMatch
                         );
                       })
-                      .map((reg) => (
-                        <tr
-                          key={reg._id}
-                          className="hover:bg-slate-50/40 dark:hover:bg-slate-800/20 transition-colors"
-                        >
+                      .map((reg) => {
+                        const total = reg.billing?.totalAmount ?? reg.totalAmount ?? 0;
+                        const paid = reg.billing?.paidAmount ?? reg.paidAmount ?? 0;
+                        const due = Math.max(0, total - paid);
+                        const hasDue = due > 0;
+                        const regEnteredCount = reg.testResults ? reg.testResults.filter((t: any) => t.resultValue && String(t.resultValue).trim() !== "" && String(t.resultValue).trim() !== "—").length : 0;
+                        const regTotalCount = reg.testResults && reg.testResults.length > 0 ? reg.testResults.length : (reg.tests ? reg.tests.length : 0);
+                        const regPendingCount = Math.max(0, regTotalCount - regEnteredCount);
+                        return (
+                          <tr
+                            key={reg._id}
+                            className={cn(
+                              "transition-colors",
+                              hasDue
+                                ? "bg-red-100/80 dark:bg-rose-950/60 hover:bg-red-200/90 dark:hover:bg-rose-900/70 border-l-4 border-l-rose-500"
+                                : "hover:bg-slate-50/40 dark:hover:bg-slate-800/20",
+                            )}
+                          >
                           <td className="px-6 py-4">
                             <span className="font-mono font-bold text-slate-800 dark:text-slate-200 block">
                               {reg.registrationNumber}
@@ -2238,35 +2399,122 @@ const PatientRegistrationForm: React.FC = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="flex flex-wrap gap-1 max-w-[200px]">
-                              {reg.tests && reg.tests.length > 0 ? (
-                                reg.tests.map((test: any, tIdx: number) => (
-                                  <span
-                                    key={tIdx}
-                                    className="px-2 py-0.5 bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 text-[9px] font-black rounded uppercase"
-                                  >
-                                    {typeof test === "string"
-                                      ? test
-                                      : test.testName || test.name}
+                            <div className="flex flex-col gap-1 max-w-[200px]">
+                              <div className="flex flex-wrap gap-1">
+                                {reg.tests && reg.tests.length > 0 ? (
+                                  reg.tests.map((test: any, tIdx: number) => (
+                                    <span
+                                      key={tIdx}
+                                      className="px-2 py-0.5 bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 text-[9px] font-black rounded uppercase"
+                                    >
+                                      {typeof test === "string"
+                                        ? test
+                                        : test.testName || test.name}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-[10px] text-amber-500 font-black uppercase">
+                                    No tests added
                                   </span>
-                                ))
-                              ) : (
-                                <span className="text-[10px] text-amber-500 font-black uppercase">
-                                  No tests added
-                                </span>
+                                )}
+                              </div>
+                              {regTotalCount > 0 && (
+                                <div className="mt-0.5">
+                                  {regEnteredCount > 0 && regPendingCount > 0 ? (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 px-1.5 py-0.5 rounded">
+                                      <Clock className="w-2.5 h-2.5" />
+                                      {regEnteredCount} Entered • {regPendingCount} Pending
+                                    </span>
+                                  ) : regEnteredCount > 0 && regPendingCount === 0 ? (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 px-1.5 py-0.5 rounded">
+                                      <Check className="w-2.5 h-2.5" />
+                                      All {regEnteredCount} Entered
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded">
+                                      {regPendingCount} Pending
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            {(() => {
+                              const total = reg.billing?.totalAmount ?? reg.totalAmount ?? 0;
+                              const paid = reg.billing?.paidAmount ?? reg.paidAmount ?? 0;
+                              const due = Math.max(0, total - paid);
+                              const isPaid = reg.paymentStatus === "PAID" || (total > 0 && due <= 0);
+                              return (
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span
+                                      className={cn(
+                                        "px-2 py-0.5 text-[9px] font-black rounded uppercase tracking-wider",
+                                        isPaid
+                                          ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400"
+                                          : due > 0 && paid > 0
+                                          ? "bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400"
+                                          : "bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400"
+                                      )}
+                                    >
+                                      {reg.paymentStatus || (isPaid ? "PAID" : due > 0 && paid > 0 ? "PARTIAL" : "PENDING")}
+                                    </span>
+                                  </div>
+                                  {due > 0 && (
+                                    <span className="font-black text-xs text-rose-700 dark:text-rose-300 bg-rose-200/80 dark:bg-rose-900/60 px-2 py-0.5 rounded-md inline-flex items-center gap-1 w-fit shadow-xs border border-rose-300/50">
+                                      Due: ₹{due.toFixed(2)}
+                                    </span>
+                                  )}
+                                  {isPaid && total > 0 && (
+                                    <span className="font-bold text-[10px] text-emerald-600 dark:text-emerald-400">
+                                      Paid in Full (₹{total.toFixed(2)})
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <button
+                                onClick={async () => {
+                                  setSavedRecord(reg);
+                                  const existingTestIds = (reg.tests || [])
+                                    .map((t: any) => (typeof t === "object" && t._id ? t._id : null))
+                                    .filter(Boolean);
+                                  setSelectedTestIds(existingTestIds);
+                                  
+                                  // Pre-fill billing options if saved
+                                  if (reg.billing) {
+                                    setDiscountVal(String(reg.billing.discountPercentage || reg.billing.discount || 0));
+                                    setDiscountType(reg.billing.discountType || "percentage");
+                                    setPaymentMethod(reg.billing.paymentMethod || "Cash");
+                                    setPaidAmountInput(String(reg.billing.paidAmount ?? ""));
+                                  } else {
+                                    setDiscountVal("0");
+                                    setDiscountType("percentage");
+                                    setPaymentMethod("Cash");
+                                    setPaidAmountInput("");
+                                  }
+
+                                  await fetchSamples();
+                                  setShowTestSelection(true);
+                                }}
+                                className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center gap-1 font-bold text-[10px]"
+                                title="Add or Edit Tests for this patient"
+                              >
+                                <FlaskConical className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">+ Tests</span>
+                              </button>
+                              <button
                                 type="button"
                                 disabled={
-                                  reg.authorizationStatus !== "AUTHORIZED"
+                                  reg.authorizationStatus !== "AUTHORIZED" || regEnteredCount === 0
                                 }
                                 onClick={() => {
                                   if (
-                                    reg.authorizationStatus === "AUTHORIZED"
+                                    reg.authorizationStatus === "AUTHORIZED" && regEnteredCount > 0
                                   ) {
                                     setReportModalRecord(reg);
                                     setIsReportModalOpen(true);
@@ -2274,14 +2522,16 @@ const PatientRegistrationForm: React.FC = () => {
                                 }}
                                 className={cn(
                                   "p-1.5 rounded-full transition-all cursor-pointer",
-                                  reg.authorizationStatus === "AUTHORIZED"
+                                  reg.authorizationStatus === "AUTHORIZED" && regEnteredCount > 0
                                     ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:scale-105 active:scale-95"
                                     : "bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600 opacity-40 cursor-not-allowed",
                                 )}
                                 title={
-                                  reg.authorizationStatus === "AUTHORIZED"
-                                    ? "Download / Print Official Pathology Report"
-                                    : "Download disabled — Awaiting Pathologist Authorization"
+                                  reg.authorizationStatus === "AUTHORIZED" && regEnteredCount > 0
+                                    ? `Download / Print Official Pathology Report (${regEnteredCount} entered result${regEnteredCount > 1 ? "s" : ""})`
+                                    : reg.authorizationStatus !== "AUTHORIZED"
+                                    ? "Download disabled — Awaiting Pathologist Authorization"
+                                    : "Download disabled — No test results entered yet"
                                 }
                               >
                                 <Download className="w-3.5 h-3.5" />
@@ -2315,7 +2565,8 @@ const PatientRegistrationForm: React.FC = () => {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -2377,13 +2628,50 @@ const PatientRegistrationForm: React.FC = () => {
             <div className="lg:col-span-2 space-y-4">
               {/* SECTION 2: Patient Information */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl p-4 md:p-5 shadow-sm space-y-3">
-                <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <span className="p-1 bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 rounded-md">
-                    <User className="w-3.5 h-3.5" />
-                  </span>
-                  <h2 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
-                    Patient Information
-                  </h2>
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 rounded-md">
+                      <User className="w-3.5 h-3.5" />
+                    </span>
+                    <h2 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
+                      Patient Information
+                    </h2>
+                  </div>
+                  {isExistingPatientLoaded && (
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-md flex items-center gap-1 animate-in fade-in duration-200">
+                      <CheckCircle2 className="w-3 h-3" /> Existing Patient Loaded
+                    </span>
+                  )}
+                </div>
+
+                {/* Patient ID Field */}
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/60 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                      Patient ID / Reg No.
+                      <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
+                        (Auto-generated for new, or type existing to fetch)
+                      </span>
+                    </label>
+                    {patientIdInput !== nextPatientId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPatientIdInput(nextPatientId);
+                        }}
+                        className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                      >
+                        <RefreshCw className="w-2.5 h-2.5" /> Restore Auto ID
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={patientIdInput}
+                    onChange={(e) => setPatientIdInput(e.target.value)}
+                    placeholder="e.g. REG-20260903-0001"
+                    className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono font-bold text-blue-600 dark:text-blue-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 uppercase tracking-wide"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2508,25 +2796,7 @@ const PatientRegistrationForm: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Complete Address */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                    Complete Address{" "}
-                    <span className="text-rose-500 font-bold">*</span>
-                  </label>
-                  <textarea
-                    rows={1}
-                    value={formData.address}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        address: e.target.value,
-                      }))
-                    }
-                    placeholder="Enter patient complete street address details"
-                    className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 font-semibold resize-none"
-                  />
-                </div>
+
 
                 {/* State, District, City text inputs */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
@@ -2632,7 +2902,7 @@ const PatientRegistrationForm: React.FC = () => {
                     />
 
                     {(formData.referralMode || "Self") === "Self" &&
-                    (formData.selectedLab || "Medoraa Labs (Our Lab)") !==
+                      (formData.selectedLab || "Medoraa Labs (Our Lab)") !==
                       "Medoraa Labs (Our Lab)" ? (
                       <div className="flex flex-col gap-1">
                         <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
@@ -2858,7 +3128,7 @@ const PatientRegistrationForm: React.FC = () => {
                         }}
                         className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none font-bold shadow-sm"
                       >
-                        <option value="None">Sample Drawn at Lab</option>
+                        <option value="None">Sample Draw by Medoraalab</option>
                         <option value="Courier">
                           Other (Collected from Outside)
                         </option>
@@ -3101,23 +3371,7 @@ const PatientRegistrationForm: React.FC = () => {
                       10-Digit Mobile Number
                     </span>
                   </li>
-                  <li className="flex items-center gap-2">
-                    <div
-                      className={cn(
-                        "w-1.5 h-1.5 rounded-full shrink-0",
-                        isAddressValid ? "bg-emerald-500" : "bg-slate-350",
-                      )}
-                    />
-                    <span
-                      className={
-                        isAddressValid
-                          ? "text-emerald-700 dark:text-emerald-500"
-                          : ""
-                      }
-                    >
-                      Street Address Details
-                    </span>
-                  </li>
+
                   <li className="flex items-center gap-2">
                     <div
                       className={cn(
@@ -3452,15 +3706,14 @@ const PatientRegistrationForm: React.FC = () => {
                 </div>
               </div>
 
-              {/* RIGHT PANEL: PDF Preview (No Scrollbar) */}
+              {/* RIGHT PANEL: Instant HTML Preview */}
               <div className="flex-1 p-2.5 sm:p-3 bg-slate-100 dark:bg-slate-950 flex flex-col overflow-hidden h-full">
                 <iframe
                   src={getApiUrl(
-                    `/api/admin/registrations/${savedRecord._id}/receipt-pdf#toolbar=0&navpanes=0&scrollbar=0&view=FitH`,
+                    `/api/admin/registrations/${savedRecord._id}/receipt-html?v=${savedRecord._id}`,
                   )}
-                  scrolling="no"
-                  className="w-full h-full rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden bg-white"
-                  title="Patient Receipt Classic PDF"
+                  className="w-full h-full rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white"
+                  title="Patient Receipt Preview"
                 />
               </div>
             </div>

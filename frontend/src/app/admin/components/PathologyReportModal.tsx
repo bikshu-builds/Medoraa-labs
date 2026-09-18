@@ -58,20 +58,32 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
     };
 
     // Extract test results and map with populated category classification (matching record.tests if available)
-    const rawResults = (record.testResults && record.testResults.length > 0)
+    const allResults = (record.testResults && record.testResults.length > 0)
         ? record.testResults
         : ((record.tests && record.tests.length > 0)
             ? record.tests.map((t: any) => ({
                 testId: typeof t === "object" ? t._id : t,
                 testName: typeof t === "string" ? t : (t.testName || t.name || "Diagnostic Parameter"),
-                resultValue: t.resultValue || "—",
+                resultValue: t.resultValue || "",
                 unit: t.unit || "",
                 referenceRange: typeof t === "object" ? (t.referenceRange || "-") : "-",
                 category: typeof t === "object" ? (t.category || t.organ || "GENERAL PATHOLOGY") : "GENERAL PATHOLOGY",
                 method: typeof t === "object" ? (t.method || "") : ""
             }))
-            : [{ testName: "Routine Pathology Parameter", resultValue: "—", unit: "", referenceRange: "-", category: "GENERAL PATHOLOGY", method: "" }]
+            : [{ testName: "Routine Pathology Parameter", resultValue: "", unit: "", referenceRange: "-", category: "GENERAL PATHOLOGY", method: "" }]
         );
+
+    // Strictly include ONLY tests that have an entered result value so pending unentered tests are NEVER printed in the report or PDF
+    const enteredOnly = allResults.filter((tr: any) => tr.resultValue && String(tr.resultValue).trim() !== "" && String(tr.resultValue).trim() !== "—");
+    const rawResults = enteredOnly;
+
+    // Track total assigned tests vs entered tests to show clear status to the user
+    const totalOrderedTests = (record.tests && record.tests.length > 0)
+        ? record.tests.length
+        : (record.testResults && record.testResults.length > 0)
+        ? record.testResults.length
+        : 0;
+    const pendingOrderedTests = Math.max(0, totalOrderedTests - rawResults.length);
 
     // Map each result to its specific Classification/Category (matching backend logic exactly)
     const testResults = rawResults.map((tr: any) => {
@@ -150,7 +162,14 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
                         <FileText className="w-5 h-5 text-amber-400 shrink-0" />
                         <div>
                             <span className="text-xs font-black uppercase tracking-wider block">Official Pathology Report — {record.registrationNumber}</span>
-                            <span className="text-[10px] text-slate-400 font-medium">Patient: {record.patientName} | Total Pages: {categoryKeys.length}</span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                                Patient: {record.patientName} | {rawResults.length} Entered Test{rawResults.length !== 1 ? 's' : ''} Included in Report
+                                {pendingOrderedTests > 0 && (
+                                    <span className="text-amber-400 font-semibold ml-1.5">
+                                        ({pendingOrderedTests} pending test{pendingOrderedTests !== 1 ? 's' : ''} omitted from PDF)
+                                    </span>
+                                )}
+                            </span>
                         </div>
                     </div>
 
@@ -158,7 +177,14 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
                     <div className="flex items-center flex-wrap gap-2">
                         <button
                             onClick={handlePrint}
-                            className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-sm transition-all active:scale-95 cursor-pointer rounded-lg"
+                            disabled={rawResults.length === 0}
+                            className={cn(
+                                "flex items-center gap-1.5 px-4 py-1.5 text-white text-xs font-extrabold shadow-sm transition-all rounded-lg",
+                                rawResults.length > 0
+                                    ? "bg-emerald-600 hover:bg-emerald-700 active:scale-95 cursor-pointer"
+                                    : "bg-slate-700 text-slate-400 opacity-60 cursor-not-allowed"
+                            )}
+                            title={rawResults.length === 0 ? "No test results entered yet to print" : "Print / Download PDF"}
                         >
                             <Download className="w-4 h-4" />
                             <span>Print / Download PDF</span>
@@ -173,8 +199,19 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
                     </div>
                 </div>
 
-                {/* View Mode 1: PDF Iframe Viewer */}
-                {viewMode === "pdf" && record._id ? (
+                {/* Empty State when 0 tests entered */}
+                {rawResults.length === 0 ? (
+                    <div className="p-12 flex flex-col items-center justify-center gap-3 text-center bg-slate-900 text-white min-h-[400px]">
+                        <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                            <FileText className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-sm font-black uppercase tracking-wider text-slate-200">No Entered Test Results To Print</h3>
+                        <p className="text-xs text-slate-400 max-w-md">
+                            All assigned tests for this patient are currently pending in the Examiner Desk. Reports can only be generated and printed once test observations have been entered.
+                        </p>
+                    </div>
+                ) : viewMode === "pdf" && record._id ? (
+                    /* View Mode 1: PDF Iframe Viewer */
                     <div className="p-3 bg-slate-900/90 flex-1 flex flex-col min-h-[550px] sm:min-h-[650px] h-[75vh]">
                         <iframe
                             src={getApiUrl(`/api/admin/registrations/${record._id}/pdf#toolbar=0&navpanes=0&scrollbar=0&view=FitH`)}
@@ -187,15 +224,9 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
                     <div className="p-4 sm:p-6 bg-slate-200/70 print:p-0 font-serif text-slate-900 space-y-6 print:space-y-0 print:bg-white">
                     {categoryKeys.map((categoryName, idx) => {
                         const items = categoryGroups[categoryName];
-                        let titleDisplay = categoryName.trim().toUpperCase();
-                        if (!titleDisplay.endsWith("#")) {
-                            if (titleDisplay.endsWith("REPORT")) {
-                                titleDisplay = `${titleDisplay}#`;
-                            } else if (titleDisplay.length <= 4) {
-                                titleDisplay = `${titleDisplay}#`;
-                            } else {
-                                titleDisplay = `${titleDisplay} REPORT#`;
-                            }
+                        let titleDisplay = categoryName.trim().toUpperCase().replace(/#+$/, "").trim();
+                        if (!titleDisplay.endsWith("REPORT")) {
+                            titleDisplay = `${titleDisplay} REPORT`;
                         }
 
                         const methodText = items[0]?.method && items[0].method !== "-"
@@ -206,7 +237,7 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
                             <div
                                 key={categoryName}
                                 className={cn(
-                                    "bg-white shadow-xl border border-slate-300 rounded-sm p-6 sm:p-8 flex flex-col justify-between min-h-[265mm] print:min-h-[270mm] print:shadow-none print:border-none print:rounded-none print:p-0",
+                                    "bg-white shadow-xl border border-slate-300 rounded-sm p-6 sm:p-8 flex flex-col justify-start space-y-6 min-h-[265mm] print:min-h-[270mm] print:shadow-none print:border-none print:rounded-none print:p-0",
                                     idx > 0 && "break-before-page print:break-before-page"
                                 )}
                                 style={{ pageBreakBefore: idx > 0 ? "always" : "auto", breakBefore: idx > 0 ? "page" : "auto" }}
@@ -316,32 +347,34 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
                                             </span>
                                         </div>
 
+                                        {/* Clinical Disclaimer Note */}
+                                        <div className="font-sans text-[10.5px] font-extrabold text-slate-900 pt-1">
+                                            NOTE : Please Correlate Clinically. If Any Discrepancy, Please Contact.
+                                        </div>
+
                                         {/* Clinical Remarks */}
                                         {record.notes && (
-                                            <div className="pt-3 border-t border-slate-200 font-sans text-xs">
+                                            <div className="pt-2 border-t border-slate-200 font-sans text-xs">
                                                 <span className="font-bold text-slate-900 uppercase">Clinical Remarks: </span>
                                                 <span className="text-slate-800 italic">{record.notes}</span>
                                             </div>
                                         )}
-                                    </div>
-                                </div>
 
-                                {/* DOCTOR / PATHOLOGIST SIGNATURE & FOOTER NOTE BLOCK */}
-                                <div className="pt-6 font-sans space-y-3">
-                                    <div className="flex flex-col items-end justify-end space-y-1 text-right">
-                                        <div className="text-2xl font-serif italic font-extrabold text-slate-900 pr-4 select-none tracking-tighter" style={{ fontFamily: 'Georgia, serif' }}>
-                                            {record.authorizedBy || "Dr. Ravi Kumar Manyam"}
+                                        {/* DOCTOR / PATHOLOGIST SIGNATURE BLOCK */}
+                                        <div className="pt-6 font-sans">
+                                            <div className="flex flex-col items-end justify-end space-y-1 text-right">
+                                                <div className="text-2xl font-serif italic font-extrabold text-slate-900 pr-4 select-none tracking-tighter" style={{ fontFamily: 'Georgia, serif' }}>
+                                                    {record.authorizedBy || "Dr. Ravi Kumar Manyam"}
+                                                </div>
+                                                <div className="border-t border-slate-800 w-48 mt-1 pt-1 ml-auto" />
+                                                <div className="font-extrabold text-xs text-slate-900">
+                                                    Dr. Ravi Kumar Manyam; Ph.D
+                                                </div>
+                                                <div className="text-[11px] font-semibold text-slate-600">
+                                                    Biochemist & Pathologist
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="border-t border-slate-800 w-48 mt-1 pt-1" />
-                                        <div className="font-extrabold text-xs text-slate-900">
-                                            Dr. Ravi Kumar Manyam; Ph.D
-                                        </div>
-                                        <div className="text-[11px] font-semibold text-slate-600">
-                                            Biochemist & Pathologist
-                                        </div>
-                                    </div>
-                                    <div className="text-[10px] font-extrabold text-slate-900 border-t border-slate-200 pt-2">
-                                        NOTE : Please Correlate Clinically. If Any Discrepancy, Please Contact.
                                     </div>
                                 </div>
                             </div>

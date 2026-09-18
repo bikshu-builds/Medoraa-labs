@@ -29,6 +29,27 @@ const getFormattedDateTime = () => {
   return { dateStr, timeStr, dateCodeStr };
 };
 
+// @desc    Get next predicted registration number
+// @route   GET /api/admin/registrations/next-id
+exports.getNextRegistrationNumber = async (req, res) => {
+  try {
+    const { dateCodeStr } = getFormattedDateTime();
+    const counterId = `registrationCode-${dateCodeStr}`;
+    const counter = await Counter.findById(counterId);
+    const nextSeq = counter ? counter.seq + 1 : 1;
+    const nextRegistrationNumber = `REG-${dateCodeStr}-${String(nextSeq).padStart(4, "0")}`;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        nextRegistrationNumber,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // @desc    Register a new patient
 // @route   POST /api/admin/registrations
 exports.addRegistration = async (req, res) => {
@@ -319,6 +340,22 @@ exports.downloadReportPDF = async (req, res) => {
       });
     }
 
+    // Check that at least one test has entered observation values
+    const hasEnteredResults =
+      registration.testResults &&
+      registration.testResults.some((tr) => {
+        const val = tr.resultValue;
+        return val && String(val).trim() !== "" && String(val).trim() !== "—";
+      });
+
+    if (!hasEnteredResults) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Cannot print report: No test results have been entered for this patient yet.",
+      });
+    }
+
     // Generate PDF Buffer
     const pdfBuffer = await generatePathologyPDF(registration);
 
@@ -492,5 +529,33 @@ exports.downloadReceiptPDF = async (req, res) => {
         success: false,
         message: "Error generating receipt PDF: " + err.message,
       });
+  }
+};
+
+// @desc    Instant HTML preview of Patient Receipt (no Puppeteer — for modal iframe)
+// @route   GET /api/admin/registrations/:id/receipt-html
+exports.downloadReceiptHTML = async (req, res) => {
+  try {
+    const { buildReceiptHTML } = require("../services/pdfGenerator");
+
+    const registration = await PatientRegistration.findById(
+      req.params.id,
+    ).populate("tests");
+
+    if (!registration) {
+      return res
+        .status(404)
+        .send("<h3>Registration not found</h3>");
+    }
+
+    const autoPrint = req.query.autoprint === 'true';
+    const html = buildReceiptHTML(registration, autoPrint);
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(html);
+  } catch (err) {
+    console.error("Receipt HTML Error:", err);
+    return res.status(500).send("<h3>Error generating receipt preview: " + err.message + "</h3>");
   }
 };

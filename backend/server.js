@@ -34,6 +34,13 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(async () => {
     console.log("Connected to MongoDB");
+
+    // Warm up Puppeteer browser instance in background so first PDF request is fast
+    try {
+      const { getBrowser } = require("./services/pdfGenerator");
+      getBrowser().then(() => console.log("[Puppeteer] Browser pre-warmed and ready.")).catch(() => {});
+    } catch (_) {}
+
     // Safe database migration for legacy doctor schema ('hospital' -> 'hospitalId')
     try {
       const db = mongoose.connection.db;

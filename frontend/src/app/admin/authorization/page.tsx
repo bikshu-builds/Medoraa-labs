@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from "react";
 import DashboardCard from "../components/DashboardCard";
 import {
-    Activity,
     CheckCircle2,
     AlertCircle,
     Search,
@@ -35,10 +34,7 @@ import {
     MapPin,
     ShieldAlert,
     Pencil,
-    Plus,
     Trash2,
-    X,
-    ShoppingCart,
     Download
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
@@ -82,9 +78,9 @@ export default function AuthorizationDashboard() {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
-    // Full page view state for active clinical sign-off workspace
     const [selectedRecord, setSelectedRecord] = useState<PatientTestRecord | null>(null);
     const [editableResults, setEditableResults] = useState<TestResultEntry[]>([]);
+    const [pendingTests, setPendingTests] = useState<TestResultEntry[]>([]);
     const [pathologistNotes, setPathologistNotes] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [successMessage, setSuccessMessage] = useState("");
@@ -105,87 +101,6 @@ export default function AuthorizationDashboard() {
         referredBy: ""
     });
 
-    // Master Test Catalog Selection Modal State
-    const [showCatalogModal, setShowCatalogModal] = useState(false);
-    const [availableSamples, setAvailableSamples] = useState<any[]>([]);
-    const [isLoadingSamples, setIsLoadingSamples] = useState(false);
-    const [catalogSearchQuery, setCatalogSearchQuery] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState("All");
-    const [selectedOrgan, setSelectedOrgan] = useState("All");
-    const [sidebarView, setSidebarView] = useState<"category" | "organ">("category");
-    const [selectedCatalogTestIds, setSelectedCatalogTestIds] = useState<string[]>([]);
-
-    const fetchSamplesCatalog = async () => {
-        try {
-            setIsLoadingSamples(true);
-            const token = localStorage.getItem("adminToken");
-            const res = await fetch(getApiUrl("/api/admin/samples"), {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            const data = await res.json();
-            if (data.success && Array.isArray(data.data)) {
-                setAvailableSamples(data.data);
-            }
-        } catch (err) {
-            console.error("Failed to fetch samples catalog", err);
-        } finally {
-            setIsLoadingSamples(false);
-        }
-    };
-
-    const handleOpenCatalogModal = () => {
-        setShowCatalogModal(true);
-        fetchSamplesCatalog();
-        if (availableSamples.length > 0) {
-            const existingNames = editableResults.map(r => r.testName.trim().toLowerCase());
-            const preSelected = availableSamples
-                .filter(s => existingNames.includes((s.testName || "").trim().toLowerCase()))
-                .map(s => s._id);
-            setSelectedCatalogTestIds(preSelected);
-        }
-    };
-
-    const toggleCatalogTestSelection = (sampleId: string) => {
-        setSelectedCatalogTestIds(prev =>
-            prev.includes(sampleId) ? prev.filter(id => id !== sampleId) : [...prev, sampleId]
-        );
-    };
-
-    const handleAddCatalogTestsToResults = () => {
-        const selectedSamples = availableSamples.filter(s => selectedCatalogTestIds.includes(s._id));
-
-        setEditableResults(prev => {
-            const existingNames = new Set(prev.map(item => item.testName.trim().toLowerCase()));
-            const newRows: TestResultEntry[] = [];
-
-            selectedSamples.forEach(sample => {
-                if (!existingNames.has(sample.testName.trim().toLowerCase())) {
-                    let unit = sample.units || sample.unit || "";
-                    if (!unit && sample.referenceRange) {
-                        const parts = sample.referenceRange.trim().split(" ");
-                        if (parts.length > 1) {
-                            const last = parts[parts.length - 1];
-                            if (/\/[a-zA-Z]|%|mm|mg|g|iu|u|mmol|mol/i.test(last)) {
-                                unit = last;
-                            }
-                        }
-                    }
-                    newRows.push({
-                        testId: sample._id,
-                        testName: sample.testName,
-                        resultValue: "",
-                        unit: unit,
-                        referenceRange: sample.referenceRange || "-",
-                        flag: "Normal"
-                    });
-                }
-            });
-
-            return [...prev, ...newRows];
-        });
-
-        setShowCatalogModal(false);
-    };
 
     // Initial fallback data
     const demoWorklist: PatientTestRecord[] = [
@@ -305,23 +220,41 @@ export default function AuthorizationDashboard() {
             });
             setIsEditingPatient(false);
 
+            // Gather all tests associated with this registration
+            const allTestsList: TestResultEntry[] = [];
+            const seenNames = new Set<string>();
+
             if (selectedRecord.testResults && selectedRecord.testResults.length > 0) {
-                setEditableResults(selectedRecord.testResults);
-            } else if (selectedRecord.tests && selectedRecord.tests.length > 0) {
-                const initial = selectedRecord.tests.map((t: any) => ({
-                    testId: t._id || t,
-                    testName: typeof t === "string" ? t : (t.testName || "Diagnostic Test"),
-                    resultValue: "",
-                    unit: "",
-                    referenceRange: typeof t === "object" ? (t.referenceRange || "-") : "-",
-                    flag: "Normal" as const
-                }));
-                setEditableResults(initial);
-            } else {
-                setEditableResults([
-                    { testName: "Routine Pathology Parameter", resultValue: "", unit: "", referenceRange: "-", flag: "Normal" }
-                ]);
+                selectedRecord.testResults.forEach((t) => {
+                    allTestsList.push(t);
+                    seenNames.add(t.testName.trim().toLowerCase());
+                });
             }
+
+            if (selectedRecord.tests && selectedRecord.tests.length > 0) {
+                selectedRecord.tests.forEach((t: any) => {
+                    const tName = typeof t === "string" ? t : (t.testName || t.name || "Diagnostic Test");
+                    if (!seenNames.has(tName.trim().toLowerCase())) {
+                        allTestsList.push({
+                            testId: t._id || t,
+                            testName: tName,
+                            resultValue: "",
+                            unit: "",
+                            referenceRange: typeof t === "object" ? (t.referenceRange || "-") : "-",
+                            flag: "Normal" as const
+                        });
+                        seenNames.add(tName.trim().toLowerCase());
+                    }
+                });
+            }
+
+            // Only tests where the Examiner has entered results are shown in Authorization
+            const entered = allTestsList.filter(t => t.resultValue && String(t.resultValue).trim() !== "");
+            // Remaining tests stay pending
+            const pending = allTestsList.filter(t => !t.resultValue || String(t.resultValue).trim() === "");
+
+            setEditableResults(entered);
+            setPendingTests(pending);
             setPathologistNotes(selectedRecord.notes || "");
             setSuccessMessage("");
         }
@@ -361,13 +294,15 @@ export default function AuthorizationDashboard() {
 
         try {
             const token = localStorage.getItem("adminToken");
+            const combinedTestResults = [...editableResults, ...pendingTests];
+
             const payload = {
                 patientName: patientForm.patientName,
                 age: { value: Number(patientForm.ageValue) || 0, type: patientForm.ageType },
                 gender: patientForm.gender,
                 mobileNumber: patientForm.mobileNumber,
                 address: patientForm.address,
-                testResults: editableResults,
+                testResults: combinedTestResults,
                 authorizationStatus: newStatus,
                 notes: remark !== undefined ? remark : pathologistNotes,
                 authorizedBy: user?.name || "Medical Pathologist"
@@ -397,7 +332,7 @@ export default function AuthorizationDashboard() {
                             mobileNumber: patientForm.mobileNumber,
                             address: patientForm.address,
                             authorizationStatus: newStatus,
-                            testResults: editableResults,
+                            testResults: combinedTestResults,
                             authorizedBy: user?.name || "Medical Pathologist",
                             authorizedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             notes: remark !== undefined ? remark : pathologistNotes
@@ -410,10 +345,16 @@ export default function AuthorizationDashboard() {
             setRegistrations(updatedList);
             localStorage.setItem("medoraa_shared_registrations", JSON.stringify(updatedList));
 
-            setSuccessMessage(newStatus === "AUTHORIZED" 
-                ? "Pathology report authorized & clinically signed off!" 
-                : "Report flagged for review."
-            );
+            const remainingCount = pendingTests.length;
+            if (newStatus === "AUTHORIZED") {
+                if (remainingCount > 0) {
+                    setSuccessMessage(`Entered tests authorized! (${remainingCount} test${remainingCount > 1 ? 's' : ''} still pending in Examination Desk)`);
+                } else {
+                    setSuccessMessage("Pathology report fully authorized & clinically signed off!");
+                }
+            } else {
+                setSuccessMessage("Report flagged for review.");
+            }
 
             setTimeout(() => {
                 setSelectedRecord(null);
@@ -421,6 +362,7 @@ export default function AuthorizationDashboard() {
             }, 1200);
         } catch (err) {
             console.error("Failed to persist authorization", err);
+            const combinedTestResults = [...editableResults, ...pendingTests];
             const fallbackList = registrations.map(item => {
                 if (item._id === id) {
                     return {
@@ -431,7 +373,7 @@ export default function AuthorizationDashboard() {
                         mobileNumber: patientForm.mobileNumber,
                         address: patientForm.address,
                         authorizationStatus: newStatus,
-                        testResults: editableResults,
+                        testResults: combinedTestResults,
                         authorizedBy: user?.name || "Medical Pathologist",
                         authorizedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         notes: remark !== undefined ? remark : pathologistNotes
@@ -447,9 +389,14 @@ export default function AuthorizationDashboard() {
     };
 
     const handleBulkApprove = async () => {
-        const pendingItems = registrations.filter(r => r.authorizationStatus === "PENDING");
+        // Only bulk approve pending records that have entered test results
+        const pendingItems = registrations.filter(r => 
+            r.authorizationStatus === "PENDING" && 
+            r.testResults && 
+            r.testResults.some(t => t.resultValue && t.resultValue.trim() !== "")
+        );
         if (pendingItems.length === 0) {
-            alert("No pending reports in worklist to authorize.");
+            alert("No pending reports with entered test results in worklist to authorize.");
             return;
         }
         if (window.confirm(`Authorize all ${pendingItems.length} pending patient reports with digital sign-off?`)) {
@@ -484,11 +431,20 @@ export default function AuthorizationDashboard() {
             r.registrationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (r.referredBy || "").toLowerCase().includes(searchTerm.toLowerCase());
 
+        const hasEntered = r.testResults && r.testResults.some(t => t.resultValue && t.resultValue.trim() !== "");
+
         if (statusFilter === "ALL") return matchesSearch;
+        if (statusFilter === "PENDING") {
+            return matchesSearch && r.authorizationStatus === "PENDING" && hasEntered;
+        }
         return matchesSearch && r.authorizationStatus === statusFilter;
     });
 
-    const pendingCount = registrations.filter(r => r.authorizationStatus === "PENDING").length;
+    const pendingCount = registrations.filter(r => 
+        r.authorizationStatus === "PENDING" && 
+        r.testResults && 
+        r.testResults.some(t => t.resultValue && t.resultValue.trim() !== "")
+    ).length;
     const authorizedCount = registrations.filter(r => r.authorizationStatus === "AUTHORIZED").length;
     const flaggedCount = registrations.filter(r => r.authorizationStatus === "FLAGGED" || r.authorizationStatus === "REJECTED").length;
     const totalCount = registrations.length;
@@ -580,14 +536,20 @@ export default function AuthorizationDashboard() {
                                     });
                                     setIsReportModalOpen(true);
                                 }}
-                                disabled={currentStatus !== "AUTHORIZED"}
+                                disabled={currentStatus !== "AUTHORIZED" || editableResults.length === 0}
                                 className={cn(
                                     "flex items-center gap-1.5 px-3 py-1.5 border text-xs font-bold transition-all shrink-0",
-                                    currentStatus === "AUTHORIZED"
+                                    currentStatus === "AUTHORIZED" && editableResults.length > 0
                                         ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300 cursor-pointer active:scale-95"
                                         : "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed opacity-60"
                                 )}
-                                title={currentStatus === "AUTHORIZED" ? "Print / Download Report" : "Report must be authorized before printing"}
+                                title={
+                                    currentStatus !== "AUTHORIZED"
+                                        ? "Report must be authorized before printing"
+                                        : editableResults.length === 0
+                                        ? "No entered test results to print"
+                                        : `Download / Print Official Pathology Report (${editableResults.length} entered result${editableResults.length > 1 ? "s" : ""})`
+                                }
                             >
                                 <Download className="w-3.5 h-3.5" />
                                 Download Report
@@ -602,11 +564,19 @@ export default function AuthorizationDashboard() {
                             </button>
                             <button
                                 onClick={() => handleUpdateStatus(selectedRecord._id, "AUTHORIZED", pathologistNotes)}
-                                disabled={isSubmitting}
-                                className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white border border-amber-600 text-xs font-bold transition-all shadow-sm cursor-pointer active:scale-95"
+                                disabled={isSubmitting || editableResults.length === 0}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold transition-all shadow-sm active:scale-95",
+                                    editableResults.length === 0
+                                        ? "bg-slate-200 text-slate-400 border border-slate-200 cursor-not-allowed"
+                                        : "bg-amber-600 hover:bg-amber-700 text-white border border-amber-600 cursor-pointer"
+                                )}
+                                title={editableResults.length === 0 ? "No entered tests to authorize" : "Approve & Authorize Report"}
                             >
                                 {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-                                Approve & Authorize Report
+                                {pendingTests.length > 0 
+                                    ? `Authorize Entered Tests (${editableResults.length})` 
+                                    : "Approve & Authorize Report"}
                             </button>
                         </div>
                     </div>
@@ -718,27 +688,27 @@ export default function AuthorizationDashboard() {
                     </div>
                 )}
 
-                {/* Patient Diagnostic Observations View & Sign-Off Table */}
+                {/* Patient Diagnostic Observations View & Sign-Off Table (Entered Tests Only) */}
                 <div className="bg-white border border-slate-200 p-6 shadow-sm space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
                             <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
                                 <ShieldCheck className="w-5 h-5 text-amber-600" />
                                 Diagnostic Observations Clinical Verification
                             </h2>
                             <p className="text-slate-500 text-xs font-semibold mt-0.5">
-                                Review and edit observation values, units, and reference ranges prior to clinical sign-off.
+                                Only entered test results from the Examiner are displayed here for clinical verification.
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={handleOpenCatalogModal}
-                                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer active:scale-95"
-                            >
-                                <Activity className="w-4 h-4" />
-                                Select from Test Catalog
-                            </button>
+                            <span className="px-2.5 py-1 text-xs font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                {editableResults.length} Entered Test{editableResults.length !== 1 ? 's' : ''}
+                            </span>
+                            {pendingTests.length > 0 && (
+                                <span className="px-2.5 py-1 text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    {pendingTests.length} Pending
+                                </span>
+                            )}
                         </div>
                     </div>
 
@@ -754,59 +724,69 @@ export default function AuthorizationDashboard() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
-                                {editableResults.map((item, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                                        <td className="py-3 px-3">
-                                            <input
-                                                type="text"
-                                                value={item.testName}
-                                                onChange={(e) => handleResultChange(idx, "testName", e.target.value)}
-                                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-none text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 shadow-xs"
-                                            />
-                                        </td>
+                                {editableResults.length > 0 ? (
+                                    editableResults.map((item, idx) => (
+                                        <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                                            <td className="py-3 px-3">
+                                                <input
+                                                    type="text"
+                                                    value={item.testName}
+                                                    onChange={(e) => handleResultChange(idx, "testName", e.target.value)}
+                                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-none text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 shadow-xs"
+                                                />
+                                            </td>
 
-                                        <td className="py-3 px-3">
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. 13.5"
-                                                value={item.resultValue}
-                                                onChange={(e) => handleResultChange(idx, "resultValue", e.target.value)}
-                                                className="w-full px-3.5 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-none text-xs font-black text-amber-950 outline-none focus:ring-1 focus:ring-amber-600 focus:border-amber-600 shadow-xs placeholder:text-amber-300"
-                                            />
-                                        </td>
+                                            <td className="py-3 px-3">
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. 13.5"
+                                                    value={item.resultValue}
+                                                    onChange={(e) => handleResultChange(idx, "resultValue", e.target.value)}
+                                                    className="w-full px-3.5 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-none text-xs font-black text-amber-950 outline-none focus:ring-1 focus:ring-amber-600 focus:border-amber-600 shadow-xs placeholder:text-amber-300"
+                                                />
+                                            </td>
 
-                                        <td className="py-3 px-3">
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. mg/dL"
-                                                value={item.unit}
-                                                onChange={(e) => handleResultChange(idx, "unit", e.target.value)}
-                                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-none text-xs font-semibold text-slate-800 outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 shadow-xs"
-                                            />
-                                        </td>
+                                            <td className="py-3 px-3">
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. mg/dL"
+                                                    value={item.unit}
+                                                    onChange={(e) => handleResultChange(idx, "unit", e.target.value)}
+                                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-none text-xs font-semibold text-slate-800 outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 shadow-xs"
+                                                />
+                                            </td>
 
-                                        <td className="py-3 px-3">
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. 70 - 100 mg/dL"
-                                                value={item.referenceRange}
-                                                onChange={(e) => handleResultChange(idx, "referenceRange", e.target.value)}
-                                                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-none text-xs font-semibold text-slate-700 outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 shadow-xs"
-                                            />
-                                        </td>
+                                            <td className="py-3 px-3">
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. 70 - 100 mg/dL"
+                                                    value={item.referenceRange}
+                                                    onChange={(e) => handleResultChange(idx, "referenceRange", e.target.value)}
+                                                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-none text-xs font-semibold text-slate-700 outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 shadow-xs"
+                                                />
+                                            </td>
 
-                                        <td className="py-3 px-3 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRemoveTestRow(idx)}
-                                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-none transition-colors cursor-pointer"
-                                                title="Remove parameter"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            <td className="py-3 px-3 text-right">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveTestRow(idx)}
+                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-none transition-colors cursor-pointer"
+                                                    title="Remove parameter"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={5} className="py-10 text-center bg-slate-50/70 text-slate-500">
+                                            <Clock className="w-8 h-8 text-amber-500 mx-auto mb-2 opacity-80" />
+                                            <p className="text-xs font-bold text-slate-800 uppercase tracking-wide">No Test Results Entered Yet</p>
+                                            <p className="text-[11px] text-slate-400 mt-1">Observations for this patient have not yet been recorded by the Examiner.</p>
                                         </td>
                                     </tr>
-                                ))}
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -827,279 +807,43 @@ export default function AuthorizationDashboard() {
                     </div>
                 </div>
 
-                {/* TEST CATALOG SELECTION MODAL */}
-                {showCatalogModal && (
-                    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-                        <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 w-full max-w-5xl rounded-none shadow-2xl overflow-hidden flex flex-col h-[85vh]">
-
-                            {/* Header */}
-                            <div className="flex items-center justify-between px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 shrink-0">
-                                <div>
-                                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                                        <Activity className="w-5 h-5 text-blue-600" />
-                                        Select Pathology Tests from Master Catalog
-                                    </h3>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                                        Patient: {selectedRecord?.patientName} | Reg No: {selectedRecord?.registrationNumber}
-                                    </p>
-                                </div>
-                                <button 
-                                    onClick={() => setShowCatalogModal(false)}
-                                    className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors text-slate-500 cursor-pointer"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
+                {/* Remaining Tests Pending Entry in Examination Desk */}
+                {pendingTests.length > 0 && (
+                    <div className="bg-amber-50/30 border border-amber-200/80 p-5 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-amber-600" />
+                                <h3 className="text-xs font-black text-amber-950 uppercase tracking-wider">
+                                    Remaining Tests Pending in Examination Desk ({pendingTests.length})
+                                </h3>
                             </div>
-
-                            {/* Content Area */}
-                            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-
-                                {/* Left Sidebar: Categories / Organs */}
-                                <div className="w-full lg:w-52 bg-slate-50 dark:bg-slate-950/40 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800 flex flex-col shrink-0">
-                                    <div className="p-3 border-b border-slate-100 dark:border-slate-800 space-y-2">
-                                        <div className="flex bg-slate-200/60 dark:bg-slate-800/80 p-0.5 border border-slate-200/40 dark:border-slate-700/50">
-                                            <button
-                                                onClick={() => {
-                                                    setSidebarView("category");
-                                                    setSelectedCategory("All");
-                                                    setSelectedOrgan("All");
-                                                }}
-                                                className={cn(
-                                                    "flex-1 py-1.5 text-[9px] font-black uppercase transition-all cursor-pointer",
-                                                    sidebarView === "category"
-                                                        ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xs font-bold"
-                                                        : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-350"
-                                                )}
-                                            >
-                                                Categories
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setSidebarView("organ");
-                                                    setSelectedCategory("All");
-                                                    setSelectedOrgan("All");
-                                                }}
-                                                className={cn(
-                                                    "flex-1 py-1.5 text-[9px] font-black uppercase transition-all cursor-pointer",
-                                                    sidebarView === "organ"
-                                                        ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xs font-bold"
-                                                        : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-350"
-                                                )}
-                                            >
-                                                Organs
-                                            </button>
-                                        </div>
+                            <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+                                Pending Entry
+                            </span>
+                        </div>
+                        <p className="text-xs text-amber-800/80 font-medium">
+                            The following registered tests have not yet had analytical results entered by the Examiner. They will appear for authorization once the Examiner records observations.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+                            {pendingTests.map((test, idx) => (
+                                <div key={idx} className="p-3 bg-white border border-amber-200/70 shadow-xs flex items-center justify-between">
+                                    <div className="min-w-0 flex-1 pr-2">
+                                        <span className="text-xs font-bold text-slate-900 block truncate">
+                                            {test.testName}
+                                        </span>
+                                        <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
+                                            Reference: {test.referenceRange || "-"}
+                                        </span>
                                     </div>
-                                    <div className="flex-1 overflow-x-auto lg:overflow-y-auto p-2 flex flex-row lg:flex-col gap-1.5 lg:space-y-1 no-scrollbar shrink-0 lg:shrink">
-                                        {sidebarView === "category" ? (
-                                            ["All", ...Array.from(new Set(availableSamples.map(s => s.category || "General").filter(c => c && c !== "-")))].map((cat) => {
-                                                const catCount = availableSamples.filter(s => (s.category || "General") === cat && cat !== "All").length;
-                                                const isSelected = selectedCategory === cat;
-                                                return (
-                                                    <button
-                                                        key={cat}
-                                                        onClick={() => setSelectedCategory(cat)}
-                                                        className={cn(
-                                                            "w-auto lg:w-full shrink-0 text-left px-3 py-2 text-xs font-bold transition-all flex items-center justify-between cursor-pointer whitespace-nowrap gap-1.5",
-                                                            isSelected
-                                                                ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
-                                                                : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400"
-                                                        )}
-                                                    >
-                                                        <span className="truncate text-left">{cat}</span>
-                                                        {cat !== "All" && (
-                                                            <span className={cn(
-                                                                "text-[9px] px-1.5 py-0.5 shrink-0 font-bold ml-1.5",
-                                                                isSelected ? "bg-blue-700 text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-500"
-                                                            )}>
-                                                                {catCount}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                );
-                                            })
-                                        ) : (
-                                            ["All", ...Array.from(new Set(availableSamples.map(s => s.organ).filter(Boolean).filter(o => o && o !== "-")))].map((org) => {
-                                                const orgCount = availableSamples.filter(s => s.organ === org && org !== "All").length;
-                                                const isSelected = selectedOrgan === org;
-                                                return (
-                                                    <button
-                                                        key={org}
-                                                        onClick={() => setSelectedOrgan(org)}
-                                                        className={cn(
-                                                            "w-auto lg:w-full shrink-0 text-left px-3 py-2 text-xs font-bold transition-all flex items-center justify-between cursor-pointer whitespace-nowrap gap-1.5",
-                                                            isSelected
-                                                                ? "bg-blue-600 text-white shadow-md shadow-blue-600/15"
-                                                                : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-400"
-                                                        )}
-                                                    >
-                                                        <span className="truncate text-left">{org}</span>
-                                                        {org !== "All" && (
-                                                            <span className={cn(
-                                                                "text-[9px] px-1.5 py-0.5 shrink-0 font-bold ml-1.5",
-                                                                isSelected ? "bg-blue-700 text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-500"
-                                                            )}>
-                                                                {orgCount}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                );
-                                            })
-                                        )}
-                                    </div>
+                                    <span className="shrink-0 px-2 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-extrabold uppercase tracking-wider border border-slate-200">
+                                        Pending
+                                    </span>
                                 </div>
-
-                                {/* Middle Content: Test Catalog Grid */}
-                                <div className="flex-1 flex flex-col min-w-0">
-                                    {/* Search Bar */}
-                                    <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3 bg-white dark:bg-slate-900 shrink-0">
-                                        <div className="relative flex-1">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                            <input
-                                                type="text"
-                                                placeholder="Search test names, organ, method or container..."
-                                                value={catalogSearchQuery}
-                                                onChange={(e) => setCatalogSearchQuery(e.target.value)}
-                                                className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-none text-xs outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-all font-medium text-slate-800 dark:text-slate-100"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Tests Grid list */}
-                                    <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                                        {isLoadingSamples ? (
-                                            <div className="flex flex-col items-center justify-center h-full gap-2">
-                                                <div className="w-6 h-6 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loading Catalog...</span>
-                                            </div>
-                                        ) : availableSamples.filter(sample => {
-                                            const matchesSearch = (sample.testName || "").toLowerCase().includes(catalogSearchQuery.toLowerCase()) ||
-                                                (sample.organ || "").toLowerCase().includes(catalogSearchQuery.toLowerCase()) ||
-                                                (sample.category || "").toLowerCase().includes(catalogSearchQuery.toLowerCase());
-                                            const matchesCategory = selectedCategory === "All" || (sample.category || "General") === selectedCategory;
-                                            const matchesOrgan = selectedOrgan === "All" || sample.organ === selectedOrgan;
-                                            return matchesSearch && matchesCategory && matchesOrgan;
-                                        }).length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center h-full text-center p-6">
-                                                <Activity className="w-10 h-10 text-slate-300 mb-2" />
-                                                <p className="text-xs font-bold text-slate-500">No tests found matching search criteria.</p>
-                                            </div>
-                                        ) : (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {availableSamples.filter(sample => {
-                                                    const matchesSearch = (sample.testName || "").toLowerCase().includes(catalogSearchQuery.toLowerCase()) ||
-                                                        (sample.organ || "").toLowerCase().includes(catalogSearchQuery.toLowerCase()) ||
-                                                        (sample.category || "").toLowerCase().includes(catalogSearchQuery.toLowerCase());
-                                                    const matchesCategory = selectedCategory === "All" || (sample.category || "General") === selectedCategory;
-                                                    const matchesOrgan = selectedOrgan === "All" || sample.organ === selectedOrgan;
-                                                    return matchesSearch && matchesCategory && matchesOrgan;
-                                                }).map((sample) => {
-                                                    const isSelected = selectedCatalogTestIds.includes(sample._id);
-                                                    return (
-                                                        <div
-                                                            key={sample._id}
-                                                            onClick={() => toggleCatalogTestSelection(sample._id)}
-                                                            className={cn(
-                                                                "p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-none cursor-pointer hover:shadow-md transition-all flex justify-between items-start gap-4 select-none group relative overflow-hidden",
-                                                                isSelected
-                                                                    ? "border-blue-500 ring-2 ring-blue-500/10 dark:bg-slate-900"
-                                                                    : "hover:border-slate-300 dark:hover:border-slate-700"
-                                                            )}
-                                                        >
-                                                            <div className="space-y-1.5 flex-1 min-w-0">
-                                                                <div className="flex items-center gap-2 flex-wrap">
-                                                                    <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px] font-black uppercase tracking-wider border border-blue-100/50 dark:border-blue-900/50">
-                                                                        {sample.category || "General"}
-                                                                    </span>
-                                                                    {sample.organ && sample.organ !== "-" && (
-                                                                        <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[8px] font-bold uppercase tracking-wide">
-                                                                            {sample.organ}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <h4 className="text-xs text-slate-800 dark:text-slate-100 uppercase tracking-tight truncate font-bold">
-                                                                    {sample.testName}
-                                                                </h4>
-                                                                <div className="flex items-center gap-3 text-[9px] text-slate-400 font-bold uppercase tracking-wide">
-                                                                    <span>Ref: {sample.referenceRange || "-"}</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className={cn(
-                                                                "w-5 h-5 border flex items-center justify-center shrink-0 transition-colors",
-                                                                isSelected ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300 dark:border-slate-700"
-                                                            )}>
-                                                                {isSelected && <Check className="w-3.5 h-3.5" />}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Right Sidebar: Selected Tests Summary */}
-                                <div className="w-full lg:w-64 bg-white dark:bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-slate-800 flex flex-col shrink-0">
-                                    <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Selected Tests for Report</span>
-                                        <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mt-1 uppercase truncate">
-                                            {availableSamples.filter(s => selectedCatalogTestIds.includes(s._id)).length} tests chosen
-                                        </p>
-                                    </div>
-
-                                    <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-                                        {availableSamples.filter(s => selectedCatalogTestIds.includes(s._id)).length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 py-12">
-                                                <ShoppingCart className="w-8 h-8 text-slate-300 mb-2" />
-                                                <p className="text-[10px] font-bold uppercase tracking-wider">No tests selected yet</p>
-                                            </div>
-                                        ) : (
-                                            availableSamples.filter(s => selectedCatalogTestIds.includes(s._id)).map((t) => (
-                                                <div key={t._id} className="p-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 text-xs">
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className="font-bold text-slate-800 dark:text-slate-200 truncate uppercase tracking-tight">{t.testName}</p>
-                                                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{t.category}</p>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => toggleCatalogTestSelection(t._id)}
-                                                        className="text-slate-400 hover:text-rose-600 transition-colors p-0.5 cursor-pointer"
-                                                    >
-                                                        <X className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-
-                            </div>
-
-                            {/* Footer */}
-                            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
-                                <button
-                                    onClick={() => setShowCatalogModal(false)}
-                                    className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-xs transition-all active:scale-95 cursor-pointer"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleAddCatalogTestsToResults}
-                                    disabled={selectedCatalogTestIds.length === 0}
-                                    className={cn(
-                                        "px-6 py-2 font-bold text-xs transition-all active:scale-95 flex items-center gap-1.5 shadow-md cursor-pointer",
-                                        selectedCatalogTestIds.length > 0
-                                            ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
-                                            : "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed shadow-none"
-                                    )}
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Add Selected Tests ({selectedCatalogTestIds.length})
-                                </button>
-                            </div>
-
+                            ))}
                         </div>
                     </div>
                 )}
+
             </div>
         );
     }
@@ -1229,11 +973,13 @@ export default function AuthorizationDashboard() {
                             {filteredRecords.length > 0 ? (
                                 filteredRecords.map((row) => {
                                     const status = row.authorizationStatus || "PENDING";
-                                    const displayTests = row.testResults && row.testResults.length > 0
-                                        ? row.testResults.map(tr => `${tr.testName}${tr.resultValue ? `: ${tr.resultValue} ${tr.unit}` : ''}`).join(", ")
-                                        : (row.tests && row.tests.length > 0
-                                            ? row.tests.map((t: any) => typeof t === "string" ? t : t.testName || t.name).join(", ")
-                                            : "Routine Test Panel");
+                                    const enteredTests = (row.testResults || []).filter(tr => tr.resultValue && String(tr.resultValue).trim() !== "");
+                                    const totalTestsCount = row.testResults?.length || (row.tests?.length || 0);
+                                    const pendingTestsCount = Math.max(0, totalTestsCount - enteredTests.length);
+
+                                    const displayTests = enteredTests.length > 0
+                                        ? enteredTests.map(tr => `${tr.testName}: ${tr.resultValue} ${tr.unit}`).join(", ")
+                                        : "No observations recorded yet (Pending Examination)";
 
                                     return (
                                         <tr key={row._id} className="hover:bg-slate-50/60 transition-colors">
@@ -1263,22 +1009,34 @@ export default function AuthorizationDashboard() {
                                             </td>
 
                                             <td className="py-3.5 px-4 max-w-[280px]">
-                                                <span className="text-xs font-bold text-slate-900 line-clamp-2">
-                                                    {displayTests}
-                                                </span>
+                                                <div className="flex flex-col gap-1">
+                                                    <span className={cn("text-xs font-bold line-clamp-2", enteredTests.length > 0 ? "text-slate-900" : "text-slate-400 italic")}>
+                                                        {displayTests}
+                                                    </span>
+                                                    {enteredTests.length > 0 && pendingTestsCount > 0 && (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 w-fit border border-amber-200">
+                                                            <Clock className="w-2.5 h-2.5" />
+                                                            {pendingTestsCount} test{pendingTestsCount > 1 ? 's' : ''} pending in Examiner
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
 
                                             <td className="py-3.5 px-4">
                                                 <span className={cn(
                                                     "inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider border",
-                                                    status === "AUTHORIZED" && "bg-emerald-50 text-emerald-700 border-emerald-200",
-                                                    status === "PENDING" && "bg-amber-50 text-amber-700 border-amber-200 animate-pulse",
+                                                    status === "AUTHORIZED" && pendingTestsCount === 0 && "bg-emerald-50 text-emerald-700 border-emerald-200",
+                                                    status === "AUTHORIZED" && pendingTestsCount > 0 && "bg-teal-50 text-teal-700 border-teal-200",
+                                                    status === "PENDING" && enteredTests.length > 0 && "bg-amber-50 text-amber-700 border-amber-200 animate-pulse",
+                                                    status === "PENDING" && enteredTests.length === 0 && "bg-slate-100 text-slate-500 border-slate-200",
                                                     status === "FLAGGED" && "bg-rose-50 text-rose-700 border-rose-200"
                                                 )}>
                                                     {status === "AUTHORIZED" && <Check className="w-3 h-3" />}
-                                                    {status === "PENDING" && <Clock className="w-3 h-3" />}
+                                                    {status === "PENDING" && enteredTests.length > 0 && <Clock className="w-3 h-3" />}
                                                     {status === "FLAGGED" && <AlertTriangle className="w-3 h-3" />}
-                                                    {status}
+                                                    {status === "AUTHORIZED" 
+                                                        ? (pendingTestsCount > 0 ? `Partial Auth (${enteredTests.length}/${totalTestsCount})` : "Authorized")
+                                                        : (enteredTests.length > 0 ? (pendingTestsCount > 0 ? `Pending (${enteredTests.length}/${totalTestsCount})` : "Pending Sign-Off") : "Awaiting Examiner")}
                                                 </span>
                                             </td>
 
@@ -1286,33 +1044,44 @@ export default function AuthorizationDashboard() {
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
                                                         type="button"
-                                                        disabled={status !== "AUTHORIZED"}
+                                                        disabled={status !== "AUTHORIZED" || enteredTests.length === 0}
                                                         onClick={() => {
-                                                            if (status === "AUTHORIZED") {
-                                                                setReportModalRecord(row);
+                                                            if (status === "AUTHORIZED" && enteredTests.length > 0) {
+                                                                setReportModalRecord({ ...row, testResults: enteredTests });
                                                                 setIsReportModalOpen(true);
                                                             }
                                                         }}
                                                         className={cn(
                                                             "p-2 rounded-full transition-all cursor-pointer border",
-                                                            status === "AUTHORIZED"
+                                                            status === "AUTHORIZED" && enteredTests.length > 0
                                                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 shadow-xs"
                                                                 : "bg-slate-50 text-slate-300 border-slate-200 opacity-40 cursor-not-allowed"
                                                         )}
                                                         title={
-                                                            status === "AUTHORIZED"
-                                                                ? "Download / Print Official Pathology Report"
-                                                                : "Download disabled — Awaiting Pathologist Authorization"
+                                                            status !== "AUTHORIZED"
+                                                                ? "Download disabled — Awaiting Pathologist Authorization"
+                                                                : enteredTests.length === 0
+                                                                ? "Download disabled — No test results entered yet"
+                                                                : `Download / Print Official Pathology Report (${enteredTests.length} entered result${enteredTests.length > 1 ? "s" : ""})`
                                                         }
                                                     >
                                                         <Download className="w-4 h-4" />
                                                     </button>
                                                     <button
                                                         onClick={() => setSelectedRecord(row)}
-                                                        className="px-3.5 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 shadow-md shadow-amber-600/10 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                                                        disabled={enteredTests.length === 0 && status !== "AUTHORIZED"}
+                                                        className={cn(
+                                                            "px-3.5 py-2 text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5",
+                                                            enteredTests.length === 0 && status !== "AUTHORIZED"
+                                                                ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                                                                : "text-white bg-amber-600 hover:bg-amber-700 shadow-md shadow-amber-600/10 cursor-pointer"
+                                                        )}
+                                                        title={enteredTests.length === 0 && status !== "AUTHORIZED" ? "Examiner has not entered results yet" : "Review & Sign Off"}
                                                     >
                                                         <ShieldCheck className="w-3.5 h-3.5" />
-                                                        Review & Sign Off
+                                                        {enteredTests.length === 0 && status !== "AUTHORIZED"
+                                                            ? "Awaiting Entry"
+                                                            : `Review & Sign Off${pendingTestsCount > 0 ? ` (${enteredTests.length})` : ''}`}
                                                     </button>
                                                 </div>
                                             </td>

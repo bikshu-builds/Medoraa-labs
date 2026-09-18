@@ -4,6 +4,7 @@ let browserInstance = null;
 
 async function getBrowser() {
   if (!browserInstance || !browserInstance.isConnected()) {
+    browserInstance = null;
     try {
       browserInstance = await puppeteer.launch({
         headless: true,
@@ -13,6 +14,7 @@ async function getBrowser() {
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
+          "--disable-web-security",
         ],
       });
     } catch (err) {
@@ -23,12 +25,23 @@ async function getBrowser() {
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--disable-gpu",
+          "--disable-web-security",
         ],
       });
     }
   }
 
   return browserInstance;
+}
+
+async function resetBrowser() {
+  try {
+    if (browserInstance) {
+      await browserInstance.close().catch(() => {});
+    }
+  } finally {
+    browserInstance = null;
+  }
 }
 
 /**
@@ -41,19 +54,30 @@ async function generatePathologyPDF(record) {
     const todayDate = new Date().toLocaleDateString("en-GB");
 
     // Extract test results and map with populated test details for category / classification
-    const rawResults = (record.testResults && record.testResults.length > 0)
+    const allResults = (record.testResults && record.testResults.length > 0)
         ? record.testResults
         : ((record.tests && record.tests.length > 0)
             ? record.tests.map(t => ({
                 testName: typeof t === "string" ? t : (t.testName || t.name || "Diagnostic Parameter"),
-                resultValue: t.resultValue || "—",
+                resultValue: t.resultValue || "",
                 unit: t.unit || "",
                 referenceRange: typeof t === "object" ? (t.referenceRange || "-") : "-",
                 category: typeof t === "object" ? (t.category || t.organ || "GENERAL PATHOLOGY") : "GENERAL PATHOLOGY",
                 method: typeof t === "object" ? (t.method || "") : ""
             }))
-            : [{ testName: "Routine Pathology Parameter", resultValue: "—", unit: "", referenceRange: "-", category: "GENERAL PATHOLOGY", method: "" }]
+            : [{ testName: "Routine Pathology Parameter", resultValue: "", unit: "", referenceRange: "-", category: "GENERAL PATHOLOGY", method: "" }]
         );
+
+    // Strictly render only tests that have entered result values (omit unentered pending tests from PDF)
+    const enteredOnly = allResults.filter(tr => {
+        const val = tr.toObject ? tr.toObject().resultValue : tr.resultValue;
+        return val && String(val).trim() !== "" && String(val).trim() !== "—";
+    });
+    const rawResults = enteredOnly;
+
+    if (rawResults.length === 0) {
+        throw new Error("No test results have been entered yet. Cannot generate PDF report.");
+    }
 
     // Map each result to its specific Classification/Category (checking category FIRST)
     const testResults = rawResults.map(tr => {
@@ -154,7 +178,7 @@ async function generatePathologyPDF(record) {
                 min-height: 270mm;
                 display: flex;
                 flex-direction: column;
-                justify-content: space-between;
+                justify-content: flex-start;
                 page-break-after: always;
                 break-after: page;
             }
@@ -167,7 +191,7 @@ async function generatePathologyPDF(record) {
                 border-collapse: collapse;
                 border: 1.5px solid #000000;
                 margin-bottom: 20px;
-                font-size: 11px;
+                font-size: 9px;
             }
             .demographics-table td {
                 padding: 5px 8px;
@@ -219,13 +243,16 @@ async function generatePathologyPDF(record) {
             .test-method-label {
                 font-weight: 900;
             }
-            .page-footer {
-                margin-top: 20px;
+            .footer-note {
+                font-size: 10px;
+                font-weight: 800;
+                color: #000000;
+                margin-top: 8px;
             }
             .signature-block {
                 text-align: right;
                 font-size: 11px;
-                margin-bottom: 20px;
+                margin-top: 30px;
             }
             .signature-name {
                 font-family: Georgia, serif;
@@ -241,26 +268,15 @@ async function generatePathologyPDF(record) {
                 color: #4b5563;
                 font-weight: 600;
             }
-            .footer-note {
-                font-size: 10px;
-                font-weight: 800;
-                color: #000000;
-            }
         </style>
     </head>
     <body>
         ${categoryKeys.map((categoryName) => {
             const items = categoryGroups[categoryName];
             
-            let titleDisplay = categoryName.trim().toUpperCase();
-            if (!titleDisplay.endsWith("#")) {
-                if (titleDisplay.endsWith("REPORT")) {
-                    titleDisplay = `${titleDisplay}#`;
-                } else if (titleDisplay.length <= 4) {
-                    titleDisplay = `${titleDisplay}#`;
-                } else {
-                    titleDisplay = `${titleDisplay} REPORT#`;
-                }
+            let titleDisplay = categoryName.trim().toUpperCase().replace(/#+$/, "").trim();
+            if (!titleDisplay.endsWith("REPORT")) {
+                titleDisplay = `${titleDisplay} REPORT`;
             }
 
             const methodText = items[0]?.method && items[0].method !== "-" 
@@ -334,24 +350,22 @@ async function generatePathologyPDF(record) {
                             <span class="test-method-label">Test Method :-</span> ${methodText}
                         </div>
 
+                        <div class="footer-note">
+                            NOTE : Please Correlate Clinically. If Any Discrepancy, Please Contact.
+                        </div>
+
                         ${record.notes ? `
                             <div style="margin-top: 15px; font-size: 11px;">
                                 <span style="font-weight: 800; text-transform: uppercase;">Clinical Remarks:</span>
                                 <span style="font-style: italic;">${record.notes}</span>
                             </div>
                         ` : ""}
-                    </div>
 
-                    <!-- Page Footer: Pathologist Signature & Clinical Note -->
-                    <div class="page-footer">
+                        <!-- Pathologist Signature -->
                         <div class="signature-block">
                             <div class="signature-name">${pathologistName}</div>
                             <div class="signature-title">Dr.Ravi Kumar Manyam; Ph.D</div>
                             <div class="signature-sub">Biochemist & Pathologist</div>
-                        </div>
-
-                        <div class="footer-note">
-                            NOTE : Please Correlate Clinically. If Any Discrepancy, Please Contact.
                         </div>
                     </div>
                 </div>
@@ -362,11 +376,12 @@ async function generatePathologyPDF(record) {
     `;
 
     // Acquire singleton/reused browser instance
-    const browser = await getBrowser();
-    const page = await browser.newPage();
-
+    let browser;
+    let page;
     try {
-        await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+        browser = await getBrowser();
+        page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: "domcontentloaded", timeout: 60000 });
         const pdfBuffer = await page.pdf({
             format: "A4",
             printBackground: true,
@@ -378,8 +393,11 @@ async function generatePathologyPDF(record) {
             }
         });
         return pdfBuffer;
+    } catch (err) {
+        await resetBrowser();
+        throw err;
     } finally {
-        await page.close();
+        if (page) await page.close().catch(() => {});
     }
 }
 
@@ -450,6 +468,18 @@ async function generateTransferLabelPDF(record, hospitalDoc = null) {
     let labPhone = transfer.contactNumber || "N/A";
     let pocName = transfer.contactPersonName || "Lab In-Charge";
 
+    if (!hospitalDoc && transfer.referenceLab) {
+        try {
+            const Hospital = require("../models/Hospital");
+            hospitalDoc = await Hospital.findOne({
+                $or: [
+                    { hospitalName: new RegExp(`^${transfer.referenceLab.trim()}$`, "i") },
+                    { "labs.labName": new RegExp(`^${transfer.referenceLab.trim()}$`, "i") }
+                ]
+            });
+        } catch (err) {}
+    }
+
     if (hospitalDoc) {
         if (hospitalDoc.pocName) pocName = hospitalDoc.pocName;
         if (hospitalDoc.telephoneNumber) labPhone = hospitalDoc.telephoneNumber;
@@ -460,26 +490,20 @@ async function generateTransferLabelPDF(record, hospitalDoc = null) {
                 hospitalDoc.address.city || hospitalDoc.address.village,
                 hospitalDoc.address.district,
                 hospitalDoc.address.state,
-                hospitalDoc.address.pincode
+                hospitalDoc.address.pincode ? `PIN: ${hospitalDoc.address.pincode}` : ""
             ].filter(Boolean);
             if (addrParts.length > 0) labAddress = addrParts.join(", ");
         }
     }
 
-    const regNo = record.registrationNumber || record._id;
-    const barcodeSVG = generateCode128SVG(regNo);
     const dateStr = transfer.transferredAt ? new Date(transfer.transferredAt).toLocaleString("en-GB") : new Date().toLocaleString("en-GB");
-
-    const transferredTestsList = (transfer.transferredTestNames && transfer.transferredTestNames.length > 0)
-        ? transfer.transferredTestNames
-        : (record.tests || []).map(t => typeof t === "string" ? t : (t.testName || t.name || "Diagnostic Parameter"));
 
     const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8" />
-        <title>Outsource Transfer Label - ${regNo}</title>
+        <title>Sample Transfer Label - ${refLabName}</title>
         <style>
             @page {
                 size: 100mm 150mm;
@@ -496,9 +520,9 @@ async function generateTransferLabelPDF(record, hospitalDoc = null) {
                 font-family: Arial, Helvetica, sans-serif;
                 background-color: #ffffff;
                 color: #000000;
-                padding: 3mm;
+                padding: 4mm;
                 font-size: 11px;
-                line-height: 1.25;
+                line-height: 1.35;
             }
             .label-box {
                 border: 2.5px solid #000000;
@@ -506,187 +530,147 @@ async function generateTransferLabelPDF(record, hospitalDoc = null) {
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
-                padding: 3.5mm;
+                padding: 4mm;
             }
             .header-banner {
                 background-color: #000000;
                 color: #ffffff;
                 text-align: center;
-                padding: 4px 0;
+                padding: 6px 0;
                 font-weight: 900;
-                font-size: 11px;
-                letter-spacing: 1px;
+                font-size: 12px;
+                letter-spacing: 1.5px;
                 text-transform: uppercase;
             }
-            .section {
-                border-bottom: 1.5px solid #000000;
-                padding: 4px 0;
+            .card-section {
+                border: 1.5px solid #000000;
+                border-radius: 4px;
+                padding: 10px 12px;
+                margin-top: 10px;
+                background-color: #ffffff;
             }
-            .title-sm {
-                font-size: 9px;
-                font-weight: 800;
+            .badge-header {
+                font-size: 10px;
+                font-weight: 900;
+                text-transform: uppercase;
+                letter-spacing: 0.8px;
+                padding-bottom: 4px;
+                margin-bottom: 6px;
+                border-bottom: 1.5px solid #000000;
+            }
+            .from-badge {
+                color: #000000;
+            }
+            .to-badge {
+                color: #000000;
+                font-size: 11px;
+            }
+            .lab-name-from {
+                font-size: 13px;
+                font-weight: 900;
                 text-transform: uppercase;
                 color: #000000;
                 margin-bottom: 2px;
             }
-            .title-lg {
-                font-size: 14px;
+            .lab-name-to {
+                font-size: 16px;
                 font-weight: 900;
                 text-transform: uppercase;
-                line-height: 1.15;
+                color: #000000;
+                line-height: 1.25;
+                margin-bottom: 4px;
             }
-            .text-bold {
-                font-weight: 800;
+            .sub-text {
+                font-size: 10px;
+                font-weight: 600;
+                color: #334155;
+                margin-bottom: 4px;
             }
-            .grid-2 {
-                display: flex;
-                justify-content: space-between;
-            }
-            .barcode-container {
-                text-align: center;
-                padding: 4px 0;
-            }
-            .barcode-text {
-                font-family: monospace;
+            .address-text {
                 font-size: 11px;
-                font-weight: 900;
-                letter-spacing: 2px;
-                margin-top: 2px;
+                font-weight: 700;
+                color: #000000;
+                line-height: 1.4;
+                margin-top: 4px;
             }
-            .test-tag-list {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 3.5px;
-                margin-top: 3px;
-            }
-            .test-tag {
-                border: 1px solid #000000;
-                padding: 2px 5px;
-                font-size: 9.5px;
-                font-weight: 800;
-                border-radius: 2px;
-                background-color: #f4f4f4;
+            .contact-row {
+                font-size: 10.5px;
+                font-weight: 700;
+                color: #000000;
+                margin-top: 5px;
             }
             .footer-warning {
                 font-size: 8.5px;
                 font-weight: 900;
                 text-align: center;
-                border-top: 1.5px dashed #000000;
-                padding-top: 3px;
+                border-top: 1.5px solid #000000;
+                padding-top: 5px;
                 text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
         </style>
     </head>
     <body>
         <div class="label-box">
-            
             <div>
-                <!-- Banner Header -->
+                <!-- Header Banner -->
                 <div class="header-banner">
-                    Outsource Sample Dispatch Label
+                    SAMPLE TRANSFER DISPATCH LABEL
                 </div>
 
-                <!-- Patient Demographics & Barcode Header -->
-                <div class="section" style="padding: 5px; background-color: #f8fafc; border-bottom: 1.5px solid #000;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div class="title-sm" style="font-size: 8px; color: #475569;">PATIENT DETAILS</div>
-                            <div style="font-size: 13px; font-weight: 900; text-transform: uppercase;">${record.patientName || "PATIENT"}</div>
-                            <div style="font-size: 9.5px; font-weight: 800; color: #1e293b;">
-                                Reg No: <span style="font-family: monospace; font-size: 10.5px;">${regNo}</span> | ${record.age?.value || ""}${record.age?.type?.substring(0, 1) || ""} / ${record.gender?.substring(0, 1) || ""}
-                            </div>
-                            ${record.mobileNumber ? `<div style="font-size: 8.5px; font-weight: 700; color: #64748b;">Ph: ${record.mobileNumber}</div>` : ""}
-                        </div>
-                        <div style="text-align: right; max-width: 120px;">
-                            ${barcodeSVG}
-                            <div class="barcode-text" style="font-size: 9.5px; margin-top: 1px;">* ${regNo} *</div>
-                        </div>
+                <!-- FROM ADDRESS (SENDER LAB) -->
+                <div class="card-section" style="background-color: #f8fafc;">
+                    <div class="badge-header from-badge">FROM (SENDER LAB):</div>
+                    <div class="lab-name-from">MEDORAA LABS & DIAGNOSTICS</div>
+                    <div class="sub-text">Diagnostic & Pathology Clinical Services</div>
+                    <div class="address-text">
+                        Main Center, Eluru Road, Eluru<br/>
+                        Andhra Pradesh - 534001
                     </div>
-                </div>
-
-                <!-- Sender & Receiver (TO / FROM) -->
-                <div class="section" style="display: flex; justify-content: space-between; padding: 5px; background-color: #ffffff; gap: 6px;">
-                    <div style="width: 48%; border-right: 1px solid #cbd5e1; padding-right: 4px;">
-                        <div class="title-sm" style="font-size: 8px; color: #64748b;">FROM (SENDER LAB):</div>
-                        <div style="font-weight: 900; font-size: 10.5px;">MEDORAA DIAGNOSTICS</div>
-                        <div style="font-size: 8.5px; font-weight: 600; color: #475569;">Main Center, Eluru</div>
-                        <div style="font-size: 8px; font-weight: 700; color: #64748b;">Date: ${dateStr}</div>
+                    <div class="contact-row" style="margin-top: 6px;">
+                        <strong>Phone:</strong> +91 40 2345 6789 / +91 98765 43210
                     </div>
-                    <div style="width: 48%;">
-                        <div class="title-sm" style="font-size: 8px; color: #2563eb;">TO (REFERENCE LAB):</div>
-                        <div class="title-lg" style="font-size: 12px; color: #1e3a8a;">${refLabName}</div>
-                        <div style="font-size: 9px; font-weight: 800; margin-top: 1px;">Contact: ${pocName}</div>
-                        <div style="font-size: 8.5px; font-weight: 700; color: #475569;">Ph: ${labPhone}</div>
+                    <div class="contact-row">
+                        <strong>Email:</strong> contact@medoraalabs.com
+                    </div>
+                    <div class="contact-row" style="font-size: 9.5px; color: #475569; margin-top: 4px;">
+                        <strong>Dispatch Date:</strong> ${dateStr}
                     </div>
                 </div>
 
-                <!-- Dispatch & Logistics Grid (ALL FORM FIELDS) -->
-                <div class="section" style="padding: 5px; background-color: #f1f5f9;">
-                    <div class="title-sm" style="font-size: 9px; font-weight: 900; border-bottom: 1px solid #cbd5e1; pb: 2px; margin-bottom: 4px;">
-                        DISPATCH & LOGISTICS INFORMATION
+                <!-- TO ADDRESS (DESTINATION REFERENCE LAB) -->
+                <div class="card-section" style="margin-top: 12px; border-width: 2px;">
+                    <div class="badge-header to-badge">TO (DESTINATION / REFERENCE LAB):</div>
+                    <div class="lab-name-to">${refLabName}</div>
+                    ${hospitalDoc?.branch ? `<div class="sub-text" style="font-size: 11px; font-weight: 800;">Branch: ${hospitalDoc.branch}</div>` : ""}
+                    <div class="contact-row" style="margin-top: 6px;">
+                        <strong>Attn / Contact Person:</strong> ${pocName}
                     </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; font-size: 9px;">
-                        <div>
-                            <span style="font-weight: 700; color: #64748b; font-size: 8px; display: block; text-transform: uppercase;">Mode of Transfer:</span>
-                            <span style="font-weight: 900; text-transform: uppercase;">${transfer.modeOfTransfer || "N/A"}</span>
-                        </div>
-                        <div>
-                            <span style="font-weight: 700; color: #64748b; font-size: 8px; display: block; text-transform: uppercase;">Courier / Logistics Agency:</span>
-                            <span style="font-weight: 900;">${transfer.courierAgency || "N/A"}</span>
-                        </div>
-                        <div>
-                            <span style="font-weight: 700; color: #64748b; font-size: 8px; display: block; text-transform: uppercase;">Contact Person Name:</span>
-                            <span style="font-weight: 900;">${transfer.contactPersonName || "N/A"}</span>
-                        </div>
-                        <div>
-                            <span style="font-weight: 700; color: #64748b; font-size: 8px; display: block; text-transform: uppercase;">Contact Mobile Number:</span>
-                            <span style="font-weight: 900;">${transfer.contactNumber || "N/A"}</span>
-                        </div>
-                        <div>
-                            <span style="font-weight: 700; color: #64748b; font-size: 8px; display: block; text-transform: uppercase;">Vehicle Number:</span>
-                            <span style="font-weight: 900; font-family: monospace;">${transfer.vehicleNumber || "N/A"}</span>
-                        </div>
-                        <div>
-                            <span style="font-weight: 700; color: #64748b; font-size: 8px; display: block; text-transform: uppercase;">Docket / Tracking Number:</span>
-                            <span style="font-weight: 900; color: #1e40af; font-family: monospace;">${transfer.docketNumber || "N/A"}</span>
-                        </div>
+                    <div class="address-text" style="margin-top: 6px;">
+                        <strong>Delivery Address:</strong><br/>
+                        ${labAddress}
                     </div>
-
-                    ${transfer.remarks ? `
-                    <div style="margin-top: 4px; padding-top: 3px; border-top: 1px dashed #cbd5e1; font-size: 8.5px;">
-                        <span style="font-weight: 800; color: #475569; text-transform: uppercase;">Dispatch Instructions / Remarks:</span>
-                        <span style="font-weight: 700; color: #0f172a; font-style: italic;"> ${transfer.remarks}</span>
-                    </div>` : ''}
-                </div>
-
-                <!-- Transferred Tests Enclosed -->
-                <div class="section" style="border-bottom: none; padding: 5px;">
-                    <div class="grid-2" style="align-items: center; margin-bottom: 3px;">
-                        <span class="title-sm" style="font-size: 9px; font-weight: 900;">PRESCRIBED OUTSOURCED TESTS (${transferredTestsList.length}):</span>
-                        <span style="font-size: 8px; font-weight: 900; color: #15803d; background-color: #dcfce7; padding: 1px 4px; border-radius: 2px;">TRANSFERRED</span>
-                    </div>
-                    <div class="test-tag-list">
-                        ${transferredTestsList.map(tName => `<span class="test-tag">${tName}</span>`).join("")}
+                    <div class="contact-row" style="margin-top: 6px; font-size: 11px;">
+                        <strong>Contact Number:</strong> ${labPhone}
                     </div>
                 </div>
             </div>
 
-            <!-- Footer Alert -->
+            <!-- Footer Warning Banner -->
             <div class="footer-warning">
                 ★ CAUTION: BIOLOGICAL DIAGNOSTIC SPECIMEN — HANDLE WITH CARE ★
             </div>
-
         </div>
     </body>
     </html>
     `;
 
-    const browser = await getBrowser();
-    const page = await browser.newPage();
-
+    let browser;
+    let page;
     try {
-        await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+        browser = await getBrowser();
+        page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: "domcontentloaded", timeout: 60000 });
         const pdfBuffer = await page.pdf({
             width: "100mm",
             height: "150mm",
@@ -699,8 +683,11 @@ async function generateTransferLabelPDF(record, hospitalDoc = null) {
             }
         });
         return pdfBuffer;
+    } catch (err) {
+        await resetBrowser();
+        throw err;
     } finally {
-        await page.close();
+        if (page) await page.close().catch(() => {});
     }
 }
 
@@ -710,31 +697,22 @@ async function generateTransferLabelPDF(record, hospitalDoc = null) {
  * @param {Object} record Patient registration document
  * @returns {Promise<Buffer>} PDF Buffer
  */
-async function generateReceiptPDF(record) {
+/**
+ * Builds the receipt HTML string for a given patient record (sync, no Puppeteer).
+ * Shared by both the HTML preview endpoint and the PDF generator.
+ * @param {Object} record Patient registration document
+ * @returns {string} HTML string
+ */
+function buildReceiptHTML(record, autoPrint = false) {
     const regNo = record.registrationNumber || record._id;
     const barcodeSVG = generateCode128SVG(regNo);
     const dateStr = record.registrationDate || new Date().toLocaleDateString("en-GB");
     const timeStr = record.registrationTime || new Date().toLocaleTimeString();
 
-    // Transport details formatting
-    const sampleReceived = record.sampleReceived || {};
-    let transportDetails = "";
-    if (sampleReceived.receivedThrough === "Employee") {
-        transportDetails = `Collector: ${sampleReceived.employee?.name || "N/A"} (${sampleReceived.employee?.id || "N/A"}) - ${sampleReceived.employee?.department || "N/A"}`;
-    } else if (sampleReceived.receivedThrough === "Person") {
-        transportDetails = `Person: ${sampleReceived.person?.name || "N/A"} (Ph: ${sampleReceived.person?.mobileNumber || "N/A"}) ID: ${sampleReceived.person?.idProofType || "ID"}: ${sampleReceived.person?.idProofNumber || "N/A"}`;
-    } else if (sampleReceived.receivedThrough === "Courier") {
-        transportDetails = `Courier: ${sampleReceived.courier?.companyName || "N/A"} (Track No: ${sampleReceived.courier?.trackingNumber || "N/A"}, Condition: ${sampleReceived.courier?.packageCondition || "Good"})`;
-    } else if (sampleReceived.receivedThrough === "Transfer") {
-        transportDetails = `Transfer To Lab: ${sampleReceived.transfer?.labName || "N/A"}`;
-    } else if (sampleReceived.receivedThrough === "Bus") {
-        transportDetails = `Bus: ${sampleReceived.bus?.busServiceName || "N/A"} (Reg: ${sampleReceived.bus?.busNumber || "N/A"}, Driver Ph: ${sampleReceived.bus?.driverMobileNumber || "N/A"})`;
-    }
-
     const tests = record.tests || [];
     const computedSubtotal = tests.reduce((sum, t) => sum + (parseFloat(t.patientPrice || t.price || 0) || 0), 0);
     const subtotal = (record.subtotal !== undefined && record.subtotal > 0) ? record.subtotal : computedSubtotal;
-    
+
     let rawDiscount = record.discount || 0;
     let discount = rawDiscount;
     if (record.discountType === "percentage" && rawDiscount > 0 && rawDiscount <= 100) {
@@ -752,9 +730,14 @@ async function generateReceiptPDF(record) {
     const balanceDue = Math.max(0, totalAmount - paidAmount);
     const paymentMethod = record.paymentMethod || "Cash";
 
-    const locationStr = record.location?.state
-        ? [record.location.city, record.location.district, record.location.state].filter(Boolean).join(", ")
-        : "";
+    const testChunks = [];
+    if (tests.length === 0) {
+        testChunks.push([]);
+    } else {
+        for (let i = 0; i < tests.length; i += 6) {
+            testChunks.push(tests.slice(i, i + 6));
+        }
+    }
 
     const htmlContent = `
     <!DOCTYPE html>
@@ -775,20 +758,32 @@ async function generateReceiptPDF(record) {
             body {
                 font-family: 'Georgia', 'Times New Roman', serif;
                 color: #000000;
-                background-color: #ffffff;
-                padding: 10px;
+                background-color: #f5f5f5;
+                padding: 16px;
                 font-size: 12px;
                 line-height: 1.4;
                 -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            @media print {
+                body {
+                    background-color: #ffffff;
+                    padding: 0;
+                }
+                .no-print { display: none !important; }
+                .page-break { page-break-after: always; }
+                .receipt-container { margin-bottom: 0 !important; }
             }
             .receipt-container {
                 border: 2px solid #000000;
                 padding: 16px;
-                min-height: 240mm;
-                max-height: 255mm;
+                background: #ffffff;
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
+                height: 276mm;
+                max-width: 185mm;
+                margin: 0 auto 20px auto;
             }
             .header-table {
                 width: 100%;
@@ -949,7 +944,12 @@ async function generateReceiptPDF(record) {
         </style>
     </head>
     <body>
-        <div class="receipt-container">
+        ${testChunks.map((chunk, chunkIndex) => {
+            const isLastPage = chunkIndex === testChunks.length - 1;
+            const pageBreakClass = !isLastPage ? "page-break" : "";
+            
+            return `
+        <div class="receipt-container ${pageBreakClass}">
             <div>
                 <!-- Classic Header -->
                 <table class="header-table">
@@ -969,7 +969,7 @@ async function generateReceiptPDF(record) {
 
                 <!-- Receipt Title -->
                 <div class="title-banner">
-                    Patient Registration Acknowledgement & Bill Receipt
+                    Patient Registration Acknowledgement & Bill Receipt ${testChunks.length > 1 ? `(Page ${chunkIndex + 1} of ${testChunks.length})` : ""}
                 </div>
 
                 <!-- Registration & Patient Demographics Grid -->
@@ -995,30 +995,9 @@ async function generateReceiptPDF(record) {
                         </td>
                     </tr>
                     <tr>
-                        <td>
+                        <td colspan="2">
                             <span class="meta-label">MOBILE NUMBER:</span><br/>
                             <span class="meta-val">+91 ${record.mobileNumber || "N/A"}</span>
-                        </td>
-                        <td>
-                            <span class="meta-label">REFERRED BY DOCTOR:</span><br/>
-                            <span class="meta-val" style="text-transform: uppercase;">${record.referredBy || "SELF"}</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="2">
-                            <span class="meta-label">ADDRESS & LOCATION:</span><br/>
-                            <span class="meta-val">${record.address || "N/A"}${locationStr ? ` (${locationStr})` : ""}</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <span class="meta-label">SAMPLE DRAWN BY:</span><br/>
-                            <span class="meta-val">${record.sampleDrawnBy || "N/A"}</span>
-                        </td>
-                        <td>
-                            <span class="meta-label">TRANSPORT LOGISTICS:</span><br/>
-                            <span class="meta-val">${sampleReceived.receivedThrough || "Standard"}</span>
-                            ${transportDetails ? `<div style="font-size: 9.5px; font-weight: 600; margin-top: 2px;">${transportDetails}</div>` : ""}
                         </td>
                     </tr>
                 </table>
@@ -1037,9 +1016,9 @@ async function generateReceiptPDF(record) {
                         </tr>
                     </thead>
                     <tbody>
-                        ${tests.length > 0 ? tests.map((t, idx) => `
+                        ${chunk.length > 0 ? chunk.map((t, idx) => `
                             <tr>
-                                <td style="text-align: center; font-weight: 700;">${idx + 1}</td>
+                                <td style="text-align: center; font-weight: 700;">${(chunkIndex * 6) + idx + 1}</td>
                                 <td style="font-weight: 700;">${typeof t === 'string' ? t : (t.testName || t.name)}</td>
                                 <td style="text-transform: uppercase; font-size: 10px;">${(typeof t === 'object' && t.category) ? t.category : "General"}</td>
                                 <td style="text-align: right; font-weight: 800; font-family: monospace;">₹${parseFloat(t.patientPrice || 0).toFixed(2)}</td>
@@ -1053,7 +1032,10 @@ async function generateReceiptPDF(record) {
                         `}
                     </tbody>
                 </table>
+            </div>
 
+            <div>
+                ${isLastPage ? `
                 <!-- Billing Totals Summary -->
                 <table class="summary-table">
                     <tr>
@@ -1083,9 +1065,8 @@ async function generateReceiptPDF(record) {
                         <td class="summary-val" style="text-transform: uppercase; font-size: 11px;">${paymentMethod}</td>
                     </tr>
                 </table>
-            </div>
+                ` : `<div style="text-align: right; font-size: 11px; font-weight: 700; color: #666; margin-bottom: 20px;">Continued on next page...</div>`}
 
-            <div>
                 <!-- Barcode Section -->
                 <div class="barcode-section">
                     <div class="barcode-box">
@@ -1112,15 +1093,33 @@ async function generateReceiptPDF(record) {
                 </div>
             </div>
         </div>
+        `;
+        }).join("")}
+        ${autoPrint ? `<script>
+            window.onload = function() {
+                window.print();
+            };
+        </script>` : ''}
     </body>
     </html>
     `;
+    return htmlContent;
+}
 
-    const browser = await getBrowser();
-    const page = await browser.newPage();
+/**
+ * Async wrapper: generates receipt PDF buffer using the shared HTML builder.
+ * @param {Object} record Patient registration document
+ * @returns {Promise<Buffer>} PDF Buffer
+ */
+async function generateReceiptPDF(record) {
+    const htmlContent = buildReceiptHTML(record);
 
+    let browser;
+    let page;
     try {
-        await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+        browser = await getBrowser();
+        page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: "domcontentloaded", timeout: 60000 });
         const pdfBuffer = await page.pdf({
             format: "A4",
             printBackground: true,
@@ -1132,12 +1131,15 @@ async function generateReceiptPDF(record) {
             }
         });
         return pdfBuffer;
+    } catch (err) {
+        await resetBrowser();
+        throw err;
     } finally {
-        await page.close();
+        if (page) await page.close().catch(() => {});
     }
 }
 
-module.exports = { generatePathologyPDF, generateTransferLabelPDF, generateReceiptPDF, getBrowser };
+module.exports = { generatePathologyPDF, generateTransferLabelPDF, generateReceiptPDF, buildReceiptHTML, getBrowser };
 
 
 
