@@ -559,3 +559,31 @@ exports.downloadReceiptHTML = async (req, res) => {
     return res.status(500).send("<h3>Error generating receipt preview: " + err.message + "</h3>");
   }
 };
+
+// @desc    Standalone 50x15mm Bottle/Vial Label HTML (for Seznik thermal printer)
+// @route   GET /api/admin/registrations/:id/bottle-label-html
+exports.downloadBottleLabelHTML = async (req, res) => {
+  try {
+    const { buildBottleLabelHTML } = require("../services/pdfGenerator");
+
+    const registration = await PatientRegistration.findById(
+      req.params.id,
+    ).populate("tests");
+
+    if (!registration) {
+      return res
+        .status(404)
+        .send("<h3>Registration not found</h3>");
+    }
+
+    const autoPrint = req.query.autoprint === 'true';
+    const html = buildBottleLabelHTML(registration, autoPrint, 0);
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(html);
+  } catch (err) {
+    console.error("Bottle Label HTML Error:", err);
+    return res.status(500).send("<h3>Error generating label: " + err.message + "</h3>");
+  }
+};

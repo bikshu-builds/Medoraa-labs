@@ -20,7 +20,8 @@ const {
     downloadReportPDF,
     downloadTransferLabelPDF,
     downloadReceiptPDF,
-    downloadReceiptHTML
+    downloadReceiptHTML,
+    downloadBottleLabelHTML
 } = require("../controllers/registration");
 
 // Samples Directory Routes
@@ -49,6 +50,7 @@ router.get("/registrations/:id/pdf", downloadReportPDF);
 router.get("/registrations/:id/transfer-label-pdf", downloadTransferLabelPDF);
 router.get("/registrations/:id/receipt-pdf", downloadReceiptPDF);
 router.get("/registrations/:id/receipt-html", downloadReceiptHTML);
+router.get("/registrations/:id/bottle-label-html", downloadBottleLabelHTML);
 
 
 // Protected Staff Routes (accessible by any logged in staff role)

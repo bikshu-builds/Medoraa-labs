@@ -1139,7 +1139,235 @@ async function generateReceiptPDF(record) {
     }
 }
 
-module.exports = { generatePathologyPDF, generateTransferLabelPDF, generateReceiptPDF, buildReceiptHTML, getBrowser };
+/**
+ * Builds the standalone 50x15mm Bottle/Vial Label HTML string for a given patient record.
+ * Displays ONLY:
+ * 1. NAME: [Patient Name]
+ * 2. AGE: [Age] • GENDER: [Gender]
+ * 3. TEST: [Prescribed Test]
+ * Centered horizontally and vertically on a single 50x15mm sticker.
+ * @param {Object} record Patient registration document
+ * @param {boolean} autoPrint Automatically trigger window.print() on load
+ * @returns {string} HTML string
+ */
+function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
+    const pageW = "50mm";
+    const pageH = "15mm";
+
+    const patientName = (record.patientName || "").toUpperCase().trim() || "PATIENT";
+    const ageVal = record.age?.value || "";
+    let ageType = "Y";
+    if (record.age?.type) {
+        ageType = record.age.type.toLowerCase().startsWith("y") ? "Y" : record.age.type.substring(0, 1).toUpperCase();
+    }
+    const ageDisplay = ageVal ? `${ageVal} ${ageType}` : "N/A";
+    const genderDisplay = (record.gender || "N/A").toUpperCase();
+
+    // Dynamic scaling for name (+2px larger: base 8.0px)
+    const nameLen = patientName.length;
+    let nameFontSize = "8.0px";
+    if (nameLen > 28) {
+        nameFontSize = "6.8px";
+    } else if (nameLen > 20) {
+        nameFontSize = "7.4px";
+    }
+
+    // Extract all test names into a single list
+    let rawTests = [];
+    if (Array.isArray(record.tests) && record.tests.length > 0) {
+        rawTests = record.tests;
+    } else if (Array.isArray(record.testResults) && record.testResults.length > 0) {
+        rawTests = record.testResults;
+    }
+
+    const testNamesList = rawTests.map(t => {
+        if (typeof t === "object" && t !== null) {
+            return (t.testName || t.name || "").trim();
+        }
+        return String(t || "").trim();
+    }).filter(Boolean);
+
+    const uniqueTests = Array.from(new Set(testNamesList.length > 0 ? testNamesList : ["ROUTINE TEST"]));
+    const testsJoined = uniqueTests.join(", ").toUpperCase();
+    const testsLen = testsJoined.length;
+
+    // Normal patients (1-4 tests): stays large at 6.0px
+    // Extreme orders (10-13+ tests): automatically scales down to 4.0px with zero bottom cutoff
+    let testFontSize = "6.0px";
+    let testLineHeight = "1.15";
+    if (testsLen > 180) {
+        testFontSize = "4.0px";
+        testLineHeight = "0.95";
+    } else if (testsLen > 120) {
+        testFontSize = "4.6px";
+        testLineHeight = "1.02";
+    } else if (testsLen > 70) {
+        testFontSize = "5.2px";
+        testLineHeight = "1.08";
+    }
+
+    const topPadding = testsLen > 180 ? "3.0mm" : "4.0mm";
+    const rowMargin = testsLen > 180 ? "0.05mm" : "0.1mm";
+
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Bottle Label - ${record.patientName || 'Specimen'}</title>
+        <style>
+            @page {
+                size: ${pageW} ${pageH};
+                margin: 0;
+            }
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            html, body {
+                width: ${pageW};
+                height: ${pageH};
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+                background: #ffffff;
+                color: #000000;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                font-size: 5.0px;
+                line-height: 1.1;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .label-page {
+                width: ${pageW};
+                height: ${pageH};
+                box-sizing: border-box;
+                position: relative;
+                page-break-after: avoid;
+                break-after: avoid;
+                page-break-inside: avoid;
+                break-inside: avoid;
+                overflow: hidden;
+                background: #ffffff;
+                font-size: 5.0px;
+                line-height: 1.1;
+                padding: 0;
+                margin: 0;
+            }
+            .label-content {
+                width: 48.5mm;
+                box-sizing: border-box;
+                text-align: left;
+                font-size: 5.0px;
+                line-height: 1.1;
+                padding: ${topPadding} 0.8mm 0 0.8mm;
+                margin: 0;
+                background: #ffffff;
+            }
+            .label-row {
+                width: 100%;
+                box-sizing: border-box;
+                display: flex;
+                align-items: baseline;
+                justify-content: flex-start;
+                text-align: left;
+                font-size: 5.0px;
+                line-height: 1.1;
+                margin: 0;
+                padding: 0;
+            }
+            .name-row {
+                white-space: nowrap;
+                line-height: 1.1;
+                margin: 0 0 ${rowMargin} 0;
+                padding: 0;
+            }
+            .demo-row {
+                white-space: nowrap;
+                line-height: 1.1;
+                margin: 0 0 ${rowMargin} 0;
+                padding: 0;
+                gap: 2.5mm;
+            }
+            .test-row {
+                display: block;
+                width: 100%;
+                line-height: ${testLineHeight};
+                word-break: break-word;
+                white-space: normal;
+                margin: 0;
+                padding: 0;
+            }
+            .lbl-key {
+                font-size: 6.8px;
+                font-weight: 700;
+                color: #000000;
+                letter-spacing: 0.05px;
+                flex-shrink: 0;
+                white-space: nowrap;
+            }
+            .test-key {
+                font-size: 6.0px;
+                font-weight: 700;
+                color: #000000;
+                letter-spacing: 0.05px;
+            }
+            .lbl-val {
+                font-size: 7.2px;
+                font-weight: 600;
+                color: #000000;
+            }
+            .name-val {
+                font-size: 8.0px;
+                font-weight: 700;
+                text-transform: uppercase;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 44mm;
+            }
+            .test-val {
+                font-weight: 600;
+                text-transform: uppercase;
+                color: #000000;
+                word-break: break-word;
+                font-size: 6.0px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="label-page">
+            <div class="label-content">
+                <!-- Line 1: N: Patient Name -->
+                <div class="label-row name-row">
+                    <span class="lbl-key">N:</span>&nbsp;<span class="lbl-val name-val" style="font-size: ${nameFontSize};">${patientName}</span>
+                </div>
+                <!-- Line 2: AGE: and G: -->
+                <div class="label-row demo-row">
+                    <div><span class="lbl-key">AGE:</span>&nbsp;<span class="lbl-val">${ageDisplay}</span></div>
+                    <div><span class="lbl-key">G:</span>&nbsp;<span class="lbl-val">${genderDisplay}</span></div>
+                </div>
+                <!-- Line 3: TT: All Test Names -->
+                <div class="test-row">
+                    <span class="lbl-key test-key" style="font-size: ${testFontSize};">TT:</span>&nbsp;<span class="lbl-val test-val" style="font-size: ${testFontSize};">${testsJoined}</span>
+                </div>
+            </div>
+        </div>
+        ${autoPrint ? `
+        <script>
+            window.onload = function() {
+                window.focus();
+                window.print();
+            };
+        </script>
+        ` : ''}
+    </body>
+    </html>
+    `;
+}
+
+module.exports = { generatePathologyPDF, generateTransferLabelPDF, generateReceiptPDF, buildReceiptHTML, buildBottleLabelHTML, getBrowser };
 
 
 

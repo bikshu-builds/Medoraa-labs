@@ -592,6 +592,12 @@ const PatientRegistrationForm: React.FC = () => {
   const [savedRecord, setSavedRecord] = useState<any | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const [printType, setPrintType] = useState<"receipt" | "label">("receipt");
+  const [modalPreviewType, setModalPreviewType] = useState<"receipt" | "label">("receipt");
+  const labelRotation: 0 = 0;
+  const updateLabelRotation = (_rotation?: any) => { };
+  const labelOrientation = "horizontal";
+  const updateLabelOrientation = (_orientation?: any) => { };
+
 
   // Official Pathology Report Modal State
   const [reportModalRecord, setReportModalRecord] = useState<any | null>(null);
@@ -761,11 +767,285 @@ const PatientRegistrationForm: React.FC = () => {
     }
   };
 
-  const handlePrintLabels = () => {
-    setPrintType("label");
-    setTimeout(() => {
+  const generateBottleLabelHTML = (
+    record: any,
+    _rotation: any = 0,
+    isPreview = false,
+    includeAutoPrint = false,
+  ) => {
+    const pageW = "50mm";
+    const pageH = "15mm";
+
+    const patientName = (record.patientName || "").toUpperCase().trim() || "PATIENT";
+    const ageVal = record.age?.value || "";
+    let ageType = "Y";
+    if (record.age?.type) {
+      ageType = record.age.type.toLowerCase().startsWith("y")
+        ? "Y"
+        : record.age.type.substring(0, 1).toUpperCase();
+    }
+    const ageDisplay = ageVal ? `${ageVal} ${ageType}` : "N/A";
+    const genderDisplay = (record.gender || "N/A").toUpperCase();
+
+    // Dynamic scaling for name (+2px larger: base 8.0px)
+    const nameLen = patientName.length;
+    let nameFontSize = "7.0px";
+    if (nameLen > 28) {
+      nameFontSize = "6.8px";
+    } else if (nameLen > 20) {
+      nameFontSize = "7.4px";
+    }
+
+    // Extract all test names into a single unified list
+    let rawTests: any[] = [];
+    if (Array.isArray(record.tests) && record.tests.length > 0) {
+      rawTests = record.tests;
+    } else if (Array.isArray(record.testResults) && record.testResults.length > 0) {
+      rawTests = record.testResults;
+    }
+
+    const testNamesList = rawTests
+      .map((t: any) => {
+        if (typeof t === "object" && t !== null) {
+          return (t.testName || t.name || "").trim();
+        }
+        return String(t || "").trim();
+      })
+      .filter(Boolean);
+
+    const uniqueTests = Array.from(new Set(testNamesList.length > 0 ? testNamesList : ["ROUTINE TEST"]));
+    const testsJoined = uniqueTests.join(", ").toUpperCase();
+    const testsLen = testsJoined.length;
+
+    // Normal patients (1-4 tests): stays large at 6.0px
+    // Extreme orders (10-13+ tests): automatically scales down to 4.0px with zero bottom cutoff
+    let testFontSize = "6.0px";
+    let testLineHeight = "1.15";
+    if (testsLen > 180) {
+      testFontSize = "4.0px";
+      testLineHeight = "0.95";
+    } else if (testsLen > 120) {
+      testFontSize = "4.6px";
+      testLineHeight = "1.02";
+    } else if (testsLen > 70) {
+      testFontSize = "5.2px";
+      testLineHeight = "1.08";
+    }
+
+    const topPadding = testsLen > 180 ? "3.0mm" : "4.0mm";
+    const rowMargin = testsLen > 180 ? "0.05mm" : "0.1mm";
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Bottle Label - ${record.patientName || "Specimen"}</title>
+  <style>
+    @page {
+      size: ${pageW} ${pageH};
+      margin: 0;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #ffffff;
+      color: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 5.0px;
+      line-height: 1.1;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    ${isPreview
+        ? `
+      html {
+        width: 50mm;
+        height: 15mm;
+        transform: scale(1.85);
+        transform-origin: top left;
+      }
+      body {
+        width: 50mm;
+        height: 15mm;
+      }
+    `
+        : `
+      html, body {
+        width: ${pageW};
+        height: ${pageH};
+      }
+    `
+      }
+    .label-page {
+      width: ${pageW};
+      height: ${pageH};
+      box-sizing: border-box;
+      position: relative;
+      page-break-after: avoid;
+      break-after: avoid;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      overflow: hidden;
+      background: #ffffff;
+      font-size: 5.0px;
+      line-height: 1.1;
+      padding: 0;
+      margin: 0;
+    }
+    .label-content {
+      width: 48.5mm;
+      box-sizing: border-box;
+      text-align: left;
+      font-size: 5.0px;
+      line-height: 1.1;
+      padding: ${topPadding} 0.8mm 0 0.8mm;
+      margin: 0;
+      background: #ffffff;
+    }
+    .label-row {
+      width: 100%;
+      box-sizing: border-box;
+      display: flex;
+      align-items: baseline;
+      justify-content: flex-start;
+      text-align: left;
+      font-size: 5.0px;
+      line-height: 1.1;
+      margin: 0;
+      padding: 0;
+    }
+    .name-row {
+      white-space: nowrap;
+      line-height: 1.1;
+      margin: 0 0 ${rowMargin} 0;
+      padding: 0;
+    }
+    .demo-row {
+      white-space: nowrap;
+      line-height: 1.1;
+      margin: 0 0 ${rowMargin} 0;
+      padding: 0;
+      gap: 2.5mm;
+    }
+    .test-row {
+      display: block;
+      width: 100%;
+      line-height: ${testLineHeight};
+      word-break: break-word;
+      white-space: normal;
+      margin: 0;
+      padding: 0;
+    }
+    .lbl-key {
+      font-size: 6.8px;
+      font-weight: 700;
+      color: #000000;
+      letter-spacing: 0.05px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .test-key {
+      font-size: 6.0px;
+      font-weight: 700;
+      color: #000000;
+      letter-spacing: 0.05px;
+    }
+    .lbl-val {
+      font-size: 7.2px;
+      font-weight: 600;
+      color: #000000;
+    }
+    .name-val {
+      font-size: 8.0px;
+      font-weight: 700;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 44mm;
+    }
+    .test-val {
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #000000;
+      word-break: break-word;
+      font-size: 6.0px;
+    }
+  </style>
+</head>
+<body>
+  <div class="label-page">
+    <div class="label-content">
+      <!-- Line 1: N: Patient Name -->
+      <div class="label-row name-row">
+        <span class="lbl-key">N:</span>&nbsp;<span class="lbl-val name-val" style="font-size: ${nameFontSize};">${patientName}</span>
+      </div>
+      <!-- Line 2: AGE: and G: -->
+      <div class="label-row demo-row">
+        <div><span class="lbl-key">AGE:</span>&nbsp;<span class="lbl-val">${ageDisplay}</span></div>
+        <div><span class="lbl-key">G:</span>&nbsp;<span class="lbl-val">${genderDisplay}</span></div>
+      </div>
+      <!-- Line 3: TT: All Test Names -->
+      <div class="test-row">
+        <span class="lbl-key test-key" style="font-size: ${testFontSize};">TT:</span>&nbsp;<span class="lbl-val test-val" style="font-size: ${testFontSize};">${testsJoined}</span>
+      </div>
+    </div>
+  </div>
+  ${!isPreview && includeAutoPrint ? `
+  <script>
+    window.onload = function() {
+      window.focus();
       window.print();
-    }, 150);
+    };
+  </script>
+  ` : ""}
+</body>
+</html>`;
+  };
+
+  const handlePrintLabels = (_overrideRotation?: any, recordToPrint?: any) => {
+    const targetRecord = recordToPrint || savedRecord;
+    if (!targetRecord) return;
+
+    // Generate label HTML without opening any new tab
+    const htmlContent = generateBottleLabelHTML(targetRecord, 0, false, false);
+
+    // Print directly from current screen via hidden iframe
+    let iframe = document.getElementById("label-print-iframe") as HTMLIFrameElement;
+    if (!iframe) {
+      iframe = document.createElement("iframe");
+      iframe.id = "label-print-iframe";
+      iframe.style.position = "fixed";
+      iframe.style.top = "-9999px";
+      iframe.style.left = "-9999px";
+      iframe.style.width = "50mm";
+      iframe.style.height = "15mm";
+      iframe.style.border = "none";
+      iframe.style.visibility = "hidden";
+      document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (e) {
+          console.error("Bottle label print error:", e);
+        }
+      }, 150);
+    }
   };
 
   const toggleTestSelection = (id: string) => {
@@ -2348,225 +2628,223 @@ const PatientRegistrationForm: React.FC = () => {
                                 : "hover:bg-slate-50/40 dark:hover:bg-slate-800/20",
                             )}
                           >
-                          <td className="px-6 py-4">
-                            <span className="font-mono font-bold text-slate-800 dark:text-slate-200 block">
-                              {reg.registrationNumber}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 block">
-                              {reg.registrationDate} {reg.registrationTime}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-extrabold text-slate-800 dark:text-slate-100">
-                                {reg.patientName}
+                            <td className="px-6 py-4">
+                              <span className="font-mono font-bold text-slate-800 dark:text-slate-200 block">
+                                {reg.registrationNumber}
                               </span>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[9px] font-black rounded uppercase">
-                                  {reg.age?.value} {reg.age?.type}
-                                </span>
-                                <span className="px-1.5 py-0.5 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-[9px] font-black rounded uppercase">
-                                  {reg.gender}
-                                </span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300 block">
-                              {reg.mobileNumber}
-                            </span>
-                            <span
-                              className="text-[10px] text-slate-400 truncate max-w-[150px] block"
-                              title={`${reg.address}${reg.location?.city ? `, ${reg.location.city}, ${reg.location.district}, ${reg.location.state}` : ""}`}
-                            >
-                              {reg.address}
-                            </span>
-                            {reg.location?.state && (
-                              <span className="text-[9px] text-slate-500 font-medium block mt-0.5">
-                                {[
-                                  reg.location.city,
-                                  reg.location.district,
-                                  reg.location.state,
-                                ]
-                                  .filter(Boolean)
-                                  .join(", ")}
+                              <span className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 block">
+                                {reg.registrationDate} {reg.registrationTime}
                               </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="font-bold text-slate-750 dark:text-slate-250">
-                              {reg.referredBy}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col gap-1 max-w-[200px]">
-                              <div className="flex flex-wrap gap-1">
-                                {reg.tests && reg.tests.length > 0 ? (
-                                  reg.tests.map((test: any, tIdx: number) => (
-                                    <span
-                                      key={tIdx}
-                                      className="px-2 py-0.5 bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 text-[9px] font-black rounded uppercase"
-                                    >
-                                      {typeof test === "string"
-                                        ? test
-                                        : test.testName || test.name}
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span className="text-[10px] text-amber-500 font-black uppercase">
-                                    No tests added
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-extrabold text-slate-800 dark:text-slate-100">
+                                  {reg.patientName}
+                                </span>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-[9px] font-black rounded uppercase">
+                                    {reg.age?.value} {reg.age?.type}
                                   </span>
+                                  <span className="px-1.5 py-0.5 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-[9px] font-black rounded uppercase">
+                                    {reg.gender}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="font-semibold text-slate-700 dark:text-slate-300 block">
+                                {reg.mobileNumber}
+                              </span>
+                              <span
+                                className="text-[10px] text-slate-400 truncate max-w-[150px] block"
+                                title={`${reg.address}${reg.location?.city ? `, ${reg.location.city}, ${reg.location.district}, ${reg.location.state}` : ""}`}
+                              >
+                                {reg.address}
+                              </span>
+                              {reg.location?.state && (
+                                <span className="text-[9px] text-slate-500 font-medium block mt-0.5">
+                                  {[
+                                    reg.location.city,
+                                    reg.location.district,
+                                    reg.location.state,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(", ")}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="font-bold text-slate-750 dark:text-slate-250">
+                                {reg.referredBy}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col gap-1 max-w-[200px]">
+                                <div className="flex flex-wrap gap-1">
+                                  {reg.tests && reg.tests.length > 0 ? (
+                                    reg.tests.map((test: any, tIdx: number) => (
+                                      <span
+                                        key={tIdx}
+                                        className="px-2 py-0.5 bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 text-[9px] font-black rounded uppercase"
+                                      >
+                                        {typeof test === "string"
+                                          ? test
+                                          : test.testName || test.name}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-[10px] text-amber-500 font-black uppercase">
+                                      No tests added
+                                    </span>
+                                  )}
+                                </div>
+                                {regTotalCount > 0 && (
+                                  <div className="mt-0.5">
+                                    {regEnteredCount > 0 && regPendingCount > 0 ? (
+                                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 px-1.5 py-0.5 rounded">
+                                        <Clock className="w-2.5 h-2.5" />
+                                        {regEnteredCount} Entered • {regPendingCount} Pending
+                                      </span>
+                                    ) : regEnteredCount > 0 && regPendingCount === 0 ? (
+                                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 px-1.5 py-0.5 rounded">
+                                        <Check className="w-2.5 h-2.5" />
+                                        All {regEnteredCount} Entered
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded">
+                                        {regPendingCount} Pending
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </div>
-                              {regTotalCount > 0 && (
-                                <div className="mt-0.5">
-                                  {regEnteredCount > 0 && regPendingCount > 0 ? (
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 px-1.5 py-0.5 rounded">
-                                      <Clock className="w-2.5 h-2.5" />
-                                      {regEnteredCount} Entered • {regPendingCount} Pending
-                                    </span>
-                                  ) : regEnteredCount > 0 && regPendingCount === 0 ? (
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 px-1.5 py-0.5 rounded">
-                                      <Check className="w-2.5 h-2.5" />
-                                      All {regEnteredCount} Entered
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded">
-                                      {regPendingCount} Pending
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            {(() => {
-                              const total = reg.billing?.totalAmount ?? reg.totalAmount ?? 0;
-                              const paid = reg.billing?.paidAmount ?? reg.paidAmount ?? 0;
-                              const due = Math.max(0, total - paid);
-                              const isPaid = reg.paymentStatus === "PAID" || (total > 0 && due <= 0);
-                              return (
-                                <div className="flex flex-col gap-1">
-                                  <div className="flex items-center gap-1.5">
-                                    <span
-                                      className={cn(
-                                        "px-2 py-0.5 text-[9px] font-black rounded uppercase tracking-wider",
-                                        isPaid
-                                          ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400"
-                                          : due > 0 && paid > 0
-                                          ? "bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400"
-                                          : "bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400"
-                                      )}
-                                    >
-                                      {reg.paymentStatus || (isPaid ? "PAID" : due > 0 && paid > 0 ? "PARTIAL" : "PENDING")}
-                                    </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              {(() => {
+                                const total = reg.billing?.totalAmount ?? reg.totalAmount ?? 0;
+                                const paid = reg.billing?.paidAmount ?? reg.paidAmount ?? 0;
+                                const due = Math.max(0, total - paid);
+                                const isPaid = reg.paymentStatus === "PAID" || (total > 0 && due <= 0);
+                                return (
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <span
+                                        className={cn(
+                                          "px-2 py-0.5 text-[9px] font-black rounded uppercase tracking-wider",
+                                          isPaid
+                                            ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400"
+                                            : due > 0 && paid > 0
+                                              ? "bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400"
+                                              : "bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400"
+                                        )}
+                                      >
+                                        {reg.paymentStatus || (isPaid ? "PAID" : due > 0 && paid > 0 ? "PARTIAL" : "PENDING")}
+                                      </span>
+                                    </div>
+                                    {due > 0 && (
+                                      <span className="font-black text-xs text-rose-700 dark:text-rose-300 bg-rose-200/80 dark:bg-rose-900/60 px-2 py-0.5 rounded-md inline-flex items-center gap-1 w-fit shadow-xs border border-rose-300/50">
+                                        Due: ₹{due.toFixed(2)}
+                                      </span>
+                                    )}
+                                    {isPaid && total > 0 && (
+                                      <span className="font-bold text-[10px] text-emerald-600 dark:text-emerald-400">
+                                        Paid in Full (₹{total.toFixed(2)})
+                                      </span>
+                                    )}
                                   </div>
-                                  {due > 0 && (
-                                    <span className="font-black text-xs text-rose-700 dark:text-rose-300 bg-rose-200/80 dark:bg-rose-900/60 px-2 py-0.5 rounded-md inline-flex items-center gap-1 w-fit shadow-xs border border-rose-300/50">
-                                      Due: ₹{due.toFixed(2)}
-                                    </span>
-                                  )}
-                                  {isPaid && total > 0 && (
-                                    <span className="font-bold text-[10px] text-emerald-600 dark:text-emerald-400">
-                                      Paid in Full (₹{total.toFixed(2)})
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                onClick={async () => {
-                                  setSavedRecord(reg);
-                                  const existingTestIds = (reg.tests || [])
-                                    .map((t: any) => (typeof t === "object" && t._id ? t._id : null))
-                                    .filter(Boolean);
-                                  setSelectedTestIds(existingTestIds);
-                                  
-                                  // Pre-fill billing options if saved
-                                  if (reg.billing) {
-                                    setDiscountVal(String(reg.billing.discountPercentage || reg.billing.discount || 0));
-                                    setDiscountType(reg.billing.discountType || "percentage");
-                                    setPaymentMethod(reg.billing.paymentMethod || "Cash");
-                                    setPaidAmountInput(String(reg.billing.paidAmount ?? ""));
-                                  } else {
-                                    setDiscountVal("0");
-                                    setDiscountType("percentage");
-                                    setPaymentMethod("Cash");
-                                    setPaidAmountInput("");
-                                  }
+                                );
+                              })()}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  onClick={async () => {
+                                    setSavedRecord(reg);
+                                    const existingTestIds = (reg.tests || [])
+                                      .map((t: any) => (typeof t === "object" && t._id ? t._id : null))
+                                      .filter(Boolean);
+                                    setSelectedTestIds(existingTestIds);
 
-                                  await fetchSamples();
-                                  setShowTestSelection(true);
-                                }}
-                                className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center gap-1 font-bold text-[10px]"
-                                title="Add or Edit Tests for this patient"
-                              >
-                                <FlaskConical className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">+ Tests</span>
-                              </button>
-                              <button
-                                type="button"
-                                disabled={
-                                  reg.authorizationStatus !== "AUTHORIZED" || regEnteredCount === 0
-                                }
-                                onClick={() => {
-                                  if (
-                                    reg.authorizationStatus === "AUTHORIZED" && regEnteredCount > 0
-                                  ) {
-                                    setReportModalRecord(reg);
-                                    setIsReportModalOpen(true);
+                                    // Pre-fill billing options if saved
+                                    if (reg.billing) {
+                                      setDiscountVal(String(reg.billing.discountPercentage || reg.billing.discount || 0));
+                                      setDiscountType(reg.billing.discountType || "percentage");
+                                      setPaymentMethod(reg.billing.paymentMethod || "Cash");
+                                      setPaidAmountInput(String(reg.billing.paidAmount ?? ""));
+                                    } else {
+                                      setDiscountVal("0");
+                                      setDiscountType("percentage");
+                                      setPaymentMethod("Cash");
+                                      setPaidAmountInput("");
+                                    }
+
+                                    await fetchSamples();
+                                    setShowTestSelection(true);
+                                  }}
+                                  className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center gap-1 font-bold text-[10px]"
+                                  title="Add or Edit Tests for this patient"
+                                >
+                                  <FlaskConical className="w-3.5 h-3.5" />
+                                  <span className="hidden sm:inline">+ Tests</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={
+                                    reg.authorizationStatus !== "AUTHORIZED" || regEnteredCount === 0
                                   }
-                                }}
-                                className={cn(
-                                  "p-1.5 rounded-full transition-all cursor-pointer",
-                                  reg.authorizationStatus === "AUTHORIZED" && regEnteredCount > 0
-                                    ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:scale-105 active:scale-95"
-                                    : "bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600 opacity-40 cursor-not-allowed",
-                                )}
-                                title={
-                                  reg.authorizationStatus === "AUTHORIZED" && regEnteredCount > 0
-                                    ? `Download / Print Official Pathology Report (${regEnteredCount} entered result${regEnteredCount > 1 ? "s" : ""})`
-                                    : reg.authorizationStatus !== "AUTHORIZED"
-                                    ? "Download disabled — Awaiting Pathologist Authorization"
-                                    : "Download disabled — No test results entered yet"
-                                }
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setSavedRecord(reg);
-                                  setPrintType("receipt");
-                                  setShowReceipt(true);
-                                }}
-                                className="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                                title="Print Receipt"
-                              >
-                                <Printer className="w-3.5 h-3.5" />
-                              </button>
-                              {reg.tests && reg.tests.length > 0 && (
+                                  onClick={() => {
+                                    if (
+                                      reg.authorizationStatus === "AUTHORIZED" && regEnteredCount > 0
+                                    ) {
+                                      setReportModalRecord(reg);
+                                      setIsReportModalOpen(true);
+                                    }
+                                  }}
+                                  className={cn(
+                                    "p-1.5 rounded-full transition-all cursor-pointer",
+                                    reg.authorizationStatus === "AUTHORIZED" && regEnteredCount > 0
+                                      ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:scale-105 active:scale-95"
+                                      : "bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600 opacity-40 cursor-not-allowed",
+                                  )}
+                                  title={
+                                    reg.authorizationStatus === "AUTHORIZED" && regEnteredCount > 0
+                                      ? `Download / Print Official Pathology Report (${regEnteredCount} entered result${regEnteredCount > 1 ? "s" : ""})`
+                                      : reg.authorizationStatus !== "AUTHORIZED"
+                                        ? "Download disabled — Awaiting Pathologist Authorization"
+                                        : "Download disabled — No test results entered yet"
+                                  }
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
                                 <button
                                   onClick={() => {
                                     setSavedRecord(reg);
-                                    setPrintType("label");
-                                    setTimeout(() => {
-                                      window.print();
-                                    }, 150);
+                                    setPrintType("receipt");
+                                    setShowReceipt(true);
                                   }}
-                                  className="p-1.5 bg-teal-50 dark:bg-teal-900/30 text-teal-650 dark:text-teal-400 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                                  title="Print Bottle Labels"
+                                  className="p-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                  title="Print Receipt"
                                 >
-                                  <Activity className="w-3.5 h-3.5" />
+                                  <Printer className="w-3.5 h-3.5" />
                                 </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                                {reg.tests && reg.tests.length > 0 && (
+                                  <button
+                                    onClick={() => {
+                                      setSavedRecord(reg);
+                                      setPrintType("label");
+                                      handlePrintLabels(undefined, reg);
+                                    }}
+                                    className="p-1.5 bg-teal-50 dark:bg-teal-900/30 text-teal-650 dark:text-teal-400 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                    title="Print Bottle Labels"
+                                  >
+                                    <Activity className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>
@@ -3619,21 +3897,33 @@ const PatientRegistrationForm: React.FC = () => {
                       </div>
                     </button>
 
-                    {/* Option 2: Print Bottle Labels */}
-                    <button
-                      onClick={handlePrintLabels}
-                      className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 border-2 border-emerald-400/80 hover:border-emerald-500 rounded-xl text-emerald-600 dark:text-emerald-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
-                    >
-                      <Printer className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <div className="text-left">
-                        <div className="font-bold text-xs sm:text-sm">
-                          Print Bottle Labels
+                    {/* Option 2: Print Bottle Labels (Exact 50x15mm) */}
+                    <div className="bg-white dark:bg-slate-800 border-2 border-emerald-400/80 hover:border-emerald-500 rounded-xl transition-all shadow-xs overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => handlePrintLabels(0)}
+                        className="w-full py-2.5 px-3.5 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 transition-all active:scale-[0.99] flex items-center justify-between cursor-pointer"
+                        title="Print 50×15mm Bottle Label"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Printer className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <div className="text-left">
+                            <div className="font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                              <span>Print Bottle Label</span>
+                              <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-extrabold px-1.5 py-0.5 rounded">
+                                50×15mm
+                              </span>
+                            </div>
+                            <div className="text-[11px] font-normal text-slate-400">
+                              Standard 0° • Single sticker with all tests
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-[11px] font-normal text-slate-400">
-                          Barcode labels for specimen bottles
-                        </div>
-                      </div>
-                    </button>
+                        <span className="text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 rounded-md shadow-xs transition-colors">
+                          Print
+                        </span>
+                      </button>
+                    </div>
 
                     {/* Option 3: Thermal Transfer Label */}
                     <button
@@ -3708,13 +3998,114 @@ const PatientRegistrationForm: React.FC = () => {
 
               {/* RIGHT PANEL: Instant HTML Preview */}
               <div className="flex-1 p-2.5 sm:p-3 bg-slate-100 dark:bg-slate-950 flex flex-col overflow-hidden h-full">
-                <iframe
-                  src={getApiUrl(
-                    `/api/admin/registrations/${savedRecord._id}/receipt-html?v=${savedRecord._id}`,
+                {/* Preview Selector Tabs */}
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setModalPreviewType("receipt")}
+                      className={cn(
+                        "px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer",
+                        modalPreviewType === "receipt"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700",
+                      )}
+                    >
+                      Patient Receipt (A4)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalPreviewType("label")}
+                      className={cn(
+                        "px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer",
+                        modalPreviewType === "label"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700",
+                      )}
+                    >
+                      Bottle Label (50×15mm)
+                    </button>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline">
+                    {modalPreviewType === "receipt"
+                      ? "A4 Patient Bill Preview"
+                      : "Seznik 50×15mm Label Preview"}
+                  </span>
+                </div>
+
+                <div className="flex-1 overflow-hidden relative rounded-xl border border-slate-200 dark:border-slate-800 bg-white">
+                  {modalPreviewType === "receipt" ? (
+                    <iframe
+                      src={getApiUrl(
+                        `/api/admin/registrations/${savedRecord._id}/receipt-html?v=${savedRecord._id}`,
+                      )}
+                      className="w-full h-full rounded-xl border-none shadow-sm bg-white"
+                      title="Patient Receipt Preview"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-900 overflow-y-auto">
+                      {/* Top Header Bar */}
+                      <div className="w-full flex items-center justify-between bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs mb-2.5 gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                            Format:
+                          </span>
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[11px] font-black border border-emerald-300 dark:border-emerald-800">
+                            50mm × 15mm Standard (0°)
+                          </span>
+                        </div>
+
+                        {/* Top Direct Print Button */}
+                        <button
+                          type="button"
+                          onClick={() => handlePrintLabels(0)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer ml-auto"
+                          title="Print 50×15mm Bottle Label"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>Print Label</span>
+                        </button>
+                      </div>
+
+                      {/* Live 50x15mm Preview Card */}
+                      <div className="flex flex-col items-center justify-center my-auto py-2">
+                        <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                          <span>Live 50mm × 15mm Sticker Preview</span>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-black border border-emerald-300 dark:border-emerald-800">
+                            0° Standard (Single Sticker)
+                          </span>
+                        </div>
+                        <iframe
+                          key={`${savedRecord?._id || "modal-label"}-${savedRecord?.patientName || ""}-${savedRecord?.tests?.length || 0}`}
+                          srcDoc={generateBottleLabelHTML(savedRecord, 0, true)}
+                          style={{
+                            width: "355px",
+                            height: "108px",
+                          }}
+                          className="rounded-lg border-2 border-emerald-500 shadow-md bg-white overflow-hidden transition-all duration-300"
+                          title="Bottle Label Live Preview"
+                        />
+                      </div>
+
+                      {/* Primary Print Button */}
+                      <div className="w-full space-y-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => handlePrintLabels(0)}
+                          className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Printer className="w-4 h-4" />
+                          <span>Print Bottle Label (50×15mm)</span>
+                        </button>
+                      </div>
+
+                      {/* Instructions Alert Banner */}
+                      <div className="w-full p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-lg text-emerald-900 dark:text-emerald-200 text-[11px] font-semibold text-center mt-2">
+                        💡 Label Size: <strong>50mm × 15mm</strong> (0° Standard). All tests are printed on this single tube sticker. In Chrome Print Dialog, set <strong>Margins: None</strong>.
+                      </div>
+                    </div>
                   )}
-                  className="w-full h-full rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm bg-white"
-                  title="Patient Receipt Preview"
-                />
+                </div>
               </div>
             </div>
           </div>
@@ -3745,372 +4136,310 @@ const PatientRegistrationForm: React.FC = () => {
             printType === "label" ? "print:block" : "print:hidden",
           )}
         >
-          {(savedRecord.tests || []).map((test: any, index: number) => {
-            const currentDate = savedRecord.registrationDate || "";
-            const currentTime = savedRecord.registrationTime || "";
-            const formattedDateTime = `${currentDate} ${currentTime}`;
+          {(() => {
+            const rawTests = savedRecord.tests && savedRecord.tests.length > 0
+              ? savedRecord.tests
+              : savedRecord.testResults && savedRecord.testResults.length > 0
+                ? savedRecord.testResults
+                : [];
 
-            const regDigits = savedRecord.registrationNumber
-              ? savedRecord.registrationNumber.replace(/[^0-9]/g, "")
-              : "";
-            const sampleDigits = regDigits.slice(-8);
-            const sampleId = `S${sampleDigits}${index + 1}`;
+            const testNamesList = rawTests
+              .map((t: any) => {
+                if (typeof t === "object" && t !== null) {
+                  return (t.testName || t.name || "").trim();
+                }
+                return String(t || "").trim();
+              })
+              .filter(Boolean);
 
-            const badgeInfo = getContainerBadgeInfo(test, availableSamples);
+            const uniqueTests = Array.from(new Set(testNamesList.length > 0 ? testNamesList : ["ROUTINE TEST"]));
+            const testsJoined = uniqueTests.join(", ").toUpperCase();
+            const testsLen = testsJoined.length;
+
+            const ageValue = savedRecord.age?.value || "";
+            const ageType = savedRecord.age?.type
+              ? savedRecord.age.type.toLowerCase().startsWith("y")
+                ? "Y"
+                : savedRecord.age.type.substring(0, 1).toUpperCase()
+              : "Y";
+            const ageDisplay = ageValue ? `${ageValue} ${ageType}` : "N/A";
+            const genderDisplay = (savedRecord.gender || "N/A").toUpperCase();
+            const patientName = (savedRecord.patientName || "PATIENT").toUpperCase().trim();
+
+            // Dynamic scaling for name to fit within 44mm without truncation
+            const nameLen = patientName.length;
+            let nameFontSize = "6.0px";
+            if (nameLen > 28) {
+              nameFontSize = "4.8px";
+            } else if (nameLen > 20) {
+              nameFontSize = "5.4px";
+            }
+
+            let testFontSize = "4.8px";
+            let testLineHeight = "1.05";
+            if (testsLen > 120) {
+              testFontSize = "3.2px";
+              testLineHeight = "0.92";
+            } else if (testsLen > 80) {
+              testFontSize = "3.6px";
+              testLineHeight = "0.96";
+            } else if (testsLen > 50) {
+              testFontSize = "4.0px";
+              testLineHeight = "1.00";
+            } else if (testsLen <= 25) {
+              testFontSize = "5.0px";
+              testLineHeight = "1.10";
+            }
 
             return (
-              <div
-                key={test._id || index}
-                className="vial-label-card"
-                style={{ pageBreakAfter: "always", breakAfter: "page" }}
-              >
-                {/* Logo Column */}
-                <div className="label-logo-col">
-                  <svg
-                    className="label-logo-icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                  </svg>
-                  <div className="label-brand-name">Medoraa</div>
-                  <div className="label-brand-sub">DIAGNOSTICS</div>
-                </div>
-
-                {/* Divider */}
-                <div className="label-divider" />
-
-                {/* Patient Info Column */}
-                <div className="label-info-col">
-                  <div className="label-field-group">
-                    <span className="label-field-title">PATIENT ID:</span>
-                    <span className="label-field-value-lg">
-                      {savedRecord.registrationNumber}
+              <div className="vial-label-card-wrapper">
+                <div className="vial-label-card">
+                  {/* Line 1: N: Patient Name */}
+                  <div className="label-text-row name-row">
+                    <span className="label-field-key">N:</span>&nbsp;<span
+                      className="label-field-val label-name-val"
+                      style={{ fontSize: nameFontSize }}
+                    >
+                      {patientName}
                     </span>
                   </div>
-                  <div
-                    className="label-field-group"
-                    style={{ marginTop: "3px" }}
-                  >
-                    <span className="label-field-title">NAME:</span>
-                    <span className="label-field-value-lg uppercase truncate-name">
-                      {savedRecord.patientName}
+
+                  {/* Line 2: AGE: and G: */}
+                  <div className="label-text-row demo-row">
+                    <div>
+                      <span className="label-field-key">AGE:</span>&nbsp;<span className="label-field-val">{ageDisplay}</span>
+                    </div>
+                    <div>
+                      <span className="label-field-key">G:</span>&nbsp;<span className="label-field-val uppercase">{genderDisplay}</span>
+                    </div>
+                  </div>
+
+                  {/* Line 3: TT: All Test Names */}
+                  <div className="label-test-row">
+                    <span className="label-field-key test-key">TT:</span>&nbsp;<span
+                      className="label-field-val label-test-val"
+                      style={{ fontSize: testFontSize, lineHeight: testLineHeight }}
+                    >
+                      {testsJoined}
                     </span>
-                  </div>
-                  <div className="label-grid" style={{ marginTop: "3px" }}>
-                    <div>
-                      <span className="label-field-title">AGE:</span>
-                      <span className="label-field-value">
-                        {savedRecord.age?.value}{" "}
-                        {savedRecord.age?.type?.substring(0, 1)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="label-field-title">GENDER:</span>
-                      <span className="label-field-value">
-                        {savedRecord.gender?.substring(0, 1)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="label-field-title">PHONE:</span>
-                      <span className="label-field-value">
-                        {savedRecord.mobileNumber}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* QR Column */}
-                <div className="label-qr-col">
-                  <div className="label-field-group">
-                    <span className="label-field-title">SAMPLE ID:</span>
-                    <span className="label-field-value-md">{sampleId}</span>
-                  </div>
-                  <div className="label-qr-wrapper">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`Patient:${savedRecord.patientName}|ID:${savedRecord.registrationNumber}|Sample:${sampleId}|Test:${typeof test === "object" ? test.testName || test.name : test}`)}`}
-                      alt="QR Code"
-                      className="label-qr-img"
-                    />
-                  </div>
-                  <div
-                    className="label-test-badge"
-                    style={{
-                      backgroundColor: badgeInfo.bgColor,
-                      color: badgeInfo.textColor,
-                    }}
-                  >
-                    {badgeInfo.text}
-                  </div>
-                </div>
-
-                {/* Barcode Column */}
-                <div className="label-barcode-col">
-                  <div className="label-barcode-wrapper">
-                    <Barcode
-                      value={sampleId}
-                      width={1.1}
-                      height={24}
-                      displayValue={false}
-                    />
-                  </div>
-                  <div className="label-timestamp-wrapper">
-                    {formattedDateTime}
                   </div>
                 </div>
               </div>
             );
-          })}
+          })()}
         </div>
       )}
 
       {/* Conditional Page Print Setup */}
       {printType === "label" ? (
         <style jsx global>{`
-          @media print {
-            @page {
-              size: 100mm 35mm;
-              margin: 0;
-            }
-            body * {
-              visibility: hidden;
-            }
-            #print-active-section,
-            #print-active-section * {
-              visibility: visible;
-            }
-            #print-active-section {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 100mm !important;
-              height: auto !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              background: white !important;
-              z-index: 9999999 !important;
-            }
+    @media print {
+      @page {
+        size: 50mm 15mm;
+        margin: 0;
+      }
 
-            /* Vial Label Container Styling */
-            .vial-label-card {
-              width: 100mm;
-              height: 35mm;
-              box-sizing: border-box;
-              padding: 1.5mm 2.5mm;
-              display: flex;
-              align-items: stretch;
-              background: white !important;
-              color: black !important;
-              font-family:
-                -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-                Helvetica, Arial, sans-serif;
-              page-break-after: always;
-              break-after: page;
-              overflow: hidden;
-            }
+      html,
+      body {
+        width: 50mm !important;
+        height: 15mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        background: white !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
 
-            /* Column 1: Logo & Brand */
-            .label-logo-col {
-              width: 18mm;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              text-align: center;
-              flex-shrink: 0;
-            }
-            .label-logo-icon {
-              width: 6mm;
-              height: 6mm;
-              color: #1a365d !important;
-            }
-            .label-brand-name {
-              font-size: 10px;
-              font-weight: 800;
-              color: #1a365d !important;
-              line-height: 1;
-              margin-top: 1mm;
-              letter-spacing: -0.2px;
-            }
-            .label-brand-sub {
-              font-size: 5px;
-              font-weight: 700;
-              color: #0d9488 !important;
-              letter-spacing: 0.8px;
-              line-height: 1;
-              margin-top: 0.5mm;
-            }
+      /* Hide all dashboard elements completely so body height matches label exactly */
+      body > *:not(#print-active-section) {
+        display: none !important;
+      }
 
-            /* Divider */
-            .label-divider {
-              width: 0.2mm;
-              background-color: #cbd5e1 !important;
-              margin: 0 1.5mm;
-              flex-shrink: 0;
-            }
+      body * {
+        visibility: hidden;
+      }
 
-            /* Column 2: Patient Info */
-            .label-info-col {
-              flex: 1;
-              display: flex;
-              flex-direction: column;
-              justify-content: center;
-              min-width: 0;
-            }
-            .label-field-group {
-              display: flex;
-              flex-direction: column;
-              line-height: 1.1;
-            }
-            .label-field-title {
-              font-size: 7px;
-              font-weight: 700;
-              color: #64748b !important;
-              letter-spacing: 0.2px;
-            }
-            .label-field-value-lg {
-              font-size: 10px;
-              font-weight: 800;
-              color: #0f172a !important;
-            }
-            .truncate-name {
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              display: block;
-            }
-            .label-grid {
-              display: grid;
-              grid-template-columns: 1fr 1fr 1.3fr;
-              gap: 1mm;
-            }
-            .label-field-value {
-              font-size: 8px;
-              font-weight: 800;
-              color: #0f172a !important;
-              display: block;
-            }
+      #print-active-section,
+      #print-active-section * {
+        visibility: visible;
+      }
 
-            /* Column 3: QR & Badge */
-            .label-qr-col {
-              width: 22mm;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: space-between;
-              flex-shrink: 0;
-              padding-top: 0.5mm;
-            }
-            .label-field-value-md {
-              font-size: 8px;
-              font-weight: 800;
-              color: #0f172a !important;
-            }
-            .label-qr-wrapper {
-              width: 14mm;
-              height: 14mm;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            }
-            .label-qr-img {
-              width: 14mm;
-              height: 14mm;
-            }
-            .label-test-badge {
-              width: 100%;
-              font-size: 8px;
-              font-weight: 800;
-              text-align: center;
-              padding: 0.5mm 0;
-              border-radius: 0.5mm;
-              text-transform: uppercase;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
+      #print-active-section {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 50mm !important;
+        height: 15mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: white !important;
+        z-index: 9999999 !important;
+        overflow: hidden !important;
+      }
 
-            /* Column 4: Barcode & Time */
-            .label-barcode-col {
-              width: 18mm;
-              display: flex;
-              flex-direction: row;
-              align-items: center;
-              justify-content: center;
-              flex-shrink: 0;
-              border-left: 0.2mm dashed #e2e8f0 !important;
-              position: relative;
-              margin-left: 1mm;
-              height: 100%;
-            }
-            .label-barcode-wrapper {
-              transform: rotate(90deg);
-              transform-origin: center;
-              white-space: nowrap;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              position: absolute;
-              left: 0;
-              top: 50%;
-              margin-top: -15px;
-            }
+      .vial-label-card-wrapper {
+        width: 50mm !important;
+        height: 15mm !important;
+        min-width: 50mm !important;
+        min-height: 15mm !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        position: relative !important;
+        overflow: hidden !important;
+        background: white !important;
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
 
-            .label-timestamp-wrapper {
-              transform: rotate(90deg);
-              transform-origin: center;
-              white-space: nowrap;
-              font-size: 6px;
-              font-weight: 700;
-              color: #64748b !important;
-              position: absolute;
-              right: 0;
-              top: 50%;
-              margin-top: -15px;
-            }
-          }
-        `}</style>
+      .vial-label-card {
+        width: 48.5mm !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        max-width: 48.5mm !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        padding: 4.0mm 0.8mm 0 0.8mm !important;
+        display: block !important;
+        text-align: left !important;
+        background: white !important;
+        color: black !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+        overflow: visible !important;
+        position: static !important;
+        transform: none !important;
+      }
+
+      .label-text-row {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        align-items: baseline !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .name-row {
+        white-space: nowrap !important;
+        line-height: 1.15 !important;
+        margin-bottom: 0.15mm !important;
+      }
+
+      .demo-row {
+        white-space: nowrap !important;
+        line-height: 1.15 !important;
+        margin-bottom: 0.15mm !important;
+        gap: 2.5mm !important;
+      }
+
+      .label-test-row {
+        display: block !important;
+        width: 100% !important;
+        word-break: break-word !important;
+        white-space: normal !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        text-align: left !important;
+      }
+
+      .demo-spacer {
+        display: inline-block !important;
+        width: 2.5mm !important;
+      }
+
+      .label-field-key {
+        font-size: 6.8px !important;
+        font-weight: 700 !important;
+        color: black !important;
+        letter-spacing: 0.05px !important;
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+      }
+
+      .test-key {
+        font-size: 6.0px !important;
+        font-weight: 700 !important;
+        color: black !important;
+        letter-spacing: 0.05px !important;
+      }
+
+      .label-field-val {
+        font-size: 7.2px !important;
+        font-weight: 600 !important;
+        color: black !important;
+      }
+
+      .label-name-val {
+        font-size: 8.0px !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        max-width: 44mm !important;
+      }
+
+      .label-test-val {
+        font-size: 6.0px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        color: black !important;
+        word-break: break-word !important;
+      }
+    }
+  `}</style>
       ) : (
         <style jsx global>{`
-          @media print {
-            html,
-            body {
-              height: auto !important;
-              overflow: visible !important;
-              margin: 0 !important;
-              padding: 0 !important;
-            }
-            body * {
-              visibility: hidden;
-            }
-            #print-active-section,
-            #print-active-section * {
-              visibility: visible;
-            }
-            #print-active-section {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 100% !important;
-              height: auto !important;
-              display: block !important;
-              overflow: visible !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              box-shadow: none !important;
-              border: none !important;
-              background: white !important;
-              color: black !important;
-              z-index: 9999999 !important;
-            }
-            @page {
-              size: A4;
-              margin: 10mm;
-            }
-          }
-        `}</style>
+    @media print {
+      html,
+      body {
+        height: auto !important;
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      body * {
+        visibility: hidden;
+      }
+
+      #print-active-section,
+      #print-active-section * {
+        visibility: visible;
+      }
+
+      #print-active-section {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        display: block !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        background: white !important;
+        color: black !important;
+        z-index: 9999999 !important;
+      }
+
+      @page {
+        size: A4;
+        margin: 10mm;
+      }
+    }
+  `}</style>
       )}
       {/* Official Pathology Report Modal */}
       <PathologyReportModal
