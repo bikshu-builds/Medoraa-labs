@@ -46,7 +46,7 @@ function ElasticGallery() {
         const text = encodeURIComponent(
             `Hello Medoraa Labs, I am interested in "${item.title}". Please share appointment slots and package details.`
         );
-        window.open(`https://wa.me/916301851252?text=${text}`, "_blank");
+        window.open(`https://wa.me/919866249074?text=${text}`, "_blank");
     };
 
     return (

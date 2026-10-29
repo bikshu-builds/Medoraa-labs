@@ -280,10 +280,10 @@ export default function Home() {
                       "flex items-center gap-0 rounded-2xl transition-all duration-300",
                       isSearchSticky
                         ? "bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-neutral-200/90 dark:border-zinc-700/80 shadow-xl shadow-[#015971]/10 px-3 sm:px-4 py-2 sm:py-2.5"
-                        : "bg-white dark:bg-zinc-900 border border-neutral-200 dark:border-zinc-700 shadow-lg shadow-[#015971]/5 dark:shadow-zinc-900/50 px-4 py-3 focus-within:ring-2 focus-within:ring-[#015971]/30 focus-within:border-[#015971]/50"
+                        : "bg-white dark:bg-zinc-900 border border-neutral-200 dark:border-zinc-700 shadow-lg shadow-[#015971]/5 dark:shadow-zinc-900/50 px-3 sm:px-4 py-2 sm:py-3 focus-within:ring-2 focus-within:ring-[#015971]/30 focus-within:border-[#015971]/50"
                     )}
                   >
-                    <div className="flex items-center text-[#015971] dark:text-cyan-400 mr-2.5 flex-shrink-0">
+                    <div className="flex items-center text-[#015971] dark:text-cyan-400 mr-2 sm:mr-2.5 flex-shrink-0">
                       <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
@@ -300,7 +300,7 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={() => setSearchQuery("")}
-                        className="p-1 mr-2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
+                        className="p-1 mr-1.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -310,8 +310,8 @@ export default function Home() {
                       className={cn(
                         "flex-shrink-0 bg-[#015971] hover:bg-[#01475a] text-white font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-md hover:shadow-lg",
                         isSearchSticky
-                          ? "text-xs sm:text-sm px-4 sm:px-5 py-2"
-                          : "text-sm sm:text-base px-5 py-2.5 ml-3"
+                          ? "text-xs sm:text-sm px-3.5 sm:px-5 py-2"
+                          : "text-xs sm:text-base px-3.5 sm:px-5 py-2 sm:py-2.5 ml-2 sm:ml-3"
                       )}
                     >
                       <span>Search</span>

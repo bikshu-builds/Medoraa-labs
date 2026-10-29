@@ -30,7 +30,7 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-const WHATSAPP_NUMBER = "916301851252";
+const WHATSAPP_NUMBER = "919866249074";
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);

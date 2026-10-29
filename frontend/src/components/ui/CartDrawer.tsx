@@ -232,7 +232,7 @@ export const CartDrawer: React.FC = () => {
                     <span>Ask for Sample Collection</span>
                   </button>
                   <p className="text-[10px] text-center text-slate-400">
-                    Sends test list directly to Medoraa Labs WhatsApp (+91 6301851252)
+                    Sends test list directly to Medoraa Labs WhatsApp (+91 9866249074)
                   </p>
                 </div>
               )}

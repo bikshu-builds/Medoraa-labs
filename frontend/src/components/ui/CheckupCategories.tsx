@@ -666,7 +666,7 @@ export function CheckupCategories() {
 
                               <button
                                 onClick={() => sendSingleTestWhatsApp(test.test_name, test.category)}
-                                title="Ask for Sample Collection on WhatsApp (+91 6301851252)"
+                                title="Ask for Sample Collection on WhatsApp (+91 9866249074)"
                                 className="py-1.5 px-2.5 bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-[11px] rounded-xl flex items-center gap-1 shadow-sm transition-all active:scale-95 flex-shrink-0"
                               >
                                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
