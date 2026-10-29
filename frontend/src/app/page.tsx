@@ -81,6 +81,14 @@ const RecentActivityNotification = () => {
   );
 };
 
+interface FloatingBadgeProps {
+  avatar: string;
+  name: string;
+  role: string;
+  className?: string;
+  delay?: number;
+}
+
 const FloatingBadge = ({ avatar, name, role, className, delay = 0 }: FloatingBadgeProps) => {
   return (
     <motion.div
