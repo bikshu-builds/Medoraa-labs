@@ -228,12 +228,12 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
               </div>
             </div>
 
-            <div className="md:hidden">
+            <div className="md:hidden pr-1 sm:pr-0">
               <motion.button
                 onClick={toggleMenu}
-                className="rounded-full border border-[#015971]/15 bg-white/90 p-2.5 text-[#015971] shadow-sm focus:outline-none"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
+                className="rounded-full border border-[#015971]/20 bg-white/95 p-2 sm:p-2.5 text-[#015971] shadow-md focus:outline-none flex items-center justify-center"
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92 }}
                 aria-label="Open menu"
               >
                 <Menu className="h-5 w-5" />

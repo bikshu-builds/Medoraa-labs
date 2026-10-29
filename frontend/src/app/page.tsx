@@ -354,18 +354,18 @@ export default function Home() {
                 duration: 0.75,
                 ease: [0.22, 1, 0.36, 1],
               }}
-              className="lg:col-span-5 flex flex-col items-center lg:items-end justify-center relative my-4 lg:my-0 select-none"
+              className="lg:col-span-5 flex flex-col items-center lg:items-end justify-center relative my-4 lg:my-0 select-none max-w-full"
             >
               {/* Outer Glowing Ambient Aura */}
-              <div className="absolute -inset-6 bg-gradient-to-tr from-[#015971]/30 via-cyan-400/25 to-teal-300/20 rounded-full blur-3xl -z-10 scale-110 pointer-events-none" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-cyan-400/20 rounded-full blur-2xl -z-10 pointer-events-none" />
+              <div className="absolute -inset-3 sm:-inset-6 bg-gradient-to-tr from-[#015971]/30 via-cyan-400/25 to-teal-300/20 rounded-full blur-2xl sm:blur-3xl -z-10 scale-100 sm:scale-110 pointer-events-none" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 sm:w-64 sm:h-64 bg-cyan-400/20 rounded-full blur-2xl -z-10 pointer-events-none" />
 
               {/* Concentric Decorative Orbital Rings */}
-              <div className="absolute -inset-4 sm:-inset-6 rounded-full border-2 border-dashed border-[#015971]/25 dark:border-cyan-400/30 pointer-events-none animate-[spin_70s_linear_infinite]" />
-              <div className="absolute -inset-1.5 sm:-inset-2 rounded-full border border-[#015971]/15 dark:border-cyan-400/20 pointer-events-none" />
+              <div className="absolute -inset-2.5 sm:-inset-6 rounded-full border-2 border-dashed border-[#015971]/25 dark:border-cyan-400/30 pointer-events-none animate-[spin_70s_linear_infinite]" />
+              <div className="absolute -inset-1 sm:-inset-2 rounded-full border border-[#015971]/15 dark:border-cyan-400/20 pointer-events-none" />
 
               {/* Main Circular Portal with Multi-layered Glassmorphism */}
-              <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 lg:w-[410px] lg:h-[410px] xl:w-[440px] xl:h-[440px] rounded-full p-3 sm:p-3.5 bg-gradient-to-tr from-white/95 via-cyan-50/60 to-white/90 dark:from-zinc-900/90 dark:via-zinc-800/90 dark:to-zinc-900/90 shadow-[0_25px_60px_-15px_rgba(1,89,113,0.3)] border-2 border-white/90 dark:border-cyan-500/30 ring-4 ring-[#015971]/10 dark:ring-cyan-400/10 backdrop-blur-xl group flex items-center justify-center">
+              <div className="relative w-56 h-56 sm:w-80 sm:h-80 md:w-96 md:h-96 lg:w-[410px] lg:h-[410px] xl:w-[440px] xl:h-[440px] rounded-full p-2.5 sm:p-3.5 bg-gradient-to-tr from-white/95 via-cyan-50/60 to-white/90 dark:from-zinc-900/90 dark:via-zinc-800/90 dark:to-zinc-900/90 shadow-[0_25px_60px_-15px_rgba(1,89,113,0.3)] border-2 border-white/90 dark:border-cyan-500/30 ring-4 ring-[#015971]/10 dark:ring-cyan-400/10 backdrop-blur-xl group flex items-center justify-center">
                 <div className="relative w-full h-full rounded-full overflow-hidden shadow-inner">
                   {/* Banner Image with targeted microscope focal point */}
                   <Image
@@ -373,7 +373,7 @@ export default function Home() {
                     alt="Medoraa Labs Precision Diagnostics"
                     fill
                     priority
-                    sizes="(max-width: 768px) 320px, 450px"
+                    sizes="(max-width: 768px) 260px, 450px"
                     className="object-cover object-[68%_36%] group-hover:scale-105 transition-transform duration-700 ease-out"
                   />
 
@@ -388,7 +388,7 @@ export default function Home() {
                   <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none" />
 
                   {/* Signature Dual-Wave Swoosh Accent at Bottom of Portal (inspired by reference banner) */}
-                  <div className="absolute bottom-0 left-0 right-0 w-full h-16 pointer-events-none overflow-hidden">
+                  <div className="absolute bottom-0 left-0 right-0 w-full h-14 sm:h-16 pointer-events-none overflow-hidden">
                     <svg viewBox="0 0 400 90" preserveAspectRatio="none" className="w-full h-full">
                       <path
                         d="M0,45 C120,80 280,10 400,50 L400,90 L0,90 Z"
@@ -410,13 +410,13 @@ export default function Home() {
                 initial={{ opacity: 0, x: -15, scale: 0.85 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 transition={{ delay: 0.8, duration: 0.6 }}
-                className="absolute -top-2 -left-2 sm:top-4 sm:-left-4 z-20 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-white/80 dark:border-zinc-700/80 rounded-2xl px-3.5 py-2 sm:px-4 sm:py-2.5 shadow-[0_12px_30px_rgba(1,89,113,0.18)] flex items-center gap-2.5 sm:gap-3"
+                className="absolute -top-1.5 left-0 sm:top-4 sm:-left-4 z-20 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-white/80 dark:border-zinc-700/80 rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2.5 shadow-[0_12px_30px_rgba(1,89,113,0.18)] flex items-center gap-2 sm:gap-3"
               >
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                  <ShieldCheck className="w-5 h-5" />
+                <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div className="text-left">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Accredited</p>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider">Accredited</p>
                   <p className="text-xs sm:text-sm font-extrabold text-[#015971] dark:text-cyan-300">NABL Quality</p>
                 </div>
               </motion.div>
@@ -426,13 +426,13 @@ export default function Home() {
                 initial={{ opacity: 0, x: 15, scale: 0.85 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 transition={{ delay: 0.95, duration: 0.6 }}
-                className="absolute -bottom-2 -right-2 sm:bottom-4 sm:-right-4 z-20 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-white/80 dark:border-zinc-700/80 rounded-2xl px-3.5 py-2 sm:px-4 sm:py-2.5 shadow-[0_12px_30px_rgba(1,89,113,0.18)] flex items-center gap-2.5 sm:gap-3"
+                className="absolute -bottom-1.5 right-0 sm:bottom-4 sm:-right-4 z-20 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-white/80 dark:border-zinc-700/80 rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2.5 shadow-[0_12px_30px_rgba(1,89,113,0.18)] flex items-center gap-2 sm:gap-3"
               >
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#015971]/10 text-[#015971] dark:text-cyan-400 flex items-center justify-center">
-                  <Microscope className="w-5 h-5" />
+                <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-xl bg-[#015971]/10 text-[#015971] dark:text-cyan-400 flex items-center justify-center">
+                  <Microscope className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div className="text-left">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Automated</p>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider">Automated</p>
                   <p className="text-xs sm:text-sm font-extrabold text-[#015971] dark:text-cyan-300">Precision Labs</p>
                 </div>
               </motion.div>
@@ -442,13 +442,13 @@ export default function Home() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1.1, duration: 0.5 }}
-                className="absolute -top-3 right-4 sm:top-1 sm:right-6 z-20 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-[#015971]/20 rounded-full px-3 py-1 shadow-md flex items-center gap-2"
+                className="absolute -top-2.5 right-2 sm:top-1 sm:right-6 z-20 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-[#015971]/20 rounded-full px-2.5 py-0.5 sm:px-3 sm:py-1 shadow-md flex items-center gap-1.5 sm:gap-2"
               >
-                <span className="flex h-2 w-2 relative">
+                <span className="flex h-1.5 w-1.5 sm:h-2 sm:w-2 relative">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-emerald-500" />
                 </span>
-                <span className="text-[11px] font-bold text-[#015971] dark:text-cyan-300 tracking-wide">
+                <span className="text-[10px] sm:text-[11px] font-bold text-[#015971] dark:text-cyan-300 tracking-wide">
                   Testing Active
                 </span>
               </motion.div>
