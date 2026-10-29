@@ -14,7 +14,7 @@ export default function AboutPage() {
             <ScrollNavigationMenu />
 
             {/* ── HERO SECTION ── */}
-            <section className="relative pt-20 pb-12 overflow-hidden bg-[#1A3263] mt-28">
+            <section className="relative pt-20 pb-12 overflow-hidden bg-[#015971] mt-28">
                 <div className="absolute inset-0 opacity-30 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] shadow-inner" />
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
                     <motion.h1
@@ -63,12 +63,12 @@ export default function AboutPage() {
                                 whileInView={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.1 }}
                                 viewport={{ once: true }}
-                                className="p-8 rounded-3xl bg-[#F8FAFC] dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 text-center group hover:border-[#1A3263]/20 transition-all"
+                                className="p-8 rounded-3xl bg-[#F8FAFC] dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 text-center group hover:border-[#015971]/20 transition-all"
                             >
-                                <div className="w-16 h-16 bg-white dark:bg-zinc-800 rounded-2xl flex items-center justify-center text-[#1A3263] mx-auto mb-6 shadow-sm group-hover:bg-[#1A3263] group-hover:text-white transition-all">
+                                <div className="w-16 h-16 bg-white dark:bg-zinc-800 rounded-2xl flex items-center justify-center text-[#015971] mx-auto mb-6 shadow-sm group-hover:bg-[#015971] group-hover:text-white transition-all">
                                     {item.icon}
                                 </div>
-                                <h3 className="text-2xl font-bold text-[#1A3263] dark:text-white mb-4">{item.title}</h3>
+                                <h3 className="text-2xl font-bold text-[#015971] dark:text-white mb-4">{item.title}</h3>
                                 <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{item.desc}</p>
                             </motion.div>
                         ))}
@@ -82,10 +82,10 @@ export default function AboutPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
                         {/* Contact Info */}
                         <div>
-                            <h2 className="text-3xl md:text-5xl font-bold text-[#1A3263] dark:text-white mb-8">Get In Touch</h2>
+                            <h2 className="text-3xl md:text-5xl font-bold text-[#015971] dark:text-white mb-8">Get In Touch</h2>
                             <div className="space-y-8">
                                 <div className="flex gap-6">
-                                    <div className="w-12 h-12 bg-white dark:bg-zinc-900 rounded-xl flex items-center justify-center text-[#1A3263] shadow-sm flex-shrink-0">
+                                    <div className="w-12 h-12 bg-white dark:bg-zinc-900 rounded-xl flex items-center justify-center text-[#015971] shadow-sm flex-shrink-0">
                                         <Phone className="w-6 h-6" />
                                     </div>
                                     <div>
@@ -94,7 +94,7 @@ export default function AboutPage() {
                                     </div>
                                 </div>
                                 <div className="flex gap-6">
-                                    <div className="w-12 h-12 bg-white dark:bg-zinc-900 rounded-xl flex items-center justify-center text-[#1A3263] shadow-sm flex-shrink-0">
+                                    <div className="w-12 h-12 bg-white dark:bg-zinc-900 rounded-xl flex items-center justify-center text-[#015971] shadow-sm flex-shrink-0">
                                         <Mail className="w-6 h-6" />
                                     </div>
                                     <div>
@@ -103,7 +103,7 @@ export default function AboutPage() {
                                     </div>
                                 </div>
                                 <div className="flex gap-6">
-                                    <div className="w-12 h-12 bg-white dark:bg-zinc-900 rounded-xl flex items-center justify-center text-[#1A3263] shadow-sm flex-shrink-0">
+                                    <div className="w-12 h-12 bg-white dark:bg-zinc-900 rounded-xl flex items-center justify-center text-[#015971] shadow-sm flex-shrink-0">
                                         <MapPin className="w-6 h-6" />
                                     </div>
                                     <div>
@@ -115,7 +115,7 @@ export default function AboutPage() {
                                     </div>
                                 </div>
                                 <div className="flex gap-6">
-                                    <div className="w-12 h-12 bg-white dark:bg-zinc-900 rounded-xl flex items-center justify-center text-[#1A3263] shadow-sm flex-shrink-0">
+                                    <div className="w-12 h-12 bg-white dark:bg-zinc-900 rounded-xl flex items-center justify-center text-[#015971] shadow-sm flex-shrink-0">
                                         <Clock className="w-6 h-6" />
                                     </div>
                                     <div>

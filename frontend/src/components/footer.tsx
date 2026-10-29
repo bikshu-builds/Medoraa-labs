@@ -5,7 +5,7 @@ import Image from "next/image";
 export default function Footer() {
     return (
         <div>
-            <footer className="bg-[#1A3263] text-white pt-12 pb-6 relative overflow-hidden">
+            <footer className="bg-[#015971] text-white pt-12 pb-6 relative overflow-hidden">
                 <div className="absolute inset-0 opacity-30 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] pointer-events-none" />
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
@@ -13,7 +13,7 @@ export default function Footer() {
                         <div className="flex flex-col gap-4">
                             <div className="flex items-center gap-2">
                                 <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-                                    <div className="w-5 h-5 bg-[#1A3263] rounded-sm" />
+                                    <div className="w-5 h-5 bg-[#015971] rounded-sm" />
                                 </div>
                                 <span className="text-xl font-bold tracking-tight text-white">Medoraa Labs</span>
                             </div>

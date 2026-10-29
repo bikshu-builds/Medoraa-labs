@@ -1,13 +1,17 @@
 "use client";
 
-import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
-import React, { useRef } from "react";
-import Image from "next/image";
-import { ShieldCheck, Activity, Droplets, FlaskConical, Microscope, Sun, Home as HomeIcon, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { motion, useScroll, useTransform, AnimatePresence, useMotionValueEvent } from "framer-motion";
+import React, { useRef, useState } from "react";
+import { ShieldCheck, Activity, Droplets, FlaskConical, Microscope, Sun, X } from "lucide-react";
 import { AuroraBackground } from "@/components/ui/aurora-background";
 import { ScrollNavigationMenu } from "@/components/scroll-navigation-menu";
 import { TestimonialsColumn } from "@/components/testimonials-columns-1";
 import RuixenBentoCards from "@/components/ui/ruixen-bento-cards";
+import { ElasticGallery } from "@/components/ui/elastic-gallery";
+import { CheckupCategories } from "@/components/ui/checkup-categories";
+import { PopularCheckupPackages } from "@/components/ui/popular-checkup-packages";
+import { VitalBodySystems } from "@/components/ui/vital-body-systems";
 import Footer from "@/components/footer";
 
 
@@ -57,7 +61,7 @@ const RecentActivityNotification = () => {
           exit={{ opacity: 0, x: -50, scale: 0.9 }}
           className="fixed bottom-6 left-6 z-[9999] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-2xl flex items-center gap-4 max-w-sm"
         >
-          <div className="w-12 h-12 rounded-full bg-[#1A3263] flex items-center justify-center flex-shrink-0">
+          <div className="w-12 h-12 rounded-full bg-[#015971] flex items-center justify-center flex-shrink-0">
             <ShieldCheck className="text-white w-6 h-6" />
           </div>
           <div className="flex flex-col">
@@ -100,7 +104,7 @@ const FloatingBadge = ({ avatar, name, role, className, delay = 0 }: FloatingBad
         <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-neutral-900 rounded-full"></div>
       </div>
       <div className="flex flex-col">
-        <span className="text-sm font-bold text-[#406093] dark:text-blue-400 leading-tight">
+        <span className="text-sm font-bold text-[#015971] dark:text-cyan-400 leading-tight">
           {name}
         </span>
         <span className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 leading-tight">
@@ -246,6 +250,27 @@ const thirdColumn = testimonials.slice(6, 9);
 export default function Home() {
   const sharedIconUrl = "https://i.pinimg.com/736x/d0/6a/13/d06a13ce1f4da8d86989657faabf6276.jpg";
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchSticky, setIsSearchSticky] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleScroll = () => {
+      if (!searchContainerRef.current) return;
+      const rect = searchContainerRef.current.getBoundingClientRect();
+      setIsSearchSticky(rect.top <= 16);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, []);
+
   // Ref for scroll-linked timeline
   const timelineRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
@@ -258,120 +283,202 @@ export default function Home() {
   return (
     <>
       <ScrollNavigationMenu />
-      <AuroraBackground>
+
+      
+
+      <AuroraBackground className="justify-start min-h-0 pt-20 sm:pt-24 pb-8">
         <motion.div
-          initial={{ opacity: 0.0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0.0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{
-            delay: 0.2,
-            duration: 0.8,
+            delay: 0.15,
+            duration: 0.6,
             ease: "easeInOut",
           }}
-          className="relative flex flex-col gap-8 md:gap-12 items-center justify-center px-4 max-w-7xl mx-auto pt-36 sm:pt-42 lg:pt-24 pb-8 lg:pb-0 lg:mt-0"
+          className="relative flex flex-col items-center justify-center text-center px-4 w-full max-w-5xl mx-auto pt-2 sm:pt-4 pb-0"
         >
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center w-full">
-            <div className="flex flex-col gap-8 text-center lg:text-left items-center lg:items-start order-2 lg:order-1">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1A3263] border border-[#1A3263]/20 text-white dark:text-blue-400 text-sm font-semibold w-fit">
-                NABL Accredited Laboratory
-              </div>
+          {/* Accredited Badge */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#015971]/10 border border-[#015971]/20 text-[#015971] dark:text-cyan-300 dark:bg-[#015971]/20 dark:border-[#015971]/40 text-sm font-semibold mb-6"
+          >
+            <span className="w-2 h-2 rounded-full bg-[#015971] dark:bg-cyan-400 inline-block animate-pulse" />
+            Your Accredited Diagnostic Lab
+          </motion.div>
 
-              <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold dark:text-white tracking-tight leading-[1.1]">
-                Advanced Diagnostics <br />
-                <span className="text-[#406093] dark:text-[#124170]">Expert Care.</span>
-              </h1>
+          {/* Main Heading */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.7 }}
+            className="text-5xl sm:text-6xl md:text-7xl font-bold text-slate-800 dark:text-white leading-[1.1] tracking-tight mb-5"
+          >
+            Your Health,{" "}
+            <span className="block text-[#015971] dark:text-[#22d3ee]">Our Priority</span>
+          </motion.h1>
 
-              <p className="text-lg md:text-xl text-neutral-600 dark:text-neutral-300 font-medium leading-relaxed max-w-xl mx-auto lg:mx-0">
-                Experience world-class laboratory services with cutting-edge technology and certified pathology experts. Accurate results delivered to your doorstep.
-              </p>
+          {/* Subtext */}
+          <motion.p
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.65, duration: 0.6 }}
+            className="text-base sm:text-lg text-neutral-600 dark:text-neutral-300 max-w-xl mx-auto mb-8 leading-relaxed"
+          >
+            Accurate lab tests, trusted reports and home sample collection
+            <br className="hidden sm:block" /> — for you and your family.
+          </motion.p>
 
-              <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto px-4 sm:px-0">
-                <button className="bg-[#1A3263] hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-xl px-8 py-4 font-bold text-base sm:text-lg transition-all shadow-xl shadow-blue-500/25 w-full sm:w-auto">
-                  Book A Test
-                </button>
-                <button className="bg-white dark:bg-neutral-900 border-2 border-neutral-200 dark:border-neutral-800 hover:border-blue-500 dark:hover:border-blue-500 text-neutral-900 dark:text-white rounded-xl px-8 py-4 font-bold text-base sm:text-lg transition-all w-full sm:w-auto">
-                  Our Services
-                </button>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-neutral-200 dark:border-neutral-800 w-full lg:w-fit">
-                <div className="flex -space-x-3">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="w-10 h-10 rounded-full border-2 border-white dark:border-neutral-900 bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-[10px] font-bold">
-                      {i === 4 ? "+5k" : "MD"}
-                    </div>
-                  ))}
+          {/* Search Bar with seamless scroll-to-sticky animation */}
+          <div
+            ref={searchContainerRef}
+            className="w-full max-w-2xl mx-auto mb-5 min-h-[58px]"
+          >
+            <div
+              className={cn(
+                "w-full transition-all duration-300 ease-out",
+                isSearchSticky
+                  ? "fixed top-4 left-0 right-0 z-40 mx-auto max-w-[calc(100%-80px)] sm:max-w-2xl px-4 pointer-events-auto"
+                  : "relative max-w-2xl mx-auto"
+              )}
+            >
+              <div
+                className={cn(
+                  "flex items-center gap-0 rounded-2xl transition-all duration-300",
+                  isSearchSticky
+                    ? "bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-neutral-200/90 dark:border-zinc-700/80 shadow-xl shadow-[#015971]/10 px-3 sm:px-4 py-2 sm:py-2.5"
+                    : "bg-white dark:bg-zinc-900 border border-neutral-200 dark:border-zinc-700 shadow-lg shadow-[#015971]/5 dark:shadow-zinc-900/50 px-4 py-3 focus-within:ring-2 focus-within:ring-[#015971]/30 focus-within:border-[#015971]/50"
+                )}
+              >
+                <div className="flex items-center text-[#015971] dark:text-cyan-400 mr-2.5 flex-shrink-0">
+                  <svg className="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
-                <div className="text-sm text-neutral-500 dark:text-neutral-400">
-                  Trusted by <span className="font-bold text-neutral-900 dark:text-white">5,000+</span> patients this month
-                </div>
-              </div>
-            </div>
-
-            <div className="relative group w-full max-w-[320px] sm:max-w-[500px] lg:max-w-none mx-auto lg:mx-0 order-1 lg:order-2">
-              <div className="absolute -inset-4 bg-blue-500/20 rounded-[2rem] blur-3xl group-hover:bg-blue-500/30 transition-all duration-500"></div>
-
-              {/* Floating Notifications */}
-              <FloatingBadge
-                avatar="/images/avatars/avatar5.png"
-                name="@sarah_med"
-                role="Senior Pathologist"
-                className="-top-6 -right-6 md:-right-12 hidden sm:flex"
-                delay={1.2}
-              />
-              <FloatingBadge
-                avatar="/images/avatars/avatar5.png"
-                name="@dr_james"
-                role="Lab Director"
-                className="top-1/2 -left-6 md:-left-12 -translate-y-1/2 hidden md:flex"
-                delay={1.5}
-              />
-              <FloatingBadge
-                avatar="/images/avatars/avatar5.png"
-                name="@emily_tech"
-                role="Quality Control"
-                className="-bottom-6 right-12 md:right-24 hidden sm:flex"
-                delay={1.8}
-              />
-              <FloatingBadge
-                avatar="/images/avatars/avatar4.png"
-                name="@rahul_labs"
-                role="Microbiologist"
-                className="-top-6 left-12 md:left-24 hidden md:flex"
-                delay={2.1}
-              />
-              <FloatingBadge
-                avatar="/images/avatars/avatar5.png"
-                name="@dr_priya"
-                role="Chief Radiologist"
-                className="bottom-1/3 -right-6 md:-right-12 hidden lg:flex"
-                delay={2.4}
-              />
-
-              <div className="relative aspect-[3/4] sm:aspect-square md:aspect-[4/3] rounded-[2rem] overflow-hidden border border-white/20 shadow-2xl">
-                <img
-                  src="/images/lab.png"
-                  alt="Medical Laboratory"
-                  className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-105"
+                <input
+                  id="unified-search"
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search tests by name, category, or health condition..."
+                  className="flex-1 bg-transparent outline-none text-neutral-800 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-neutral-500 text-sm sm:text-base min-w-0"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60"></div>
-                <div className="absolute bottom-6 left-6 right-6 p-4 backdrop-blur-md bg-white/10 border border-white/20 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
-                      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="text-white font-bold text-sm">Certified Results</div>
-                      <div className="text-white/70 text-xs">Pathologist Reviewed</div>
-                    </div>
-                  </div>
-                </div>
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="p-1 mr-2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  id="unified-search-btn"
+                  className={cn(
+                    "flex-shrink-0 bg-[#015971] hover:bg-[#01475a] text-white font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-md hover:shadow-lg",
+                    isSearchSticky
+                      ? "text-xs sm:text-sm px-4 sm:px-5 py-2"
+                      : "text-sm sm:text-base px-5 py-2.5 ml-3"
+                  )}
+                >
+                  <span>Search</span>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
+
+          {/* Popular Searches */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.9, duration: 0.6 }}
+            className="flex flex-wrap items-center justify-center gap-2 mb-10 sm:mb-12"
+          >
+            <span className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">Popular Searches:</span>
+            {["CBC", "Thyroid", "Vitamin D", "Diabetes", "LFT", "Lipid Profile"].map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setSearchQuery(tag)}
+                id={`popular-search-${tag.toLowerCase().replace(" ", "-")}`}
+                className="text-sm font-medium text-[#015971] dark:text-cyan-300 bg-white/70 dark:bg-zinc-800/60 hover:bg-[#015971] hover:text-white dark:hover:bg-[#015971] border border-[#015971]/25 dark:border-[#015971]/40 rounded-full px-3.5 py-1 transition-all backdrop-blur-sm"
+              >
+                {tag}
+              </button>
+            ))}
+          </motion.div>
+
+          {/* Feature Cards */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.0, duration: 0.7 }}
+            className="w-full max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 pb-10"
+          >
+            {[
+              {
+                icon: (
+                  <svg className="w-7 h-7 text-[#015971] dark:text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                ),
+                title: "Home Sample Collection",
+                subtitle: "At your doorstep",
+              },
+              {
+                icon: (
+                  <svg className="w-7 h-7 text-[#015971] dark:text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                ),
+                title: "Accurate Reports",
+                subtitle: "Trusted & on time",
+              },
+              {
+                icon: (
+                  <svg className="w-7 h-7 text-[#015971] dark:text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                ),
+                title: "NABL Certified Lab",
+                subtitle: "Quality you can trust",
+              },
+            ].map((card, i) => (
+              <motion.div
+                key={i}
+                whileHover={{ y: -4, boxShadow: "0 12px 32px rgba(1,89,113,0.14)" }}
+                className="flex items-center gap-4 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border border-white/60 dark:border-zinc-700/50 rounded-2xl p-4 shadow-md cursor-default transition-all"
+              >
+                <div className="w-12 h-12 flex-shrink-0 rounded-xl bg-[#015971]/10 dark:bg-zinc-800 flex items-center justify-center">
+                  {card.icon}
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-bold text-[#015971] dark:text-white leading-tight">{card.title}</p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{card.subtitle}</p>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
         </motion.div>
       </AuroraBackground>
+
+      {/* ── ELASTIC GALLERY SECTION ── */}
+      <section id="gallery" className="relative w-full bg-slate-50/60 dark:bg-black/50 py-4">
+        <ElasticGallery />
+      </section>
+
+      {/* ── HEALTH CHECKUP CATEGORIES SECTION ── */}
+      <CheckupCategories />
+
+      {/* ── POPULAR HEALTH CHECKUP PACKAGES SECTION ── */}
+      <PopularCheckupPackages />
+
+      {/* ── VITAL BODY SYSTEMS SECTION ── */}
+      <VitalBodySystems />
 
       {/* ── SCROLLING CARDS SECTION ── */}
       {/* ── CLASSIC SERVICES SECTION ── */}
@@ -383,7 +490,7 @@ export default function Home() {
             transition={{ duration: 0.6 }}
             className="text-center mb-12"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold text-[#1A3263] dark:text-white mb-3">
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#015971] dark:text-white mb-3">
               Our Core Services
             </h2>
             <p className="text-muted-foreground text-base max-w-2xl mx-auto font-medium">
@@ -460,12 +567,12 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.05 }}
                 viewport={{ once: true }}
-                className="p-6 rounded-2xl bg-[#F8FAFC] dark:bg-zinc-900 border border-transparent hover:border-[#1A3263]/20 hover:bg-white dark:hover:bg-black transition-all hover:shadow-xl hover:shadow-[#1A3263]/5 group"
+                className="p-6 rounded-2xl bg-[#F8FAFC] dark:bg-zinc-900 border border-transparent hover:border-[#015971]/20 hover:bg-white dark:hover:bg-black transition-all hover:shadow-xl hover:shadow-[#015971]/5 group"
               >
-                <div className="w-12 h-12 rounded-xl bg-white dark:bg-zinc-800 flex items-center justify-center text-[#1A3263] dark:text-blue-400 mb-5 shadow-sm group-hover:bg-[#1A3263] group-hover:text-white transition-colors">
+                <div className="w-12 h-12 rounded-xl bg-white dark:bg-zinc-800 flex items-center justify-center text-[#015971] dark:text-cyan-400 mb-5 shadow-sm group-hover:bg-[#015971] group-hover:text-white transition-colors">
                   {service.icon}
                 </div>
-                <h3 className="text-lg font-bold text-[#1A3263] dark:text-white mb-3">
+                <h3 className="text-lg font-bold text-[#015971] dark:text-white mb-3">
                   {service.title}
                 </h3>
                 <p className="text-neutral-600 dark:text-neutral-400 text-sm leading-relaxed">
@@ -503,7 +610,7 @@ export default function Home() {
             {/* Vertical Line Animation - Now scroll-linked and responsive */}
             <div className="absolute left-6 md:left-1/2 transform -translate-x-1/2 h-full w-1 bg-neutral-100 dark:bg-neutral-800" />
             <motion.div
-              className="absolute left-6 md:left-1/2 transform -translate-x-1/2 w-1 bg-[#1A3263] origin-top"
+              className="absolute left-6 md:left-1/2 transform -translate-x-1/2 w-1 bg-[#015971] origin-top"
               style={{ height: "100%", scaleY }}
             />
 
@@ -517,14 +624,14 @@ export default function Home() {
                     transition={{ duration: 0.8 }}
                     viewport={{ once: true }}
                   >
-                    <h3 className="text-lg md:text-2xl font-bold text-[#1A3263] dark:text-white mb-1 md:mb-2">Book Appointment</h3>
+                    <h3 className="text-lg md:text-2xl font-bold text-[#015971] dark:text-white mb-1 md:mb-2">Book Appointment</h3>
                     <p className="text-neutral-600 dark:text-neutral-400 text-sm md:text-base leading-relaxed">
                       Select your required tests from our wide range of packages and book a convenient time slot that fits your schedule.
                     </p>
                   </motion.div>
                 </div>
 
-                <div className="absolute left-6 md:left-1/2 -translate-x-1/2 z-10 w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#1A3263] border-4 border-white dark:border-black flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-xl">
+                <div className="absolute left-6 md:left-1/2 -translate-x-1/2 z-10 w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#015971] border-4 border-white dark:border-black flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-xl">
                   1
                 </div>
 
@@ -535,7 +642,7 @@ export default function Home() {
               <div className="relative flex flex-col md:flex-row items-center justify-between gap-0">
                 <div className="w-full md:w-[45%] hidden md:block" />
 
-                <div className="absolute left-6 md:left-1/2 -translate-x-1/2 z-10 w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#1A3263] border-4 border-white dark:border-black flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-xl">
+                <div className="absolute left-6 md:left-1/2 -translate-x-1/2 z-10 w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#015971] border-4 border-white dark:border-black flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-xl">
                   2
                 </div>
 
@@ -546,7 +653,7 @@ export default function Home() {
                     transition={{ duration: 0.8 }}
                     viewport={{ once: true }}
                   >
-                    <h3 className="text-lg md:text-2xl font-bold text-[#1A3263] dark:text-white mb-1 md:mb-2">Sample Collection</h3>
+                    <h3 className="text-lg md:text-2xl font-bold text-[#015971] dark:text-white mb-1 md:mb-2">Sample Collection</h3>
                     <p className="text-neutral-600 dark:text-neutral-400 text-sm md:text-base leading-relaxed">
                       Our certified phlebotomist will visit your home or you can visit our nearest center for a quick and painless sample collection.
                     </p>
@@ -563,14 +670,14 @@ export default function Home() {
                     transition={{ duration: 0.8 }}
                     viewport={{ once: true }}
                   >
-                    <h3 className="text-lg md:text-2xl font-bold text-[#1A3263] dark:text-white mb-1 md:mb-2">Get Reports Online</h3>
+                    <h3 className="text-lg md:text-2xl font-bold text-[#015971] dark:text-white mb-1 md:mb-2">Get Reports Online</h3>
                     <p className="text-neutral-600 dark:text-neutral-400 text-sm md:text-base leading-relaxed">
                       Receive accurate digital reports via WhatsApp or email within 24 hours. Consult with our experts for a detailed explanation.
                     </p>
                   </motion.div>
                 </div>
 
-                <div className="absolute left-6 md:left-1/2 -translate-x-1/2 z-10 w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#1A3263] border-4 border-white dark:border-black flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-xl">
+                <div className="absolute left-6 md:left-1/2 -translate-x-1/2 z-10 w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#015971] border-4 border-white dark:border-black flex items-center justify-center text-white font-bold text-lg md:text-xl shadow-xl">
                   3
                 </div>
 

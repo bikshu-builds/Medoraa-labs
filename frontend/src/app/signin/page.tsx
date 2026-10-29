@@ -74,15 +74,15 @@ export default function UnifiedSignIn() {
         <div className="h-screen flex flex-col md:flex-row bg-[#F8FAFC] overflow-hidden">
             {/* Branding Side */}
             <div
-                className="hidden md:flex flex-col justify-between w-1/2 bg-[#1A3263] p-16 text-white relative overflow-hidden h-full"
+                className="hidden md:flex flex-col justify-between w-1/2 bg-[#015971] p-16 text-white relative overflow-hidden h-full"
                 style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/arabesque.png")` }}
             >
                 <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-400/20 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-cyan-400/20 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
 
                 <div className="relative z-10">
                     <Link href="/" className="flex items-center gap-3 mb-16 hover:opacity-90 transition-opacity w-fit">
-                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-[#1A3263] shadow-xl">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-[#015971] shadow-xl">
                             <Activity className="w-6 h-6" />
                         </div>
                         <span className="text-2xl font-black tracking-tight">Medoraa Labs</span>
@@ -90,19 +90,19 @@ export default function UnifiedSignIn() {
 
                     <h1 className="text-5xl font-black leading-tight mb-6">
                         Your Health,<br />
-                        <span className="text-blue-300">Our Priority.</span>
+                        <span className="text-cyan-200">Our Priority.</span>
                     </h1>
-                    <p className="text-xl text-blue-100 max-w-md font-medium leading-relaxed">
+                    <p className="text-xl text-cyan-100 max-w-md font-medium leading-relaxed">
                         Access world-class diagnostics, track your reports, and book home collections with ease.
                     </p>
                 </div>
 
-                <div className="relative z-10 flex items-center gap-8 text-blue-200">
+                <div className="relative z-10 flex items-center gap-8 text-cyan-200">
                     <div className="flex flex-col">
                         <span className="text-3xl font-black text-white">50k+</span>
                         <span className="text-xs font-bold uppercase tracking-widest">Happy Patients</span>
                     </div>
-                    <div className="w-px h-10 bg-blue-400/30" />
+                    <div className="w-px h-10 bg-cyan-400/30" />
                     <div className="flex flex-col">
                         <span className="text-3xl font-black text-white">200+</span>
                         <span className="text-xs font-bold uppercase tracking-widest">Diagnostic Tests</span>
@@ -113,13 +113,13 @@ export default function UnifiedSignIn() {
             {/* Login Form Side */}
             <div className="flex-1 flex items-start justify-center p-4 sm:p-8 overflow-y-auto h-full">
                 <div className="w-full max-w-md space-y-6 py-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-[#1A3263] transition-colors mb-2">
+                    <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-[#015971] transition-colors mb-2">
                         <ArrowLeft className="w-4 h-4" /> Back to Home
                     </Link>
                     <div className="text-center md:text-left mb-2">
                         <div className="md:hidden flex justify-center mb-6">
                             <Link href="/">
-                                <div className="w-12 h-12 bg-[#1A3263] rounded-2xl flex items-center justify-center text-white shadow-xl shadow-[#1A3263]/20">
+                                <div className="w-12 h-12 bg-[#015971] rounded-2xl flex items-center justify-center text-white shadow-xl shadow-[#015971]/20">
                                     <Activity className="w-7 h-7" />
                                 </div>
                             </Link>
@@ -144,13 +144,13 @@ export default function UnifiedSignIn() {
                                     Email
                                 </label>
                                 <div className="relative group">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#1A3263] transition-colors" />
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#015971] transition-colors" />
                                     <input
                                         type="email"
                                         placeholder="name@example.com"
                                         value={identifier}
                                         onChange={(e) => setIdentifier(e.target.value)}
-                                        className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                                        className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#015971]/20 outline-none transition-all"
                                         required
                                     />
                                 </div>
@@ -159,13 +159,13 @@ export default function UnifiedSignIn() {
                             <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Password</label>
                                 <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#1A3263] transition-colors" />
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#015971] transition-colors" />
                                     <input
                                         type="password"
                                         placeholder="••••••••"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#1A3263]/20 outline-none transition-all"
+                                        className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#015971]/20 outline-none transition-all"
                                         required
                                     />
                                 </div>
@@ -174,7 +174,7 @@ export default function UnifiedSignIn() {
                             <button
                                 type="submit"
                                 disabled={isLoading}
-                                className="w-full bg-[#1A3263] hover:bg-[#2A4273] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-[#1A3263]/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full bg-[#015971] hover:bg-[#01475a] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-[#015971]/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Sign In <ArrowRight className="w-4 h-4" /></>}
                             </button>
