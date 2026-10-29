@@ -4,6 +4,8 @@ import "./globals.css";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 import WhatsAppButton from "@/components/WhatsAppButton";
+import { CartProvider } from "@/context/CartContext";
+import { CartDrawer } from "@/components/ui/CartDrawer";
 
 const mavenPro = localFont({
   src: [
@@ -84,10 +86,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("h-full", "antialiased", mavenPro.variable)} suppressHydrationWarning>
-      <body className="min-h-full flex flex-col font-sans">
-        {children}
-        <WhatsAppButton />
+    <html lang="en" className={cn("h-full overflow-x-hidden max-w-full", "antialiased", mavenPro.variable)} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col font-sans overflow-x-hidden max-w-full w-full">
+        <CartProvider>
+          {children}
+          <CartDrawer />
+          <WhatsAppButton />
+        </CartProvider>
       </body>
     </html>
   );

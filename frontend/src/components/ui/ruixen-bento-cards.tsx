@@ -11,31 +11,31 @@ const cardContents = [
     title: "NABL Accredited Labs",
     description:
       "Our laboratories are fully accredited by NABL, ensuring the highest standards of accuracy and reliability for every medical test we perform.",
-    icon: <FlaskConical className="w-10 h-10 text-[#1A3263]" />,
+    icon: <FlaskConical className="w-10 h-10 text-[#015971]" />,
   },
   {
     title: "Home Collection",
     description:
       "Skip the wait. Our certified professionals provide seamless, painless sample collection from the comfort of your home.",
-    icon: <Home className="w-10 h-10 text-[#1A3263]" />,
+    icon: <Home className="w-10 h-10 text-[#015971]" />,
   },
   {
     title: "Advanced Imaging & Diagnostics",
     description:
       "From high-resolution MRI and CT scans to advanced pathology, we use state-of-the-art diagnostic technology to provide deep insights into your health. Our facility is equipped with the latest imaging systems that ensure minimal radiation and maximum precision. Whether it's a routine checkup or specialized screening, our expert radiologists and pathologists work together to deliver comprehensive results that you and your doctor can trust.",
-    icon: <Microscope className="w-10 h-10 text-[#1A3263]" />,
+    icon: <Microscope className="w-10 h-10 text-[#015971]" />,
   },  
   {
     title: "24/7 Expert Care",
     description:
       "Our team of medical experts and pathologists are available around the clock to ensure your health never takes a backseat.",
-    icon: <Activity className="w-10 h-10 text-[#1A3263]" />,
+    icon: <Activity className="w-10 h-10 text-[#015971]" />,
   },
   {
     title: "Fast & Secure Reports",
     description:
       "Receive your digitally signed reports securely via WhatsApp or Email within 24 hours of sample collection.",
-    icon: <ShieldCheck className="w-10 h-10 text-[#1A3263]" />,
+    icon: <ShieldCheck className="w-10 h-10 text-[#015971]" />,
   },
 ]
 
@@ -54,7 +54,7 @@ const PlusCard: React.FC<{
   return (
     <div
       className={cn(
-        "relative border border-dashed border-zinc-300 dark:border-zinc-800 p-6 bg-white dark:bg-zinc-950 min-h-[200px] transition-all hover:border-[#1A3263] group overflow-hidden",
+        "relative border border-dashed border-zinc-300 dark:border-zinc-800 p-6 bg-white dark:bg-zinc-950 min-h-[200px] transition-all hover:border-[#015971] group overflow-hidden",
         "flex flex-col justify-between",
         className
       )}
@@ -68,11 +68,11 @@ const PlusCard: React.FC<{
 
       {/* Content */}
       <div className="relative z-10 space-y-3">
-        <div className="p-2 bg-[#F1F5F9] dark:bg-zinc-900 rounded-lg w-fit text-[#1A3263] [&>svg]:w-8 [&>svg]:h-8">
+        <div className="p-2 bg-[#E6F3F6] dark:bg-zinc-900 rounded-lg w-fit text-[#015971] [&>svg]:w-8 [&>svg]:h-8">
           {icon}
         </div>
         <div>
-          <h3 className="text-xl font-bold text-[#1A3263] dark:text-gray-100 mb-2">
+          <h3 className="text-xl font-bold text-[#015971] dark:text-gray-100 mb-2">
             {title}
           </h3>
           <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-sm">
@@ -115,9 +115,9 @@ export default function RuixenBentoCards() {
         
         {/* Section Header */}
         <div className="max-w-3xl mb-12">
-          <h2 className="text-3xl md:text-5xl font-bold text-[#1A3263] dark:text-white mb-4 tracking-tight">
+          <h2 className="text-3xl md:text-5xl font-bold text-[#015971] dark:text-white mb-4 tracking-tight">
             Advanced Technology. <br />
-            <span className="text-[#406093]">Compassionate Care.</span>
+            <span className="text-[#015971]">Compassionate Care.</span>
           </h2>
           <p className="text-gray-600 dark:text-gray-400 text-lg font-medium leading-relaxed">
             Medoraa Labs combines world-class diagnostic expertise with cutting-edge technology to give you accurate insights into your health journey.

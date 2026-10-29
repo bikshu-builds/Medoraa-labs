@@ -4,8 +4,9 @@ import * as React from "react"
 import { useState } from "react"
 import Image from "next/image"
 import { motion, AnimatePresence, useScroll, useMotionValueEvent, Variants } from "framer-motion"
-import { Menu, X, User, Settings, Mail, Info, Activity } from "lucide-react"
+import { Menu, X, User, Settings, Mail, Info, Activity, ShoppingBag } from "lucide-react"
 import Link from "next/link"
+import { useCart } from "@/context/CartContext"
 
 interface MenuItem {
   id: number
@@ -61,6 +62,7 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<number | null>(null)
+  const { totalCount, openCart } = useCart()
 
   const { scrollY } = useScroll()
 
@@ -155,7 +157,7 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
                 >
                   Medoraa Labs
                 </span>
-                <span className="text-[10px] font-medium text-[#5A7A82] sm:text-[11px]">
+                <span className="hidden sm:inline-block text-[10px] font-medium text-[#5A7A82] sm:text-[11px]">
                   Precision Diagnostics, Healthier Tomorrows.
                 </span>
               </motion.div>
@@ -173,9 +175,9 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
           pointerEvents: isScrolled ? "none" : "auto",
         }}
         transition={{ duration: 0.28, ease: "easeInOut" }}
-        className={`fixed top-3 right-0 left-0 z-50 bg-transparent sm:top-4 ${className}`}
+        className={`fixed top-3 right-0 left-0 z-50 bg-transparent sm:top-4 w-full max-w-full ${className}`}
       >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
           <div className="flex h-14 items-center justify-end">
             <div className="hidden items-center space-x-5 rounded-full border border-[#015971]/10 bg-white/80 px-4 py-1.5 shadow-sm backdrop-blur-md md:flex">
               <div className="flex items-baseline space-x-1">
@@ -207,7 +209,16 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
                 ))}
               </div>
 
-              <div className="flex items-center border-l border-[#015971]/15 pl-3">
+              <div className="flex items-center space-x-2 border-l border-[#015971]/15 pl-3">
+                {totalCount > 0 && (
+                  <button
+                    onClick={openCart}
+                    className="relative flex items-center gap-1.5 rounded-full bg-[#015971]/10 px-3 py-1 text-xs font-bold text-[#015971] transition-all hover:bg-[#015971] hover:text-white"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>Cart ({totalCount})</span>
+                  </button>
+                )}
                 <Link
                   href="/signin"
                   className="rounded-full border border-[#015971] px-3.5 py-1 text-sm font-bold text-[#015971] transition-colors hover:bg-[#015971] hover:text-white"
@@ -303,6 +314,21 @@ export const ScrollNavigationMenu: React.FC<ScrollNavbarProps> = ({
                       </Link>
                     </motion.div>
                   ))}
+
+                  {totalCount > 0 && (
+                    <motion.div variants={itemVariants} className="pt-2">
+                      <button
+                        onClick={() => {
+                          toggleMenu();
+                          openCart();
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#015971] p-3 font-bold text-white shadow-md transition-colors hover:bg-[#01475a]"
+                      >
+                        <ShoppingBag className="w-4 h-4" />
+                        <span>View Cart ({totalCount})</span>
+                      </button>
+                    </motion.div>
+                  )}
 
                   <motion.div variants={itemVariants} className="space-y-3 pt-4">
                     <Link
