@@ -15,6 +15,7 @@ const {
     getRegistrations,
     getNextRegistrationNumber,
     updateRegistrationTests,
+    updateRegistrationPayment,
     updateRegistrationAuthorization,
     transferRegistrationSample,
     downloadReportPDF,
@@ -66,6 +67,7 @@ router.get("/registrations/next-id", getNextRegistrationNumber);
 router.post("/registrations", addRegistration);
 router.get("/registrations", getRegistrations);
 router.put("/registrations/:id/tests", updateRegistrationTests);
+router.put("/registrations/:id/payment", updateRegistrationPayment);
 router.put("/registrations/:id/authorization", updateRegistrationAuthorization);
 router.put("/registrations/:id/transfer-sample", transferRegistrationSample);
 

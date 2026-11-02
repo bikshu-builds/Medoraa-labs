@@ -251,6 +251,74 @@ exports.updateRegistrationTests = async (req, res) => {
 };
 
 // @desc    Update authorization status & test result values
+
+// @desc    Update payment and due amount for a registration
+// @route   PUT /api/admin/registrations/:id/payment
+exports.updateRegistrationPayment = async (req, res) => {
+  try {
+    const {
+      paidAmount,
+      amountToPay,
+      totalAmount,
+      paymentMethod,
+      paymentStatus,
+      paymentNotes,
+    } = req.body;
+
+    const registration = await PatientRegistration.findById(req.params.id).populate("tests");
+    if (!registration) {
+      return res.status(404).json({ success: false, message: "Registration record not found" });
+    }
+
+    if (totalAmount !== undefined && !isNaN(parseFloat(totalAmount))) {
+      registration.totalAmount = Math.max(0, parseFloat(totalAmount));
+    }
+
+    const billTotal = parseFloat(registration.totalAmount) || 0;
+    const currentPaid = parseFloat(registration.paidAmount) || 0;
+
+    let newPaid = currentPaid;
+    if (amountToPay !== undefined && !isNaN(parseFloat(amountToPay))) {
+      newPaid = currentPaid + parseFloat(amountToPay);
+    } else if (paidAmount !== undefined && !isNaN(parseFloat(paidAmount))) {
+      newPaid = parseFloat(paidAmount);
+    }
+
+    newPaid = Math.max(0, newPaid);
+    const newDue = Math.max(0, billTotal - newPaid);
+
+    let calculatedStatus = "PAID";
+    if (newDue > 0 && newPaid > 0) {
+      calculatedStatus = "PARTIAL";
+    } else if (newDue > 0 && newPaid === 0) {
+      calculatedStatus = "PENDING";
+    }
+
+    registration.paidAmount = newPaid;
+    registration.paymentStatus = paymentStatus || calculatedStatus;
+    if (paymentMethod) {
+      registration.paymentMethod = paymentMethod;
+    }
+
+    if (paymentNotes && typeof paymentNotes === "string" && paymentNotes.trim() !== "") {
+      const now = new Date();
+      const dateStr = `${String(now.getDate()).padStart(2, "0")}-${String(now.getMonth() + 1).padStart(2, "0")}-${now.getFullYear()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      const noteEntry = `[${dateStr}] Payment Updated: Paid ₹${newPaid.toFixed(2)}, Due ₹${newDue.toFixed(2)} (${paymentMethod || registration.paymentMethod || "Cash"}) - ${paymentNotes.trim()}`;
+      registration.notes = registration.notes ? `${registration.notes}\n${noteEntry}` : noteEntry;
+    }
+
+    await registration.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Payment and due amount updated successfully",
+      data: registration,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.updateRegistrationAuthorization = async (req, res) => {
   try {
     const {
@@ -356,13 +424,20 @@ exports.downloadReportPDF = async (req, res) => {
       });
     }
 
+    // Check header/footer options
+    const includeHeaderFooter = req.query.header !== 'false' && req.query.withHeader !== 'false';
+    const isDownload = req.query.download === 'true';
+
     // Generate PDF Buffer
-    const pdfBuffer = await generatePathologyPDF(registration);
+    const pdfBuffer = await generatePathologyPDF(registration, { includeHeaderFooter });
+
+    const baseName = `Pathology_Report_${registration.registrationNumber || registration._id}`;
+    const filename = includeHeaderFooter ? `${baseName}.pdf` : `${baseName}_Letterhead.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `inline; filename=Pathology_Report_${registration.registrationNumber || registration._id}.pdf`,
+      `${isDownload ? 'attachment' : 'inline'}; filename=${filename}`,
     );
     res.setHeader("Content-Length", pdfBuffer.length);
 
@@ -511,12 +586,18 @@ exports.downloadReceiptPDF = async (req, res) => {
         });
     }
 
-    const pdfBuffer = await generateReceiptPDF(registration);
+    const includeHeaderFooter = req.query.header !== 'false' && req.query.withHeader !== 'false';
+    const isDownload = req.query.download === 'true';
+
+    const pdfBuffer = await generateReceiptPDF(registration, { includeHeaderFooter });
+
+    const baseName = `Receipt_${registration.registrationNumber || registration._id}`;
+    const filename = includeHeaderFooter ? `${baseName}.pdf` : `${baseName}_Letterhead.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `inline; filename=Receipt_${registration.registrationNumber || registration._id}.pdf`,
+      `${isDownload ? 'attachment' : 'inline'}; filename=${filename}`,
     );
     res.setHeader("Content-Length", pdfBuffer.length);
 
@@ -549,7 +630,8 @@ exports.downloadReceiptHTML = async (req, res) => {
     }
 
     const autoPrint = req.query.autoprint === 'true';
-    const html = buildReceiptHTML(registration, autoPrint);
+    const includeHeaderFooter = req.query.header !== 'false' && req.query.withHeader !== 'false';
+    const html = buildReceiptHTML(registration, autoPrint, { includeHeaderFooter });
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
