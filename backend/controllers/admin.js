@@ -19,7 +19,7 @@ exports.login = async (req, res) => {
         const token = jwt.sign(
             { id: admin._id, role: admin.role || "admin" },
             process.env.JWT_SECRET,
-            { expiresIn: "1d" }
+            { expiresIn: "7d" }
         );
 
         // Fire-and-forget the email notification to avoid blocking the HTTP response

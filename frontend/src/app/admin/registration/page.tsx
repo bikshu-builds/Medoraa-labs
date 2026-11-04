@@ -34,13 +34,23 @@ import {
   Maximize2,
   ExternalLink,
   FlaskConical,
+  CreditCard,
+  Pencil,
+  Edit2,
+  Filter,
+  ArrowUpDown,
+  RotateCcw,
+  SlidersHorizontal,
+  Trash2,
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
+import { printPdfDirect } from "@/lib/pdfPrinter";
 import { cn } from "@/lib/utils";
 import JsBarcode from "jsbarcode";
 import * as XLSX from "xlsx";
 import PathologyReportModal from "../components/PathologyReportModal";
 import SampleTransferModal from "../components/SampleTransferModal";
+import UpdateDueModal from "../components/UpdateDueModal";
 
 interface BarcodeProps {
   value: string;
@@ -78,7 +88,7 @@ const Barcode: React.FC<BarcodeProps> = ({
   return <svg ref={svgRef}></svg>;
 };
 
-// Container badge color and text parser for thermal bottle labels
+// Container badge color and text parser for thermal sample labels
 const getContainerBadgeInfo = (test: any, samplesList: any[] = []) => {
   let containerStr = "";
   let testNameStr = "";
@@ -460,13 +470,58 @@ const PatientRegistrationForm: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [patientSearchQuery, setPatientSearchQuery] = useState("");
   const [userRole, setUserRole] = useState<string>("registration");
+
+  // Table Column Filters & Sorting
+  const [paymentFilter, setPaymentFilter] = useState<string>("ALL"); // ALL | HAS_DUE | PAID | PARTIAL | PENDING
+  const [dateFilter, setDateFilter] = useState<string>("ALL"); // ALL | TODAY | YESTERDAY | LAST_7 | THIS_MONTH | CUSTOM
+  const [customDate, setCustomDate] = useState<string>("");
+  const [referralFilter, setReferralFilter] = useState<string>("ALL"); // ALL | SELF | DOCTOR | HOSPITAL
+  const [testStatusFilter, setTestStatusFilter] = useState<string>("ALL"); // ALL | ENTERED | PENDING
+  const [genderFilter, setGenderFilter] = useState<string>("ALL"); // ALL | MALE | FEMALE | OTHER
+  const [sortOption, setSortOption] = useState<string>("DATE_DESC"); // DATE_DESC | DATE_ASC | NAME_ASC | NAME_DESC | DUE_DESC
+  const [openHeaderFilter, setOpenHeaderFilter] = useState<string | null>(null);
+
+  // Helper date parser
+  const getRegDateObj = (reg: any): Date | null => {
+    if (reg.createdAt) {
+      const d = new Date(reg.createdAt);
+      if (!isNaN(d.getTime())) return d;
+    }
+    if (reg.registrationDate) {
+      const parts = reg.registrationDate.split("-");
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          const d = new Date(reg.registrationDate);
+          if (!isNaN(d.getTime())) return d;
+        } else {
+          const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          if (!isNaN(d.getTime())) return d;
+        }
+      }
+    }
+    return null;
+  };
+
+  const resetAllFilters = () => {
+    setPaymentFilter("ALL");
+    setDateFilter("ALL");
+    setCustomDate("");
+    setReferralFilter("ALL");
+    setTestStatusFilter("ALL");
+    setGenderFilter("ALL");
+    setPatientSearchQuery("");
+    setSortOption("DATE_DESC");
+    setOpenHeaderFilter(null);
+  };
 
   // Handle Patient ID change & auto-populate existing patient details
   useEffect(() => {
     const query = patientIdInput.trim();
-    if (!query) {
+    // Do not search existing patients if input matches the generated next new patient ID
+    if (!query || query === nextPatientId) {
       setIsExistingPatientLoaded(false);
       return;
     }
@@ -497,7 +552,7 @@ const PatientRegistrationForm: React.FC = () => {
         referredBy: found.referredBy || "Self",
         sampleDrawnBy: found.sampleDrawnBy || "",
         referralMode: found.referralMode || "Self",
-        selectedLab: found.selectedLab || "Medoraa Labs (Our Lab)",
+        selectedLab: found.selectedLab || "",
       }));
     } else {
       setIsExistingPatientLoaded(false);
@@ -520,7 +575,7 @@ const PatientRegistrationForm: React.FC = () => {
     referredBy: "Self",
     sampleDrawnBy: "",
     referralMode: "Self" as "Self" | "Hospital",
-    selectedLab: "Medoraa Labs (Our Lab)",
+    selectedLab: "",
     selectedHospital: "",
     selectedDoctor: "",
     sampleReceived: {
@@ -592,7 +647,7 @@ const PatientRegistrationForm: React.FC = () => {
   const [savedRecord, setSavedRecord] = useState<any | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const [printType, setPrintType] = useState<"receipt" | "label">("receipt");
-  const [modalPreviewType, setModalPreviewType] = useState<"receipt" | "label">("receipt");
+  const [modalPreviewType, setModalPreviewType] = useState<"receipt" | "receipt-letterhead" | "label">("receipt");
   const labelRotation: 0 = 0;
   const updateLabelRotation = (_rotation?: any) => { };
   const labelOrientation = "horizontal";
@@ -611,8 +666,12 @@ const PatientRegistrationForm: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
   const [customPaymentMethod, setCustomPaymentMethod] = useState<string>("");
   const [paidAmountInput, setPaidAmountInput] = useState<string>("");
-  const [adminQrCode, setAdminQrCode] = useState<string>("");
+  const [adminQrCode, setAdminQrCode] = useState<string>("/scanner.jpeg");
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
+  // Update Due / Payment Modal State
+  const [dueModalRecord, setDueModalRecord] = useState<any | null>(null);
+  const [isDueModalOpen, setIsDueModalOpen] = useState(false);
+
   const [isTransferModalOpen, setIsTransferModalOpen] =
     useState<boolean>(false);
 
@@ -638,6 +697,82 @@ const PatientRegistrationForm: React.FC = () => {
     mobileNumber: "",
     password: "",
   });
+
+
+  const handleDeleteAllRegistrations = async () => {
+    if (!registrations || registrations.length === 0) {
+      alert("No patient registration records available to delete.");
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      `⚠️ CRITICAL WARNING: Are you sure you want to PERMANENTLY DELETE ALL ${registrations.length} patient registrations?\n\nThis will remove all patient details, billing records, and test reports.\n\nThis action CANNOT be undone. Click OK to proceed.`
+    );
+    if (!confirmDelete) return;
+
+    const secondConfirm = window.prompt(
+      `Please type "DELETE" to confirm permanent deletion of all ${registrations.length} patient records:`
+    );
+    if (secondConfirm !== "DELETE") {
+      alert("Batch deletion canceled. Confirmation text did not match.");
+      return;
+    }
+
+    setIsDeletingAll(true);
+    try {
+      const token = localStorage.getItem("adminToken");
+      const res = await fetch(getApiUrl("/api/admin/registrations"), {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message || "All patient registrations deleted successfully.");
+        fetchRegistrations();
+        fetchNextPatientId();
+      } else {
+        alert(data.message || "Failed to delete patient registrations.");
+      }
+    } catch (err: any) {
+      console.error("Batch delete error:", err);
+      alert(err.message || "An unexpected error occurred while deleting registrations.");
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
+
+  const handleDeleteRegistration = async (
+    id: string,
+    patientName: string,
+    regNo: string,
+  ) => {
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete patient registration ${regNo} (${patientName || "Patient"})?\n\nThis action cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const token = localStorage.getItem("adminToken");
+      const res = await fetch(getApiUrl(`/api/admin/registrations/${id}`), {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchRegistrations();
+        fetchNextPatientId();
+      } else {
+        alert(data.message || "Failed to delete patient registration.");
+      }
+    } catch (err: any) {
+      console.error("Delete registration error:", err);
+      alert(err.message || "An unexpected error occurred while deleting registration.");
+    }
+  };
 
   const fetchRegistrations = async () => {
     setIsLoadingRegistrations(true);
@@ -683,6 +818,8 @@ const PatientRegistrationForm: React.FC = () => {
       const setData = await setRes.json();
       if (setData.success && setData.data?.upiQrCode) {
         setAdminQrCode(setData.data.upiQrCode);
+      } else {
+        setAdminQrCode("/scanner.jpeg");
       }
     } catch (err) {
       console.error("Failed to fetch lab settings", err);
@@ -746,7 +883,7 @@ const PatientRegistrationForm: React.FC = () => {
         if (triggerPrintOnComplete) {
           setPrintType("receipt");
           setTimeout(() => {
-            window.print();
+            handlePrintReceipt(data.data);
           }, 500);
         }
       } else {
@@ -760,13 +897,16 @@ const PatientRegistrationForm: React.FC = () => {
     }
   };
 
-  const handlePrintReceipt = () => {
-    if (savedRecord?._id) {
-      const url = getApiUrl(`/api/admin/registrations/${savedRecord._id}/receipt-html?v=${savedRecord._id}&autoprint=true`);
-      window.open(url, "_blank");
-    }
-  };
+  const handlePrintReceipt = async (recordToPrint?: any, includeHeader: boolean = true) => {
+    const target = recordToPrint || savedRecord;
+    if (!target?._id) return;
 
+    // Print PDF using the exact same duplex PDF generated for Download
+    const pdfUrl = getApiUrl(
+      `/api/admin/registrations/${target._id}/receipt-pdf?header=${includeHeader}&autoprint=true&t=${Date.now()}`,
+    );
+    await printPdfDirect(pdfUrl);
+  };
   const generateBottleLabelHTML = (
     record: any,
     _rotation: any = 0,
@@ -776,6 +916,7 @@ const PatientRegistrationForm: React.FC = () => {
     const pageW = "50mm";
     const pageH = "15mm";
 
+    const patientId = (record.registrationNumber || record.patientId || "").toUpperCase().trim();
     const patientName = (record.patientName || "").toUpperCase().trim() || "PATIENT";
     const ageVal = record.age?.value || "";
     let ageType = "Y";
@@ -789,11 +930,11 @@ const PatientRegistrationForm: React.FC = () => {
 
     // Dynamic scaling for name (+2px larger: base 8.0px)
     const nameLen = patientName.length;
-    let nameFontSize = "7.0px";
+    let nameFontSize = "7.2px";
     if (nameLen > 28) {
-      nameFontSize = "6.8px";
+      nameFontSize = "6.2px";
     } else if (nameLen > 20) {
-      nameFontSize = "7.4px";
+      nameFontSize = "6.8px";
     }
 
     // Extract all test names into a single unified list
@@ -832,14 +973,14 @@ const PatientRegistrationForm: React.FC = () => {
       testLineHeight = "1.08";
     }
 
-    const topPadding = testsLen > 180 ? "3.0mm" : "4.0mm";
-    const rowMargin = testsLen > 180 ? "0.05mm" : "0.1mm";
+    const topPadding = testsLen > 180 ? "2.2mm" : testsLen > 70 ? "2.8mm" : "3.2mm";
+    const rowMargin = testsLen > 180 ? "0.06mm" : "0.15mm";
 
     return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Bottle Label - ${record.patientName || "Specimen"}</title>
+  <title>Sample Label - ${record.patientName || "Specimen"}</title>
   <style>
     @page {
       size: ${pageW} ${pageH};
@@ -931,7 +1072,13 @@ const PatientRegistrationForm: React.FC = () => {
       line-height: 1.1;
       margin: 0 0 ${rowMargin} 0;
       padding: 0;
-      gap: 2.5mm;
+      gap: 1.8mm;
+    }
+    .id-val {
+      font-size: 6.2px;
+      font-weight: 700;
+      color: #000000;
+      letter-spacing: 0.1px;
     }
     .test-row {
       display: block;
@@ -986,8 +1133,9 @@ const PatientRegistrationForm: React.FC = () => {
       <div class="label-row name-row">
         <span class="lbl-key">N:</span>&nbsp;<span class="lbl-val name-val" style="font-size: ${nameFontSize};">${patientName}</span>
       </div>
-      <!-- Line 2: AGE: and G: -->
+      <!-- Line 2: ID, AGE, and G: -->
       <div class="label-row demo-row">
+        <div><span class="lbl-key">ID:</span>&nbsp;<span class="lbl-val id-val">${patientId || "N/A"}</span></div>
         <div><span class="lbl-key">AGE:</span>&nbsp;<span class="lbl-val">${ageDisplay}</span></div>
         <div><span class="lbl-key">G:</span>&nbsp;<span class="lbl-val">${genderDisplay}</span></div>
       </div>
@@ -1042,7 +1190,7 @@ const PatientRegistrationForm: React.FC = () => {
           iframe.contentWindow?.focus();
           iframe.contentWindow?.print();
         } catch (e) {
-          console.error("Bottle label print error:", e);
+          console.error("Sample Label print error:", e);
         }
       }, 150);
     }
@@ -1235,32 +1383,12 @@ const PatientRegistrationForm: React.FC = () => {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
-  // Auto-save draft check
+  // Clear any legacy registration draft on mount
   useEffect(() => {
-    const draft = localStorage.getItem("medoraa_registration_draft");
-    if (draft) {
-      try {
-        const parsed = JSON.parse(draft);
-        setFormData(parsed);
-        setIsDraftRestored(true);
-      } catch (e) {
-        console.error("Failed to parse local draft", e);
-      }
-    }
+    try {
+      localStorage.removeItem("medoraa_registration_draft");
+    } catch {}
   }, []);
-
-  // Auto-save form changes
-  const isFirstRun = useRef(true);
-  useEffect(() => {
-    if (isFirstRun.current) {
-      isFirstRun.current = false;
-      return;
-    }
-    localStorage.setItem(
-      "medoraa_registration_draft",
-      JSON.stringify(formData),
-    );
-  }, [formData]);
 
   // Validation checks
   const isMobileValid = /^\d{10}$/.test(formData.mobileNumber);
@@ -1330,7 +1458,7 @@ const PatientRegistrationForm: React.FC = () => {
 
     const refVal = record.referredBy || "Self";
     let referralMode: "Self" | "Hospital" = "Self";
-    let selectedLab = "Medoraa Labs (Our Lab)";
+    let selectedLab = "";
     let selectedHospital = "";
     let selectedDoctor = "";
 
@@ -1339,7 +1467,8 @@ const PatientRegistrationForm: React.FC = () => {
       const startIndex = refVal.indexOf("(");
       const endIndex = refVal.lastIndexOf(")");
       if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-        selectedLab = refVal.slice(startIndex + 1, endIndex);
+        const labInside = refVal.slice(startIndex + 1, endIndex);
+        selectedLab = labInside === "Medoraa Labs (Our Lab)" ? "" : labInside;
 
         // Parse hospital name if present in the lab name, e.g. "Apollo Lab (Apollo Hospital)"
         const labOpenParen = selectedLab.lastIndexOf(" (");
@@ -1440,84 +1569,101 @@ const PatientRegistrationForm: React.FC = () => {
     });
   };
 
-  // Reset handler
+  // Core form reset logic
+  const resetFormFields = (keepOpen = false) => {
+    setFormData({
+      location: { state: "", district: "", city: "" },
+      patientName: "",
+      age: { value: "", type: "Years" },
+      gender: "Male",
+      mobileNumber: "",
+      address: "",
+      referredBy: "Self",
+      sampleDrawnBy: "",
+      referralMode: "Self",
+      selectedLab: "",
+      selectedHospital: "",
+      selectedDoctor: "",
+      sampleReceived: {
+        receivedThrough: "None",
+        transfer: { labName: "None" },
+        employee: {
+          name: "",
+          id: "",
+          mobileNumber: "",
+          department: "",
+          designation: "",
+          dateReceived: "",
+          timeReceived: "",
+          remarks: "",
+        },
+        person: {
+          name: "",
+          mobileNumber: "",
+          relationship: "",
+          address: "",
+          idProofType: "Aadhaar",
+          idProofNumber: "",
+          dateReceived: "",
+          timeReceived: "",
+          remarks: "",
+        },
+        courier: {
+          companyName: "",
+          trackingNumber: "",
+          orderNumber: "",
+          contactNumber: "",
+          pickupLocation: "",
+          arrivalDate: "",
+          arrivalTime: "",
+          receivedByEmployee: "",
+          packageCondition: "Good",
+          remarks: "",
+        },
+        bus: {
+          busNumber: "",
+          busServiceName: "",
+          driverName: "",
+          driverMobileNumber: "",
+          conductorName: "",
+          conductorMobileNumber: "",
+          originLocation: "",
+          destinationLocation: "",
+          arrivalDate: "",
+          arrivalTime: "",
+          receivedByEmployee: "",
+          packageCondition: "Good",
+          remarks: "",
+        },
+      },
+    });
+
+    try {
+      localStorage.removeItem("medoraa_registration_draft");
+    } catch {}
+    setIsDraftRestored(false);
+    setSavedRecord(null);
+    setIsExistingPatientLoaded(false);
+    setSelectedTestIds([]);
+    setDiscountVal("0");
+    setDiscountType("percentage");
+    setPaymentMethod("Cash");
+    setPaidAmountInput("");
+    setCustomPaymentMethod("");
+    setShowForm(keepOpen);
+
+    // Fetch and assign next patient ID
+    fetchNextPatientId();
+  };
+
+  // Reset handler with user confirmation
   const handleReset = () => {
     if (
       confirm(
-        "Are you sure you want to reset the form? This will discard your current inputs and draft.",
+        "Are you sure you want to reset the form? This will clear all input fields.",
       )
     ) {
-      setFormData({
-        location: { state: "", district: "", city: "" },
-        patientName: "",
-        age: { value: "", type: "Years" },
-        gender: "Male",
-        mobileNumber: "",
-        address: "",
-        referredBy: "Self",
-        sampleDrawnBy: "",
-        referralMode: "Self",
-        selectedLab: "Medoraa Labs (Our Lab)",
-        selectedHospital: "",
-        selectedDoctor: "",
-        sampleReceived: {
-          receivedThrough: "None",
-          transfer: { labName: "None" },
-          employee: {
-            name: "",
-            id: "",
-            mobileNumber: "",
-            department: "",
-            designation: "",
-            dateReceived: "",
-            timeReceived: "",
-            remarks: "",
-          },
-          person: {
-            name: "",
-            mobileNumber: "",
-            relationship: "",
-            address: "",
-            idProofType: "Aadhaar",
-            idProofNumber: "",
-            dateReceived: "",
-            timeReceived: "",
-            remarks: "",
-          },
-          courier: {
-            companyName: "",
-            trackingNumber: "",
-            orderNumber: "",
-            contactNumber: "",
-            pickupLocation: "",
-            arrivalDate: "",
-            arrivalTime: "",
-            receivedByEmployee: "",
-            packageCondition: "Good",
-            remarks: "",
-          },
-          bus: {
-            busNumber: "",
-            busServiceName: "",
-            driverName: "",
-            driverMobileNumber: "",
-            conductorName: "",
-            conductorMobileNumber: "",
-            originLocation: "",
-            destinationLocation: "",
-            arrivalDate: "",
-            arrivalTime: "",
-            receivedByEmployee: "",
-            packageCondition: "Good",
-            remarks: "",
-          },
-        },
-      });
-      localStorage.removeItem("medoraa_registration_draft");
-      setIsDraftRestored(false);
-      setSavedRecord(null);
-      setIsExistingPatientLoaded(false);
-      fetchNextPatientId();
+      resetFormFields(true);
     }
   };
 
@@ -1533,7 +1679,9 @@ const PatientRegistrationForm: React.FC = () => {
       const referredByValue =
         (formData.referralMode || "Self") === "Hospital"
           ? `${formData.selectedDoctor || ""} (${formData.selectedHospital || ""})`
-          : `Self (${formData.selectedLab || "Medoraa Labs (Our Lab)"})`;
+          : formData.selectedLab && formData.selectedLab !== "Medoraa Labs (Our Lab)"
+            ? `Self (${formData.selectedLab})`
+            : "Self";
 
       // Clean up sampleReceived depending on what is selected
       const cleanedSampleReceived = { ...formData.sampleReceived };
@@ -1672,7 +1820,6 @@ const PatientRegistrationForm: React.FC = () => {
     ...staff.map((s) => `${s.name} (${s.role || "Staff"})`),
   ];
   const labOptions = [
-    "Medoraa Labs (Our Lab)",
     ...hospitals.flatMap((h) =>
       (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`),
     ),
@@ -1707,7 +1854,6 @@ const PatientRegistrationForm: React.FC = () => {
       ]
       : [
         "Self",
-        "Medoraa Labs (Our Lab)",
         // All labs (with hospital name)
         ...hospitals.flatMap((h) =>
           (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`),
@@ -1733,12 +1879,10 @@ const PatientRegistrationForm: React.FC = () => {
   const currentReferredBy = (() => {
     if ((formData.referralMode || "Self") === "Self") {
       if (
-        (formData.selectedLab || "Medoraa Labs (Our Lab)") ===
-        "Medoraa Labs (Our Lab)"
+        !formData.selectedLab ||
+        formData.selectedLab === "Medoraa Labs (Our Lab)"
       ) {
-        return formData.selectedHospital === "Self"
-          ? "Self"
-          : "Medoraa Labs (Our Lab)";
+        return "Self";
       }
       if (formData.selectedHospital && formData.selectedHospital !== "Self") {
         const suffix = ` (${formData.selectedHospital})`;
@@ -1746,7 +1890,7 @@ const PatientRegistrationForm: React.FC = () => {
           return formData.selectedLab.slice(0, -suffix.length);
         }
       }
-      return formData.selectedLab || "";
+      return formData.selectedLab || "Self";
     }
     if (formData.selectedHospital && formData.selectedHospital !== "Self") {
       return formData.selectedDoctor || "";
@@ -1767,10 +1911,10 @@ const PatientRegistrationForm: React.FC = () => {
     if (val === "Self" || val === "Medoraa Labs (Our Lab)") {
       setFormData((prev) => ({
         ...prev,
-        selectedHospital: val === "Self" ? "Self" : "",
+        selectedHospital: "Self",
         selectedDoctor: "Self",
         referralMode: "Self",
-        selectedLab: "Medoraa Labs (Our Lab)",
+        selectedLab: "",
       }));
     } else {
       if (formData.selectedHospital && formData.selectedHospital !== "Self") {
@@ -2089,6 +2233,11 @@ const PatientRegistrationForm: React.FC = () => {
                                       {sample.organ}
                                     </span>
                                   )}
+                                  {sample.container && sample.container !== "-" && (
+                                    <span className="px-2 py-0.5 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 text-[8px] font-extrabold uppercase tracking-wide rounded border border-teal-200/60 dark:border-teal-800/60">
+                                      Container: {sample.container}
+                                    </span>
+                                  )}
                                 </div>
                                 <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight truncate font-bold">
                                   {sample.testName}
@@ -2097,7 +2246,7 @@ const PatientRegistrationForm: React.FC = () => {
                                   <span>Method: {sample.method || "-"}</span>
                                   <span>•</span>
                                   <span>
-                                    Specimen: {sample.sampleUsedForTest || "-"}
+                                    Sample Used: {sample.sampleUsedForTest || "-"}
                                   </span>
                                 </div>
                               </div>
@@ -2165,8 +2314,9 @@ const PatientRegistrationForm: React.FC = () => {
                             <p className="font-bold text-slate-800 dark:text-slate-200 truncate uppercase tracking-tight">
                               {t.testName}
                             </p>
-                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 truncate">
                               {t.category}
+                              {t.container && t.container !== "-" ? ` • ${t.container}` : ""}
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
@@ -2306,17 +2456,45 @@ const PatientRegistrationForm: React.FC = () => {
                                 />
                               </div>
                               <div className="space-y-1">
-                                <label className="text-[10px] font-extrabold text-rose-500 dark:text-rose-400 uppercase tracking-wider block">
-                                  Due (₹)
-                                </label>
-                                <div className="w-full px-2.5 py-1.5 bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-black text-rose-600 dark:text-rose-400 flex items-center justify-between">
-                                  <span>₹{calculatedDue.toFixed(0)}</span>
+                                <div className="flex items-center justify-between">
+                                  <label className="text-[10px] font-extrabold text-rose-500 dark:text-rose-400 uppercase tracking-wider block">
+                                    Due (₹)
+                                  </label>
                                   {calculatedDue > 0 && (
-                                    <span className="text-[9px] bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 px-1 py-0.2 rounded font-extrabold">
-                                      DUE
-                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setPaidAmountInput(String(totalPayable));
+                                      }}
+                                      className="text-[9px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline cursor-pointer"
+                                    >
+                                      Clear Due
+                                    </button>
                                   )}
                                 </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (savedRecord) {
+                                      setDueModalRecord(savedRecord);
+                                      setIsDueModalOpen(true);
+                                    } else if (calculatedDue > 0) {
+                                      setPaidAmountInput(String(totalPayable));
+                                    }
+                                  }}
+                                  className="w-full px-2.5 py-1.5 bg-rose-50/80 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-black text-rose-600 dark:text-rose-400 flex items-center justify-between transition-all cursor-pointer text-left"
+                                  title={savedRecord ? "Click to open Payment / Due update popup" : "Click to clear due (pay full)"}
+                                >
+                                  <span>₹{calculatedDue.toFixed(0)}</span>
+                                  {calculatedDue > 0 ? (
+                                    <span className="text-[9px] bg-rose-200 hover:bg-rose-300 dark:bg-rose-900/70 text-rose-700 dark:text-rose-200 px-1.5 py-0.5 rounded font-extrabold flex items-center gap-1">
+                                      <CreditCard className="w-2.5 h-2.5" />
+                                      {savedRecord ? "Update Due" : "DUE"}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] text-emerald-600 font-extrabold">PAID</span>
+                                  )}
+                                </button>
                               </div>
                             </div>
                           );
@@ -2435,86 +2613,28 @@ const PatientRegistrationForm: React.FC = () => {
                 billing slips.
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
               {userRole === "admin" && (
                 <button
                   onClick={handleExportRegistrations}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-lg text-xs text-slate-700 dark:text-slate-350 transition-all active:scale-95 cursor-pointer shadow-sm"
+                  className="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-lg text-xs text-slate-700 dark:text-slate-350 transition-all active:scale-95 cursor-pointer shadow-sm"
                 >
                   <FileSpreadsheet className="w-4 h-4" />
                   <span>Export Excel</span>
                 </button>
               )}
               <button
+                onClick={handleDeleteAllRegistrations}
+                disabled={isDeletingAll || registrations.length === 0}
+                className="flex items-center gap-1.5 px-3.5 py-2 border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 text-rose-700 dark:text-rose-400 font-bold rounded-lg text-xs transition-all active:scale-95 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Permanently delete all patient registrations"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isDeletingAll ? "Deleting..." : "Delete All"}</span>
+              </button>
+              <button
                 onClick={() => {
-                  setSavedRecord(null);
-                  setFormData({
-                    location: { state: "", district: "", city: "" },
-                    patientName: "",
-                    age: { value: "", type: "Years" },
-                    gender: "Male",
-                    mobileNumber: "",
-                    address: "",
-                    referredBy: "Self",
-                    sampleDrawnBy: "",
-                    referralMode: "Self",
-                    selectedLab: "Medoraa Labs (Our Lab)",
-                    selectedHospital: "",
-                    selectedDoctor: "",
-                    sampleReceived: {
-                      receivedThrough: "Employee",
-                      transfer: { labName: "None" },
-                      employee: {
-                        name: "",
-                        id: "",
-                        mobileNumber: "",
-                        department: "",
-                        designation: "",
-                        dateReceived: "",
-                        timeReceived: "",
-                        remarks: "",
-                      },
-                      person: {
-                        name: "",
-                        mobileNumber: "",
-                        relationship: "",
-                        address: "",
-                        idProofType: "Aadhaar",
-                        idProofNumber: "",
-                        dateReceived: "",
-                        timeReceived: "",
-                        remarks: "",
-                      },
-                      courier: {
-                        companyName: "",
-                        trackingNumber: "",
-                        orderNumber: "",
-                        contactNumber: "",
-                        pickupLocation: "",
-                        arrivalDate: "",
-                        arrivalTime: "",
-                        receivedByEmployee: "",
-                        packageCondition: "Good",
-                        remarks: "",
-                      },
-                      bus: {
-                        busNumber: "",
-                        busServiceName: "",
-                        driverName: "",
-                        driverMobileNumber: "",
-                        conductorName: "",
-                        conductorMobileNumber: "",
-                        originLocation: "",
-                        destinationLocation: "",
-                        arrivalDate: "",
-                        arrivalTime: "",
-                        receivedByEmployee: "",
-                        packageCondition: "Good",
-                        remarks: "",
-                      },
-                    },
-                  });
-                  setShowForm(true);
+                  resetFormFields(true);
                 }}
                 className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-lg text-xs transition-all active:scale-95 shadow-md cursor-pointer"
               >
@@ -2524,28 +2644,184 @@ const PatientRegistrationForm: React.FC = () => {
             </div>
           </div>
 
-          {/* Search & Statistics */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 border border-slate-200/60 dark:border-slate-800 rounded-xl shadow-sm">
-            <div className="relative flex-1 max-w-md">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Search className="w-4 h-4" />
-              </span>
-              <input
-                id="patient-search-input"
-                type="text"
-                placeholder="Search by name, registration no, phone..."
-                value={patientSearchQuery}
-                onChange={(e) => setPatientSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-550 focus:ring-1 focus:ring-blue-550 text-slate-800 dark:text-slate-100"
-              />
-            </div>
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Total Registrations:{" "}
-              <span className="text-slate-850 dark:text-slate-250 font-extrabold">
-                {registrations.length}
-              </span>
-            </div>
-          </div>
+          {/* Search & Filters Toolbar */}
+          {(() => {
+            const hasDueCount = registrations.filter((r) => {
+              const t = r.billing?.totalAmount ?? r.totalAmount ?? 0;
+              const p = r.billing?.paidAmount ?? r.paidAmount ?? 0;
+              return t - p > 0;
+            }).length;
+
+            const paidCount = registrations.filter((r) => {
+              const t = r.billing?.totalAmount ?? r.totalAmount ?? 0;
+              const p = r.billing?.paidAmount ?? r.paidAmount ?? 0;
+              return r.paymentStatus === "PAID" || (t > 0 && t - p <= 0);
+            }).length;
+
+            const pendingTestsCount = registrations.filter((r) => {
+              const ent = r.testResults
+                ? r.testResults.filter(
+                    (t: any) =>
+                      t.resultValue &&
+                      String(t.resultValue).trim() !== "" &&
+                      String(t.resultValue).trim() !== "—",
+                  ).length
+                : 0;
+              const tot =
+                r.testResults && r.testResults.length > 0
+                  ? r.testResults.length
+                  : r.tests
+                    ? r.tests.length
+                    : 0;
+              return tot > 0 && ent < tot;
+            }).length;
+
+            const todayCount = registrations.filter((r) => {
+              const d = getRegDateObj(r);
+              if (!d) return false;
+              const now = new Date();
+              return (
+                d.getFullYear() === now.getFullYear() &&
+                d.getMonth() === now.getMonth() &&
+                d.getDate() === now.getDate()
+              );
+            }).length;
+
+            const activeFilterCount =
+              (paymentFilter !== "ALL" ? 1 : 0) +
+              (dateFilter !== "ALL" ? 1 : 0) +
+              (referralFilter !== "ALL" ? 1 : 0) +
+              (testStatusFilter !== "ALL" ? 1 : 0) +
+              (genderFilter !== "ALL" ? 1 : 0) +
+              (patientSearchQuery.trim() !== "" ? 1 : 0);
+
+            return (
+              <div className="space-y-3 bg-white dark:bg-slate-900 p-4 border border-slate-200/60 dark:border-slate-800 rounded-xl shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="relative flex-1 max-w-md">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Search className="w-4 h-4" />
+                    </span>
+                    <input
+                      id="patient-search-input"
+                      type="text"
+                      placeholder="Search by name, registration no, phone, doctor..."
+                      value={patientSearchQuery}
+                      onChange={(e) => setPatientSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      Total:{" "}
+                      <span className="text-slate-800 dark:text-slate-200 font-extrabold">
+                        {registrations.length}
+                      </span>
+                    </div>
+                    {activeFilterCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={resetAllFilters}
+                        className="text-xs font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 flex items-center gap-1 cursor-pointer bg-rose-50 dark:bg-rose-950/40 px-2 py-1 rounded-md border border-rose-200 dark:border-rose-800 hover:scale-105 active:scale-95 transition-all"
+                        title="Reset all filters and sorting"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Clear Filters ({activeFilterCount})</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick Filters Pill Bar */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1 mr-1">
+                    <SlidersHorizontal className="w-3 h-3" /> Filters:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentFilter("ALL");
+                      setDateFilter("ALL");
+                      setTestStatusFilter("ALL");
+                    }}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                      paymentFilter === "ALL" && dateFilter === "ALL" && testStatusFilter === "ALL"
+                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs"
+                        : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    )}
+                  >
+                    All ({registrations.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPaymentFilter(paymentFilter === "HAS_DUE" ? "ALL" : "HAS_DUE")
+                    }
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                      paymentFilter === "HAS_DUE"
+                        ? "bg-rose-600 text-white shadow-xs font-black"
+                        : "bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                    )}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                    Has Due ({hasDueCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPaymentFilter(paymentFilter === "PAID" ? "ALL" : "PAID")
+                    }
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                      paymentFilter === "PAID"
+                        ? "bg-emerald-600 text-white shadow-xs font-black"
+                        : "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                    )}
+                  >
+                    Paid ({paidCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTestStatusFilter(testStatusFilter === "PENDING" ? "ALL" : "PENDING")
+                    }
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                      testStatusFilter === "PENDING"
+                        ? "bg-amber-600 text-white shadow-xs font-black"
+                        : "bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                    )}
+                  >
+                    Pending Tests ({pendingTestsCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDateFilter(dateFilter === "TODAY" ? "ALL" : "TODAY")
+                    }
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                      dateFilter === "TODAY"
+                        ? "bg-blue-600 text-white shadow-xs font-black"
+                        : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                    )}
+                  >
+                    Today ({todayCount})
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Backdrop to close header filter popovers */}
+          {openHeaderFilter && (
+            <div
+              className="fixed inset-0 z-40 bg-black/5"
+              onClick={() => setOpenHeaderFilter(null)}
+            />
+          )}
 
           {/* Table Container */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
@@ -2573,44 +2849,629 @@ const PatientRegistrationForm: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-slate-50/75 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      <th className="px-6 py-3.5">Reg No &amp; Date</th>
-                      <th className="px-6 py-3.5">Patient Info</th>
+                    <tr className="bg-slate-50/90 dark:bg-slate-800/70 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 select-none">
+                      {/* Column 1: Reg No & Date */}
+                      <th className="px-6 py-3.5 relative">
+                        <div className="flex items-center justify-between gap-1">
+                          <span>Reg No &amp; Date</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenHeaderFilter(
+                                openHeaderFilter === "date" ? null : "date",
+                              )
+                            }
+                            className={cn(
+                              "p-1 rounded transition-colors cursor-pointer",
+                              dateFilter !== "ALL" || sortOption.startsWith("DATE")
+                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300 ring-1 ring-blue-400"
+                                : "text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 dark:hover:bg-slate-700/60",
+                            )}
+                            title="Filter & sort by date"
+                          >
+                            <Filter className="w-3 h-3" />
+                          </button>
+                        </div>
+                        {openHeaderFilter === "date" && (
+                          <div className="absolute left-4 top-full mt-1 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2.5 z-50 text-xs font-semibold text-slate-700 dark:text-slate-200 normal-case tracking-normal">
+                            <div className="px-2 py-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                              <span>Date Filter</span>
+                              {dateFilter !== "ALL" && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDateFilter("ALL");
+                                    setCustomDate("");
+                                  }}
+                                  className="text-[10px] text-blue-600 hover:underline cursor-pointer lowercase"
+                                >
+                                  reset
+                                </button>
+                              )}
+                            </div>
+                            <div className="mt-1 space-y-0.5">
+                              {[
+                                { label: "All Dates", val: "ALL" },
+                                { label: "📅 Today", val: "TODAY" },
+                                { label: "Yesterday", val: "YESTERDAY" },
+                                { label: "Last 7 Days", val: "LAST_7" },
+                                { label: "This Month", val: "THIS_MONTH" },
+                              ].map((opt) => (
+                                <button
+                                  key={opt.val}
+                                  type="button"
+                                  onClick={() => {
+                                    setDateFilter(opt.val);
+                                    setOpenHeaderFilter(null);
+                                  }}
+                                  className={cn(
+                                    "w-full text-left px-2 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-xs",
+                                    dateFilter === opt.val
+                                      ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 font-bold"
+                                      : "hover:bg-slate-100 dark:hover:bg-slate-800",
+                                  )}
+                                >
+                                  <span>{opt.label}</span>
+                                  {dateFilter === opt.val && (
+                                    <Check className="w-3.5 h-3.5 text-blue-600" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+
+                            <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                              <label className="text-[10px] font-bold text-slate-400 uppercase block">
+                                Custom Date
+                              </label>
+                              <input
+                                type="date"
+                                value={customDate}
+                                onChange={(e) => {
+                                  setCustomDate(e.target.value);
+                                  if (e.target.value) {
+                                    setDateFilter("CUSTOM");
+                                  }
+                                }}
+                                className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+
+                            <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-0.5">
+                              <div className="text-[10px] font-bold text-slate-400 uppercase px-1">
+                                Sort Order
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSortOption("DATE_DESC");
+                                  setOpenHeaderFilter(null);
+                                }}
+                                className={cn(
+                                  "w-full text-left px-2 py-1 rounded-lg flex items-center justify-between text-[11px] cursor-pointer",
+                                  sortOption === "DATE_DESC"
+                                    ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 font-bold"
+                                    : "hover:bg-slate-100 dark:hover:bg-slate-800",
+                                )}
+                              >
+                                <span>Newest First</span>
+                                {sortOption === "DATE_DESC" && (
+                                  <Check className="w-3 h-3 text-blue-600" />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSortOption("DATE_ASC");
+                                  setOpenHeaderFilter(null);
+                                }}
+                                className={cn(
+                                  "w-full text-left px-2 py-1 rounded-lg flex items-center justify-between text-[11px] cursor-pointer",
+                                  sortOption === "DATE_ASC"
+                                    ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 font-bold"
+                                    : "hover:bg-slate-100 dark:hover:bg-slate-800",
+                                )}
+                              >
+                                <span>Oldest First</span>
+                                {sortOption === "DATE_ASC" && (
+                                  <Check className="w-3 h-3 text-blue-600" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </th>
+
+                      {/* Column 2: Patient Info */}
+                      <th className="px-6 py-3.5 relative">
+                        <div className="flex items-center justify-between gap-1">
+                          <span>Patient Info</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenHeaderFilter(
+                                openHeaderFilter === "patient" ? null : "patient",
+                              )
+                            }
+                            className={cn(
+                              "p-1 rounded transition-colors cursor-pointer",
+                              genderFilter !== "ALL" || sortOption.startsWith("NAME")
+                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300 ring-1 ring-blue-400"
+                                : "text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 dark:hover:bg-slate-700/60",
+                            )}
+                            title="Filter gender & sort by name"
+                          >
+                            <Filter className="w-3 h-3" />
+                          </button>
+                        </div>
+                        {openHeaderFilter === "patient" && (
+                          <div className="absolute left-6 top-full mt-1 w-52 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2.5 z-50 text-xs font-semibold text-slate-700 dark:text-slate-200 normal-case tracking-normal">
+                            <div className="px-2 py-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                              <span>Gender Filter</span>
+                              {genderFilter !== "ALL" && (
+                                <button
+                                  type="button"
+                                  onClick={() => setGenderFilter("ALL")}
+                                  className="text-[10px] text-blue-600 hover:underline cursor-pointer lowercase"
+                                >
+                                  reset
+                                </button>
+                              )}
+                            </div>
+                            <div className="mt-1 space-y-0.5">
+                              {[
+                                { label: "All Genders", val: "ALL" },
+                                { label: "Male", val: "MALE" },
+                                { label: "Female", val: "FEMALE" },
+                                { label: "Other", val: "OTHER" },
+                              ].map((opt) => (
+                                <button
+                                  key={opt.val}
+                                  type="button"
+                                  onClick={() => {
+                                    setGenderFilter(opt.val);
+                                    setOpenHeaderFilter(null);
+                                  }}
+                                  className={cn(
+                                    "w-full text-left px-2 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer",
+                                    genderFilter === opt.val
+                                      ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 font-bold"
+                                      : "hover:bg-slate-100 dark:hover:bg-slate-800",
+                                  )}
+                                >
+                                  <span>{opt.label}</span>
+                                  {genderFilter === opt.val && (
+                                    <Check className="w-3.5 h-3.5 text-blue-600" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-0.5">
+                              <div className="text-[10px] font-bold text-slate-400 uppercase px-1">
+                                Sort By Name
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSortOption("NAME_ASC");
+                                  setOpenHeaderFilter(null);
+                                }}
+                                className={cn(
+                                  "w-full text-left px-2 py-1 rounded-lg flex items-center justify-between text-[11px] cursor-pointer",
+                                  sortOption === "NAME_ASC"
+                                    ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 font-bold"
+                                    : "hover:bg-slate-100 dark:hover:bg-slate-800",
+                                )}
+                              >
+                                <span>A → Z (Alphabetical)</span>
+                                {sortOption === "NAME_ASC" && (
+                                  <Check className="w-3 h-3 text-blue-600" />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSortOption("NAME_DESC");
+                                  setOpenHeaderFilter(null);
+                                }}
+                                className={cn(
+                                  "w-full text-left px-2 py-1 rounded-lg flex items-center justify-between text-[11px] cursor-pointer",
+                                  sortOption === "NAME_DESC"
+                                    ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 font-bold"
+                                    : "hover:bg-slate-100 dark:hover:bg-slate-800",
+                                )}
+                              >
+                                <span>Z → A (Reverse)</span>
+                                {sortOption === "NAME_DESC" && (
+                                  <Check className="w-3 h-3 text-blue-600" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </th>
+
+                      {/* Column 3: Contact */}
                       <th className="px-6 py-3.5">Contact</th>
-                      <th className="px-6 py-3.5">Referred By</th>
-                      <th className="px-6 py-3.5">Tests</th>
-                      <th className="px-6 py-3.5">Payment / Due</th>
+
+                      {/* Column 4: Referred By */}
+                      <th className="px-6 py-3.5 relative">
+                        <div className="flex items-center justify-between gap-1">
+                          <span>Referred By</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenHeaderFilter(
+                                openHeaderFilter === "referral" ? null : "referral",
+                              )
+                            }
+                            className={cn(
+                              "p-1 rounded transition-colors cursor-pointer",
+                              referralFilter !== "ALL"
+                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300 ring-1 ring-blue-400"
+                                : "text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 dark:hover:bg-slate-700/60",
+                            )}
+                            title="Filter by referral mode"
+                          >
+                            <Filter className="w-3 h-3" />
+                          </button>
+                        </div>
+                        {openHeaderFilter === "referral" && (
+                          <div className="absolute left-6 top-full mt-1 w-52 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2.5 z-50 text-xs font-semibold text-slate-700 dark:text-slate-200 normal-case tracking-normal">
+                            <div className="px-2 py-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                              <span>Referral Filter</span>
+                              {referralFilter !== "ALL" && (
+                                <button
+                                  type="button"
+                                  onClick={() => setReferralFilter("ALL")}
+                                  className="text-[10px] text-blue-600 hover:underline cursor-pointer lowercase"
+                                >
+                                  reset
+                                </button>
+                              )}
+                            </div>
+                            <div className="mt-1 space-y-0.5">
+                              {[
+                                { label: "All Referrals", val: "ALL" },
+                                { label: "Self Referral", val: "SELF" },
+                                { label: "By Doctor", val: "DOCTOR" },
+                                { label: "By Hospital / Clinic", val: "HOSPITAL" },
+                              ].map((opt) => (
+                                <button
+                                  key={opt.val}
+                                  type="button"
+                                  onClick={() => {
+                                    setReferralFilter(opt.val);
+                                    setOpenHeaderFilter(null);
+                                  }}
+                                  className={cn(
+                                    "w-full text-left px-2 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer",
+                                    referralFilter === opt.val
+                                      ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 font-bold"
+                                      : "hover:bg-slate-100 dark:hover:bg-slate-800",
+                                  )}
+                                >
+                                  <span>{opt.label}</span>
+                                  {referralFilter === opt.val && (
+                                    <Check className="w-3.5 h-3.5 text-blue-600" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </th>
+
+                      {/* Column 5: Tests */}
+                      <th className="px-6 py-3.5 relative">
+                        <div className="flex items-center justify-between gap-1">
+                          <span>Tests</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenHeaderFilter(
+                                openHeaderFilter === "tests" ? null : "tests",
+                              )
+                            }
+                            className={cn(
+                              "p-1 rounded transition-colors cursor-pointer",
+                              testStatusFilter !== "ALL"
+                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300 ring-1 ring-blue-400"
+                                : "text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 dark:hover:bg-slate-700/60",
+                            )}
+                            title="Filter by test result status"
+                          >
+                            <Filter className="w-3 h-3" />
+                          </button>
+                        </div>
+                        {openHeaderFilter === "tests" && (
+                          <div className="absolute right-0 top-full mt-1 w-52 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2.5 z-50 text-xs font-semibold text-slate-700 dark:text-slate-200 normal-case tracking-normal">
+                            <div className="px-2 py-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                              <span>Test Status</span>
+                              {testStatusFilter !== "ALL" && (
+                                <button
+                                  type="button"
+                                  onClick={() => setTestStatusFilter("ALL")}
+                                  className="text-[10px] text-blue-600 hover:underline cursor-pointer lowercase"
+                                >
+                                  reset
+                                </button>
+                              )}
+                            </div>
+                            <div className="mt-1 space-y-0.5">
+                              {[
+                                { label: "All Tests", val: "ALL" },
+                                { label: "⏳ Pending Results", val: "PENDING" },
+                                { label: "✅ All Results Entered", val: "ENTERED" },
+                              ].map((opt) => (
+                                <button
+                                  key={opt.val}
+                                  type="button"
+                                  onClick={() => {
+                                    setTestStatusFilter(opt.val);
+                                    setOpenHeaderFilter(null);
+                                  }}
+                                  className={cn(
+                                    "w-full text-left px-2 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer",
+                                    testStatusFilter === opt.val
+                                      ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 font-bold"
+                                      : "hover:bg-slate-100 dark:hover:bg-slate-800",
+                                  )}
+                                >
+                                  <span>{opt.label}</span>
+                                  {testStatusFilter === opt.val && (
+                                    <Check className="w-3.5 h-3.5 text-blue-600" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </th>
+
+                      {/* Column 6: Payment / Due */}
+                      <th className="px-6 py-3.5 relative">
+                        <div className="flex items-center justify-between gap-1">
+                          <span>Payment / Due</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenHeaderFilter(
+                                openHeaderFilter === "payment" ? null : "payment",
+                              )
+                            }
+                            className={cn(
+                              "p-1 rounded transition-colors cursor-pointer",
+                              paymentFilter !== "ALL" || sortOption === "DUE_DESC"
+                                ? "bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300 ring-1 ring-rose-400"
+                                : "text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 dark:hover:bg-slate-700/60",
+                            )}
+                            title="Filter by Payment / Due Status"
+                          >
+                            <Filter className="w-3 h-3" />
+                          </button>
+                        </div>
+                        {openHeaderFilter === "payment" && (
+                          <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2.5 z-50 text-xs font-semibold text-slate-700 dark:text-slate-200 normal-case tracking-normal">
+                            <div className="px-2 py-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                              <span>Payment / Due Filter</span>
+                              {paymentFilter !== "ALL" && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPaymentFilter("ALL")}
+                                  className="text-[10px] text-blue-600 hover:underline cursor-pointer lowercase"
+                                >
+                                  reset
+                                </button>
+                              )}
+                            </div>
+                            <div className="mt-1 space-y-0.5">
+                              {[
+                                { label: "All Payments", val: "ALL" },
+                                { label: "🔴 Due Only (Unpaid / Partial)", val: "HAS_DUE" },
+                                { label: "🟢 Paid in Full", val: "PAID" },
+                                { label: "🟡 Partial Paid", val: "PARTIAL" },
+                                { label: "⚪ Pending (Zero Paid)", val: "PENDING" },
+                              ].map((opt) => (
+                                <button
+                                  key={opt.val}
+                                  type="button"
+                                  onClick={() => {
+                                    setPaymentFilter(opt.val);
+                                    setOpenHeaderFilter(null);
+                                  }}
+                                  className={cn(
+                                    "w-full text-left px-2 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer",
+                                    paymentFilter === opt.val
+                                      ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold"
+                                      : "hover:bg-slate-100 dark:hover:bg-slate-800",
+                                  )}
+                                >
+                                  <span>{opt.label}</span>
+                                  {paymentFilter === opt.val && (
+                                    <Check className="w-3.5 h-3.5 text-rose-600" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSortOption(
+                                    sortOption === "DUE_DESC"
+                                      ? "DATE_DESC"
+                                      : "DUE_DESC",
+                                  );
+                                  setOpenHeaderFilter(null);
+                                }}
+                                className={cn(
+                                  "w-full text-left px-2 py-1.5 rounded-lg flex items-center justify-between text-[11px] cursor-pointer",
+                                  sortOption === "DUE_DESC"
+                                    ? "bg-rose-50 dark:bg-rose-950/60 text-rose-600 font-bold"
+                                    : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300",
+                                )}
+                              >
+                                <span>Sort: Highest Due First</span>
+                                {sortOption === "DUE_DESC" && (
+                                  <Check className="w-3 h-3 text-rose-600" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </th>
+
+                      {/* Column 7: Actions */}
                       <th className="px-6 py-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                    {registrations
-                      .filter((reg) => {
+                    {(() => {
+                      const displayedRegistrations = registrations
+                        .filter((reg) => {
+                        // 1. Text Search Query
                         const query = patientSearchQuery.toLowerCase().trim();
-                        let isSampleMatch = false;
-                        if (query.startsWith("s") && query.length >= 10) {
-                          const sampleBody = query.substring(
-                            1,
-                            query.length - 1,
-                          );
-                          const regDigitsClean = reg.registrationNumber
-                            ? reg.registrationNumber.replace(/[^0-9]/g, "")
-                            : "";
-                          if (regDigitsClean.includes(sampleBody)) {
-                            isSampleMatch = true;
+                        if (query) {
+                          let isSampleMatch = false;
+                          if (query.startsWith("s") && query.length >= 10) {
+                            const sampleBody = query.substring(
+                              1,
+                              query.length - 1,
+                            );
+                            const regDigitsClean = reg.registrationNumber
+                              ? reg.registrationNumber.replace(/[^0-9]/g, "")
+                              : "";
+                            if (regDigitsClean.includes(sampleBody)) {
+                              isSampleMatch = true;
+                            }
+                          }
+                          const matchesSearch =
+                            reg.patientName?.toLowerCase().includes(query) ||
+                            reg.registrationNumber
+                              ?.toLowerCase()
+                              .includes(query) ||
+                            reg.mobileNumber?.includes(query) ||
+                            reg.referredBy?.toLowerCase().includes(query) ||
+                            isSampleMatch;
+                          if (!matchesSearch) return false;
+                        }
+
+                        // 2. Payment / Due Filter
+                        const total = reg.billing?.totalAmount ?? reg.totalAmount ?? 0;
+                        const paid = reg.billing?.paidAmount ?? reg.paidAmount ?? 0;
+                        const due = Math.max(0, total - paid);
+                        const isPaid = reg.paymentStatus === "PAID" || (total > 0 && due <= 0);
+
+                        if (paymentFilter === "HAS_DUE" && due <= 0) return false;
+                        if (paymentFilter === "PAID" && !isPaid) return false;
+                        if (paymentFilter === "PARTIAL" && (due <= 0 || paid <= 0)) return false;
+                        if (paymentFilter === "PENDING" && (paid > 0 || total === 0)) return false;
+
+                        // 3. Gender Filter
+                        if (genderFilter !== "ALL") {
+                          if (reg.gender?.toLowerCase() !== genderFilter.toLowerCase()) return false;
+                        }
+
+                        // 4. Referral Filter
+                        if (referralFilter === "SELF") {
+                          const ref = (reg.referredBy || "").toLowerCase();
+                          const mode = (reg.referralMode || "").toLowerCase();
+                          if (!ref.includes("self") && mode !== "self") return false;
+                        } else if (referralFilter === "DOCTOR") {
+                          const mode = (reg.referralMode || "").toLowerCase();
+                          const ref = (reg.referredBy || "").toLowerCase();
+                          if (mode !== "doctor" && !ref.includes("dr.") && !ref.includes("dr ") && !ref.includes("doctor")) return false;
+                        } else if (referralFilter === "HOSPITAL") {
+                          const mode = (reg.referralMode || "").toLowerCase();
+                          const ref = (reg.referredBy || "").toLowerCase();
+                          if (mode !== "hospital" && !ref.includes("hospital") && !ref.includes("clinic")) return false;
+                        }
+
+                        // 5. Test Status Filter
+                        const regEnteredCount = reg.testResults ? reg.testResults.filter((t: any) => t.resultValue && String(t.resultValue).trim() !== "" && String(t.resultValue).trim() !== "—").length : 0;
+                        const regTotalCount = reg.testResults && reg.testResults.length > 0 ? reg.testResults.length : (reg.tests ? reg.tests.length : 0);
+                        const regPendingCount = Math.max(0, regTotalCount - regEnteredCount);
+
+                        if (testStatusFilter === "PENDING" && regPendingCount === 0) return false;
+                        if (testStatusFilter === "ENTERED" && (regEnteredCount === 0 || regPendingCount > 0)) return false;
+
+                        // 6. Date Filter
+                        if (dateFilter !== "ALL") {
+                          const d = getRegDateObj(reg);
+                          if (!d) return false;
+                          const now = new Date();
+                          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+                          if (dateFilter === "TODAY") {
+                            if (d < todayStart) return false;
+                          } else if (dateFilter === "YESTERDAY") {
+                            const yestStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
+                            if (d < yestStart || d >= todayStart) return false;
+                          } else if (dateFilter === "LAST_7") {
+                            const last7 = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+                            if (d < last7) return false;
+                          } else if (dateFilter === "THIS_MONTH") {
+                            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                            if (d < monthStart) return false;
+                          } else if (dateFilter === "CUSTOM" && customDate) {
+                            const [cYear, cMonth, cDay] = customDate.split("-").map(Number);
+                            if (d.getFullYear() !== cYear || d.getMonth() !== cMonth - 1 || d.getDate() !== cDay) {
+                              return false;
+                            }
                           }
                         }
-                        return (
-                          reg.patientName?.toLowerCase().includes(query) ||
-                          reg.registrationNumber
-                            ?.toLowerCase()
-                            .includes(query) ||
-                          reg.mobileNumber?.includes(query) ||
-                          reg.referredBy?.toLowerCase().includes(query) ||
-                          isSampleMatch
-                        );
+
+                        return true;
                       })
-                      .map((reg) => {
+                      .sort((a, b) => {
+                        if (sortOption === "DATE_ASC") {
+                          const da = getRegDateObj(a)?.getTime() || 0;
+                          const db = getRegDateObj(b)?.getTime() || 0;
+                          return da - db;
+                        } else if (sortOption === "NAME_ASC") {
+                          return (a.patientName || "").localeCompare(b.patientName || "");
+                        } else if (sortOption === "NAME_DESC") {
+                          return (b.patientName || "").localeCompare(a.patientName || "");
+                        } else if (sortOption === "DUE_DESC") {
+                          const totalA = a.billing?.totalAmount ?? a.totalAmount ?? 0;
+                          const paidA = a.billing?.paidAmount ?? a.paidAmount ?? 0;
+                          const dueA = Math.max(0, totalA - paidA);
+
+                          const totalB = b.billing?.totalAmount ?? b.totalAmount ?? 0;
+                          const paidB = b.billing?.paidAmount ?? b.paidAmount ?? 0;
+                          const dueB = Math.max(0, totalB - paidB);
+
+                          return dueB - dueA;
+                        }
+                        // Default DATE_DESC
+                        const da = getRegDateObj(a)?.getTime() || 0;
+                        const db = getRegDateObj(b)?.getTime() || 0;
+                        return db - da;
+                      });
+
+                      if (displayedRegistrations.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={7} className="px-6 py-12 text-center">
+                              <div className="flex flex-col items-center justify-center gap-2">
+                                <Filter className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                                <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
+                                  No registrations match the selected filters
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={resetAllFilters}
+                                  className="mt-1 px-3 py-1.5 text-xs font-extrabold text-blue-600 hover:text-blue-700 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg cursor-pointer transition-all"
+                                >
+                                  Reset All Filters
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return displayedRegistrations.map((reg) => {
                         const total = reg.billing?.totalAmount ?? reg.totalAmount ?? 0;
                         const paid = reg.billing?.paidAmount ?? reg.paidAmount ?? 0;
                         const due = Math.max(0, total - paid);
@@ -2728,28 +3589,57 @@ const PatientRegistrationForm: React.FC = () => {
                                 return (
                                   <div className="flex flex-col gap-1">
                                     <div className="flex items-center gap-1.5">
-                                      <span
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDueModalRecord(reg);
+                                          setIsDueModalOpen(true);
+                                        }}
                                         className={cn(
-                                          "px-2 py-0.5 text-[9px] font-black rounded uppercase tracking-wider",
+                                          "px-2 py-0.5 text-[9px] font-black rounded uppercase tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-xs",
                                           isPaid
-                                            ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400"
+                                            ? "bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400"
                                             : due > 0 && paid > 0
-                                              ? "bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400"
-                                              : "bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400"
+                                              ? "bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-400"
+                                              : "bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-400"
                                         )}
+                                        title="Click to view or update payment / due"
                                       >
                                         {reg.paymentStatus || (isPaid ? "PAID" : due > 0 && paid > 0 ? "PARTIAL" : "PENDING")}
-                                      </span>
+                                      </button>
                                     </div>
                                     {due > 0 && (
-                                      <span className="font-black text-xs text-rose-700 dark:text-rose-300 bg-rose-200/80 dark:bg-rose-900/60 px-2 py-0.5 rounded-md inline-flex items-center gap-1 w-fit shadow-xs border border-rose-300/50">
-                                        Due: ₹{due.toFixed(2)}
-                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDueModalRecord(reg);
+                                          setIsDueModalOpen(true);
+                                        }}
+                                        className="font-black text-xs text-rose-700 dark:text-rose-300 bg-rose-200/90 hover:bg-rose-300 dark:bg-rose-900/70 dark:hover:bg-rose-800/80 px-2.5 py-1 rounded-md inline-flex items-center gap-1.5 w-fit shadow-xs border border-rose-300/80 cursor-pointer transition-all hover:scale-105 active:scale-95 group text-left"
+                                        title="Click to update / pay due amount"
+                                      >
+                                        <span>Due: ₹{due.toFixed(2)}</span>
+                                        <span className="text-[9px] bg-rose-600 group-hover:bg-rose-700 text-white font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5">
+                                          <CreditCard className="w-2.5 h-2.5" />
+                                          Pay
+                                        </span>
+                                      </button>
                                     )}
                                     {isPaid && total > 0 && (
-                                      <span className="font-bold text-[10px] text-emerald-600 dark:text-emerald-400">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDueModalRecord(reg);
+                                          setIsDueModalOpen(true);
+                                        }}
+                                        className="font-bold text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer text-left w-fit"
+                                        title="Click to view payment details"
+                                      >
                                         Paid in Full (₹{total.toFixed(2)})
-                                      </span>
+                                      </button>
                                     )}
                                   </div>
                                 );
@@ -2835,16 +3725,30 @@ const PatientRegistrationForm: React.FC = () => {
                                       handlePrintLabels(undefined, reg);
                                     }}
                                     className="p-1.5 bg-teal-50 dark:bg-teal-900/30 text-teal-650 dark:text-teal-400 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                                    title="Print Bottle Labels"
+                                    title="Print Sample Labels"
                                   >
                                     <Activity className="w-3.5 h-3.5" />
                                   </button>
                                 )}
+                                <button
+                                  onClick={() =>
+                                    handleDeleteRegistration(
+                                      reg._id,
+                                      reg.patientName,
+                                      reg.registrationNumber,
+                                    )
+                                  }
+                                  className="p-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                  title="Delete Registration"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             </td>
                           </tr>
                         );
-                      })}
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -2871,7 +3775,10 @@ const PatientRegistrationForm: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  resetFormFields(false);
+                }}
                 className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-lg text-xs text-slate-700 dark:text-slate-300 transition-all active:scale-95 shadow-sm cursor-pointer"
               >
                 Back to Patients List
@@ -2879,26 +3786,6 @@ const PatientRegistrationForm: React.FC = () => {
             </div>
           </div>
 
-          {/* Restored Draft Alert Banner */}
-          {isDraftRestored && (
-            <div className="flex items-center justify-between px-4 py-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-900/30 rounded-xl animate-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center gap-2">
-                <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
-                  We found and restored a pending patient registration draft.
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  localStorage.removeItem("medoraa_registration_draft");
-                  setIsDraftRestored(false);
-                }}
-                className="text-[10px] font-black uppercase text-amber-700 hover:text-amber-900 dark:text-amber-400 hover:underline px-2 py-1 rounded"
-              >
-                Dismiss Draft
-              </button>
-            </div>
-          )}
 
           {/* Form grid layout */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -3721,9 +4608,8 @@ const PatientRegistrationForm: React.FC = () => {
                   </button>
                   <button
                     onClick={() => {
-                      if (confirm("Discard draft changes and cancel?")) {
-                        setShowForm(false);
-                        setSavedRecord(null);
+                      if (confirm("Discard changes and cancel?")) {
+                        resetFormFields(false);
                       }
                     }}
                     className="py-2 border border-rose-200 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-bold rounded-xl text-xs text-rose-600 dark:text-rose-400 transition-all active:scale-95 cursor-pointer"
@@ -3854,10 +4740,12 @@ const PatientRegistrationForm: React.FC = () => {
                 <button
                   onClick={() => {
                     setShowReceipt(false);
+                    setShowTestSelection(false);
+                    resetFormFields(false);
                     fetchRegistrations();
                   }}
                   className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-500 dark:text-slate-400 cursor-pointer"
-                  title="Close Popup"
+                  title="Close and complete registration"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -3867,8 +4755,10 @@ const PatientRegistrationForm: React.FC = () => {
             {/* 2-Column Layout: Left Side = Options Panel, Right Side = PDF Preview */}
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-100 dark:bg-slate-950">
               {/* LEFT PANEL: Options & Action Cards (No Scrollbar) */}
-              <div className="w-full md:w-[310px] lg:w-[330px] p-4 sm:p-5 bg-slate-50/90 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 print:hidden flex flex-col justify-between overflow-hidden space-y-4 shrink-0">
-                <div className="space-y-4">
+              <div className="w-full md:w-[320px] lg:w-[340px] p-3 sm:p-4 bg-slate-50/90 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 print:hidden flex flex-col h-full overflow-hidden shrink-0">
+                {/* Scrollable Options List */}
+                <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-0">
+
                   {/* Section Title */}
                   <div>
                     <div className="text-xs font-black tracking-wider text-slate-500 uppercase">
@@ -3881,35 +4771,125 @@ const PatientRegistrationForm: React.FC = () => {
 
                   {/* Vertical Stack of Action Cards */}
                   <div className="space-y-2.5">
-                    {/* Option 1: Print Receipt */}
-                    <button
-                      onClick={handlePrintReceipt}
-                      className="w-full py-3 px-3.5 bg-white dark:bg-slate-800 hover:bg-blue-50/70 dark:hover:bg-blue-950/30 border-2 border-blue-400/80 hover:border-blue-500 rounded-xl text-blue-600 dark:text-blue-400 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer shadow-xs"
-                    >
-                      <Printer className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
-                      <div className="text-left">
-                        <div className="font-bold text-xs sm:text-sm">
-                          Print Receipt
+                    {/* Option 1A: Print Receipt (With Header & Footer) */}
+                    <div className="bg-white dark:bg-slate-800 border-2 border-blue-400/80 hover:border-blue-500 rounded-xl transition-all shadow-xs overflow-hidden">
+                      <div className="p-3 flex items-center justify-between gap-2">
+                        <div
+                          onClick={() => {
+                            setModalPreviewType("receipt");
+                            handlePrintReceipt(null, true);
+                          }}
+                          className="flex items-center gap-2.5 flex-1 cursor-pointer"
+                        >
+                          <Printer className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
+                          <div className="text-left">
+                            <div className="font-bold text-xs sm:text-sm text-blue-600 dark:text-blue-400">
+                              Receipt (With Header)
+                            </div>
+                            <div className="text-[10.5px] font-normal text-slate-400">
+                              Official banners & logo watermark • Duplex (Front + Back)
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-[11px] font-normal text-slate-400">
-                          Generate A4 patient receipt copy
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModalPreviewType("receipt");
+                              handlePrintReceipt(null, true);
+                            }}
+                            className="px-2.5 py-1 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors cursor-pointer"
+                            title="Print in-page with Header & Footer"
+                          >
+                            Print
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (savedRecord?._id) {
+                                window.open(
+                                  getApiUrl(
+                                    `/api/admin/registrations/${savedRecord._id}/receipt-pdf?header=true&download=true`,
+                                  ),
+                                  "_blank",
+                                );
+                              }
+                            }}
+                            className="p-1 hover:bg-blue-50 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-md transition-colors cursor-pointer"
+                            title="Download PDF (With Header & Footer)"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
-                    </button>
+                    </div>
 
-                    {/* Option 2: Print Bottle Labels (Exact 50x15mm) */}
+                    {/* Option 1B: Print Receipt (Without Header / Letterhead) */}
+                    <div className="bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 rounded-xl transition-all shadow-xs overflow-hidden">
+                      <div className="p-3 flex items-center justify-between gap-2">
+                        <div
+                          onClick={() => {
+                            setModalPreviewType("receipt-letterhead");
+                            handlePrintReceipt(null, false);
+                          }}
+                          className="flex items-center gap-2.5 flex-1 cursor-pointer"
+                        >
+                          <FileText className="w-5 h-5 text-slate-700 dark:text-slate-300 shrink-0" />
+                          <div className="text-left">
+                            <div className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-200">
+                              Receipt (No Header)
+                            </div>
+                            <div className="text-[10.5px] font-normal text-slate-400">
+                              Clearance for pre-printed letterhead • Duplex (Front + Back)
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setModalPreviewType("receipt-letterhead");
+                              handlePrintReceipt(null, false);
+                            }}
+                            className="px-2.5 py-1 text-[11px] font-bold text-white bg-slate-700 hover:bg-slate-800 rounded-md transition-colors cursor-pointer"
+                            title="Print in-page without Header (Letterhead)"
+                          >
+                            Print
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (savedRecord?._id) {
+                                window.open(
+                                  getApiUrl(
+                                    `/api/admin/registrations/${savedRecord._id}/receipt-pdf?header=false&download=true`,
+                                  ),
+                                  "_blank",
+                                );
+                              }
+                            }}
+                            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-md transition-colors cursor-pointer"
+                            title="Download PDF without Header (Letterhead)"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Option 2: Print Sample Labels (Exact 50x15mm) */}
                     <div className="bg-white dark:bg-slate-800 border-2 border-emerald-400/80 hover:border-emerald-500 rounded-xl transition-all shadow-xs overflow-hidden">
                       <button
                         type="button"
                         onClick={() => handlePrintLabels(0)}
                         className="w-full py-2.5 px-3.5 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 transition-all active:scale-[0.99] flex items-center justify-between cursor-pointer"
-                        title="Print 50×15mm Bottle Label"
+                        title="Print 50×15mm Sample Label"
                       >
                         <div className="flex items-center gap-2.5">
                           <Printer className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                           <div className="text-left">
                             <div className="font-bold text-xs sm:text-sm flex items-center gap-1.5">
-                              <span>Print Bottle Label</span>
+                              <span>Print Sample Label</span>
                               <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-extrabold px-1.5 py-0.5 rounded">
                                 50×15mm
                               </span>
@@ -3972,7 +4952,8 @@ const PatientRegistrationForm: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="space-y-3 pt-2">
+                {/* Always-visible Pinned Bottom Action Buttons */}
+                <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-800 space-y-2 shrink-0 bg-slate-50/90 dark:bg-slate-900">
                   {/* Divider OR */}
                   <div className="relative flex items-center">
                     <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
@@ -3982,16 +4963,34 @@ const PatientRegistrationForm: React.FC = () => {
                     <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
                   </div>
 
-                  {/* Done / Complete Registration */}
+                  {/* Register Next Patient */}
                   <button
+                    type="button"
                     onClick={() => {
                       setShowReceipt(false);
+                      setShowTestSelection(false);
+                      resetFormFields(true);
                       fetchRegistrations();
                     }}
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl transition-all active:scale-[0.99] shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl transition-all active:scale-[0.99] shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <UserPlus className="w-4 h-4 text-white" />
+                    <span>+ Register Next Patient</span>
+                  </button>
+
+                  {/* Done / Complete Registration */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReceipt(false);
+                      setShowTestSelection(false);
+                      resetFormFields(false);
+                      fetchRegistrations();
+                    }}
+                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl transition-all active:scale-[0.99] shadow-md flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4 text-white" />
-                    <span>Done / Complete Registration</span>
+                    <span>Done / Back to Directory</span>
                   </button>
                 </div>
               </div>
@@ -4011,7 +5010,19 @@ const PatientRegistrationForm: React.FC = () => {
                           : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700",
                       )}
                     >
-                      Patient Receipt (A4)
+                      Receipt (With Header)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalPreviewType("receipt-letterhead")}
+                      className={cn(
+                        "px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer",
+                        modalPreviewType === "receipt-letterhead"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700",
+                      )}
+                    >
+                      Receipt (No Header)
                     </button>
                     <button
                       type="button"
@@ -4023,12 +5034,14 @@ const PatientRegistrationForm: React.FC = () => {
                           : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700",
                       )}
                     >
-                      Bottle Label (50×15mm)
+                      Sample Label (50×15mm)
                     </button>
                   </div>
                   <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline">
                     {modalPreviewType === "receipt"
-                      ? "A4 Patient Bill Preview"
+                      ? "A4 Patient Bill (Official Header & Footer)"
+                      : modalPreviewType === "receipt-letterhead"
+                      ? "A4 Patient Bill (Pre-printed Letterhead Clearance)"
                       : "Seznik 50×15mm Label Preview"}
                   </span>
                 </div>
@@ -4036,11 +5049,21 @@ const PatientRegistrationForm: React.FC = () => {
                 <div className="flex-1 overflow-hidden relative rounded-xl border border-slate-200 dark:border-slate-800 bg-white">
                   {modalPreviewType === "receipt" ? (
                     <iframe
+                      key={`receipt-header-${savedRecord._id}`}
                       src={getApiUrl(
-                        `/api/admin/registrations/${savedRecord._id}/receipt-html?v=${savedRecord._id}`,
+                        `/api/admin/registrations/${savedRecord._id}/receipt-html?v=${savedRecord._id}&header=true`,
                       )}
                       className="w-full h-full rounded-xl border-none shadow-sm bg-white"
-                      title="Patient Receipt Preview"
+                      title="Patient Receipt Preview (With Header)"
+                    />
+                  ) : modalPreviewType === "receipt-letterhead" ? (
+                    <iframe
+                      key={`receipt-letterhead-${savedRecord._id}`}
+                      src={getApiUrl(
+                        `/api/admin/registrations/${savedRecord._id}/receipt-html?v=${savedRecord._id}&header=false`,
+                      )}
+                      className="w-full h-full rounded-xl border-none shadow-sm bg-white"
+                      title="Patient Receipt Preview (No Header / Letterhead)"
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-900 overflow-y-auto">
@@ -4060,7 +5083,7 @@ const PatientRegistrationForm: React.FC = () => {
                           type="button"
                           onClick={() => handlePrintLabels(0)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer ml-auto"
-                          title="Print 50×15mm Bottle Label"
+                          title="Print 50×15mm Sample Label"
                         >
                           <Printer className="w-3.5 h-3.5" />
                           <span>Print Label</span>
@@ -4083,7 +5106,7 @@ const PatientRegistrationForm: React.FC = () => {
                             height: "108px",
                           }}
                           className="rounded-lg border-2 border-emerald-500 shadow-md bg-white overflow-hidden transition-all duration-300"
-                          title="Bottle Label Live Preview"
+                          title="Sample Label Live Preview"
                         />
                       </div>
 
@@ -4095,7 +5118,7 @@ const PatientRegistrationForm: React.FC = () => {
                           className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                         >
                           <Printer className="w-4 h-4" />
-                          <span>Print Bottle Label (50×15mm)</span>
+                          <span>Print Sample Label (50×15mm)</span>
                         </button>
                       </div>
 
@@ -4164,6 +5187,7 @@ const PatientRegistrationForm: React.FC = () => {
               : "Y";
             const ageDisplay = ageValue ? `${ageValue} ${ageType}` : "N/A";
             const genderDisplay = (savedRecord.gender || "N/A").toUpperCase();
+            const patientId = (savedRecord.registrationNumber || savedRecord.patientId || "").toUpperCase().trim();
             const patientName = (savedRecord.patientName || "PATIENT").toUpperCase().trim();
 
             // Dynamic scaling for name to fit within 44mm without truncation
@@ -4204,8 +5228,11 @@ const PatientRegistrationForm: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Line 2: AGE: and G: */}
+                  {/* Line 2: ID, AGE: and G: */}
                   <div className="label-text-row demo-row">
+                    <div>
+                      <span className="label-field-key">ID:</span>&nbsp;<span className="label-field-val label-id-val">{patientId || "N/A"}</span>
+                    </div>
                     <div>
                       <span className="label-field-key">AGE:</span>&nbsp;<span className="label-field-val">{ageDisplay}</span>
                     </div>
@@ -4306,7 +5333,7 @@ const PatientRegistrationForm: React.FC = () => {
         max-width: 48.5mm !important;
         box-sizing: border-box !important;
         margin: 0 !important;
-        padding: 4.0mm 0.8mm 0 0.8mm !important;
+        padding: 3.2mm 0.8mm 0 0.8mm !important;
         display: block !important;
         text-align: left !important;
         background: white !important;
@@ -4330,7 +5357,7 @@ const PatientRegistrationForm: React.FC = () => {
 
       .name-row {
         white-space: nowrap !important;
-        line-height: 1.15 !important;
+        line-height: 1.1 !important;
         margin-bottom: 0.15mm !important;
       }
 
@@ -4338,7 +5365,14 @@ const PatientRegistrationForm: React.FC = () => {
         white-space: nowrap !important;
         line-height: 1.15 !important;
         margin-bottom: 0.15mm !important;
-        gap: 2.5mm !important;
+        gap: 1.8mm !important;
+      }
+
+      .label-id-val {
+        font-size: 6.2px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.1px !important;
+        color: black !important;
       }
 
       .label-test-row {
@@ -4441,6 +5475,24 @@ const PatientRegistrationForm: React.FC = () => {
     }
   `}</style>
       )}
+            {/* Update Due Amount & Payment Modal */}
+      <UpdateDueModal
+        record={dueModalRecord}
+        isOpen={isDueModalOpen}
+        onClose={() => {
+          setIsDueModalOpen(false);
+          setDueModalRecord(null);
+        }}
+        adminQrCode={adminQrCode}
+        onSuccess={() => {
+          fetchRegistrations();
+        }}
+        onPrintReceipt={(rec) => {
+          setSavedRecord(rec);
+          setPrintType("receipt");
+          setShowReceipt(true);
+        }}
+      />
       {/* Official Pathology Report Modal */}
       <PathologyReportModal
         record={reportModalRecord}

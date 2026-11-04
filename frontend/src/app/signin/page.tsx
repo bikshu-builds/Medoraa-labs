@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -23,6 +23,16 @@ export default function UnifiedSignIn() {
     const [role, setRole] = useState<Role>("admin");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
+    const [notice, setNotice] = useState("");
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get("reason") === "session_expired") {
+                setNotice("Your session has expired after 7 days. Please sign in again.");
+            }
+        }
+    }, []);
 
     // Form States
     const [identifier, setIdentifier] = useState("");
@@ -146,6 +156,12 @@ export default function UnifiedSignIn() {
 
                     <div className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/60 border border-slate-100 relative overflow-hidden">
 
+                        {notice && (
+                            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-amber-700 text-xs font-bold animate-in fade-in duration-300">
+                                <ShieldCheck className="w-4 h-4 shrink-0 text-amber-600" />
+                                {notice}
+                            </div>
+                        )}
                         {error && (
                             <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 text-xs font-bold animate-in shake duration-300">
                                 <Lock className="w-4 h-4" />

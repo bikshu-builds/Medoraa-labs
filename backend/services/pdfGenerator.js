@@ -1,6 +1,48 @@
 const puppeteer = require("puppeteer");
+const { attachDuplexBackside } = require("./pdfDuplexMerger");
+const fs = require("fs");
+const path = require("path");
 
 let browserInstance = null;
+
+let cachedAssets = null;
+
+function getLetterheadAssets(forceReload = false) {
+  if (cachedAssets && !forceReload) return cachedAssets;
+
+  let headerBase64 = "";
+  let footerBase64 = "";
+  let logoBase64 = "";
+
+  const candidateDirs = [
+    path.join(__dirname, "../assets/logos"),
+    path.join(__dirname, "../../frontend/public/images/logos"),
+    path.join(__dirname, "../../frontend/public/images/logo's"),
+  ];
+
+  for (const dir of candidateDirs) {
+    try {
+      const hPath = path.join(dir, "header.png");
+      const fPath = path.join(dir, "footer.png");
+      const lPath = path.join(dir, "logo.png");
+
+      if (!headerBase64 && fs.existsSync(hPath)) {
+        headerBase64 = `data:image/png;base64,${fs.readFileSync(hPath).toString("base64")}`;
+      }
+      if (!footerBase64 && fs.existsSync(fPath)) {
+        footerBase64 = `data:image/png;base64,${fs.readFileSync(fPath).toString("base64")}`;
+      }
+      if (!logoBase64 && fs.existsSync(lPath)) {
+        logoBase64 = `data:image/png;base64,${fs.readFileSync(lPath).toString("base64")}`;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  cachedAssets = { headerBase64, footerBase64, logoBase64 };
+  return cachedAssets;
+}
 
 async function getBrowser() {
   if (!browserInstance || !browserInstance.isConnected()) {
@@ -50,7 +92,10 @@ async function resetBrowser() {
  * @param {Object} record Patient registration document
  * @returns {Promise<Buffer>} PDF Buffer
  */
-async function generatePathologyPDF(record) {
+function buildPathologyReportHTML(record, options = {}) {
+    const includeHeaderFooter = options.includeHeaderFooter !== false;
+    const includeWatermark = options.watermark !== false;
+    const { headerBase64, footerBase64, logoBase64 } = getLetterheadAssets();
     const todayDate = new Date().toLocaleDateString("en-GB");
 
     // Extract test results and map with populated test details for category / classification
@@ -134,6 +179,46 @@ async function generatePathologyPDF(record) {
 
     const categoryKeys = Object.keys(categoryGroups);
 
+    // Build paginated report pages: strictly maximum 8 tests per page, category-wise
+    const TESTS_PER_PAGE = 8;
+    const reportPages = [];
+
+    categoryKeys.forEach((categoryName) => {
+        const catItems = categoryGroups[categoryName] || [];
+        const totalCatTests = catItems.length;
+
+        if (totalCatTests === 0) {
+            reportPages.push({
+                categoryName,
+                items: [],
+                pageInCat: 1,
+                totalCatPages: 1,
+                isContinuation: false,
+                isLastInCat: true,
+            });
+            return;
+        }
+
+        const totalCatPages = Math.ceil(totalCatTests / TESTS_PER_PAGE);
+        for (let i = 0; i < totalCatTests; i += TESTS_PER_PAGE) {
+            const pageItems = catItems.slice(i, i + TESTS_PER_PAGE);
+            const pageInCat = Math.floor(i / TESTS_PER_PAGE) + 1;
+            const isContinuation = i > 0;
+            const isLastInCat = (i + TESTS_PER_PAGE) >= totalCatTests;
+
+            reportPages.push({
+                categoryName,
+                items: pageItems,
+                pageInCat,
+                totalCatPages,
+                isContinuation,
+                isLastInCat,
+            });
+        }
+    });
+
+    const totalReportPages = reportPages.length;
+
     // Format sample text
     let sampleTypeText = "Clot-Act, Urine";
     if (record.sampleReceived) {
@@ -160,220 +245,360 @@ async function generatePathologyPDF(record) {
         <style>
             @page {
                 size: A4;
-                margin: 10mm 15mm 10mm 15mm;
+                margin: 0;
             }
             * {
                 box-sizing: border-box;
-            }
-            body {
-                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-                color: #111827;
                 margin: 0;
                 padding: 0;
+            }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                color: #0f172a;
                 background-color: #ffffff;
+                padding: 0;
+                margin: 0;
+                font-size: 11px;
+                line-height: 1.4;
                 -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
             .report-page {
-                box-sizing: border-box;
-                min-height: 270mm;
+                min-height: 297mm;
+                max-height: 297mm;
+                height: 297mm;
+                position: relative;
                 display: flex;
                 flex-direction: column;
-                justify-content: flex-start;
+                justify-content: space-between;
                 page-break-after: always;
                 break-after: page;
+                box-sizing: border-box;
+                background: #ffffff;
+                overflow: hidden;
             }
-            .report-page:last-child {
+            .report-page.last-page {
                 page-break-after: auto;
                 break-after: auto;
             }
-            .demographics-table {
+            .report-page-header-banner {
                 width: 100%;
-                border-collapse: collapse;
-                border: 1.5px solid #000000;
-                margin-bottom: 20px;
-                font-size: 9px;
+                flex-shrink: 0;
             }
-            .demographics-table td {
-                padding: 5px 8px;
-                border: 1px solid #000000;
-                vertical-align: middle;
+            .report-page-header-banner img {
+                width: 100%;
+                display: block;
             }
-            .label {
-                font-weight: 800;
-                text-transform: uppercase;
+            .report-page-footer-banner {
+                width: 100%;
+                flex-shrink: 0;
+                margin-top: auto;
             }
-            .val {
-                font-weight: 700;
+            .report-page-footer-banner img {
+                width: 100%;
+                display: block;
             }
-            .category-block {
+            .letterhead-clearance-top {
+                height: 32mm;
+                flex-shrink: 0;
+            }
+            .letterhead-clearance-bottom {
+                height: 22mm;
+                flex-shrink: 0;
+                margin-top: auto;
+            }
+            .watermark-layer {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 300px;
+                height: 300px;
+                opacity: 0.07;
+                pointer-events: none;
+                z-index: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .watermark-layer img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+            }
+            .report-content {
                 flex: 1;
+                position: relative;
+                z-index: 1;
+                display: flex;
+                flex-direction: column;
+                padding: 0 32px;
             }
-            .category-title {
-                text-align: center;
-                font-size: 13px;
-                font-weight: 900;
-                text-transform: uppercase;
-                text-decoration: underline;
-                margin-bottom: 18px;
+            /* Clean Patient Card matching Medoraa letterhead style */
+            .patient-card {
+                border: 1.5px solid #cbd5e1;
+                border-radius: 8px;
+                background: #ffffff;
+                margin: 16px 0 16px 0;
+                overflow: hidden;
+            }
+            .patient-card-row {
+                display: flex;
+                border-bottom: 1px solid #cbd5e1;
+            }
+            .patient-card-row.last-row {
+                border-bottom: none;
+            }
+            .patient-card-cell {
+                padding: 7px 14px;
+                box-sizing: border-box;
+            }
+            .patient-card-cell.with-divider {
+                border-right: 1px solid #cbd5e1;
+            }
+            .meta-label {
+                font-size: 9px;
+                font-weight: 700;
+                color: #64748b;
                 letter-spacing: 0.5px;
+                text-transform: uppercase;
+                margin-bottom: 2px;
             }
+            .meta-val {
+                font-size: 12.5px;
+                font-weight: 800;
+                color: #0f172a;
+                line-height: 1.25;
+            }
+            /* Category Section Heading */
+            .category-heading {
+                font-size: 13px;
+                font-weight: 800;
+                color: #0f172a;
+                margin: 10px 0 8px 0;
+                padding-bottom: 4px;
+                border-bottom: 1.5px solid #0f172a;
+                letter-spacing: 0.3px;
+            }
+            /* Results Table: Orange Health Labs minimal style */
             .results-table {
                 width: 100%;
                 border-collapse: collapse;
                 font-size: 11px;
-                margin-bottom: 16px;
+                margin-bottom: 4px;
             }
             .results-table th {
-                border-bottom: 2px solid #000000;
-                padding: 6px;
+                border-bottom: 1.5px solid #cbd5e1;
+                padding: 7px 8px;
                 text-align: left;
-                font-weight: 800;
+                font-weight: 700;
+                font-size: 10px;
                 text-transform: uppercase;
+                color: #64748b;
             }
             .results-table td {
-                padding: 6px;
-                border-bottom: 1px solid #e5e7eb;
+                padding: 7px 8px;
+                border-bottom: 1px solid #f1f5f9;
                 vertical-align: top;
+                color: #0f172a;
             }
-            .test-method {
-                font-size: 10.5px;
-                margin-top: 20px;
-                color: #1f2937;
+            .results-table td.result-val {
+                font-weight: 800;
+                color: #0f172a;
             }
-            .test-method-label {
-                font-weight: 900;
+            .results-table td.ref-range {
+                color: #475569;
+                font-size: 10px;
+                white-space: pre-line;
+            }
+            .test-method-line {
+                font-size: 9px;
+                color: #64748b;
+                font-style: italic;
+                margin: 4px 0 14px 4px;
             }
             .footer-note {
-                font-size: 10px;
-                font-weight: 800;
-                color: #000000;
-                margin-top: 8px;
-            }
-            .signature-block {
-                text-align: right;
-                font-size: 11px;
-                margin-top: 30px;
-            }
-            .signature-name {
-                font-family: Georgia, serif;
+                font-size: 9px;
+                color: #64748b;
                 font-style: italic;
-                font-weight: bold;
-                font-size: 20px;
+                margin-bottom: 10px;
+            }
+            /* Signature Block — Left Aligned (Orange Health Labs style) */
+            .signature-section {
+                margin-top: 24px;
+                margin-bottom: 10px;
+            }
+            .approved-label {
+                font-size: 9.5px;
+                color: #64748b;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
                 margin-bottom: 2px;
             }
-            .signature-title {
-                font-weight: 800;
+            .sig-name {
+                font-family: Georgia, 'Times New Roman', serif;
+                font-style: italic;
+                font-size: 20px;
+                font-weight: 700;
+                color: #0f172a;
+                line-height: 1.2;
+                margin-bottom: 2px;
             }
-            .signature-sub {
-                color: #4b5563;
+            .sig-details {
+                font-size: 10px;
+                font-weight: 700;
+                color: #1e293b;
+            }
+            .sig-role {
+                font-size: 9.5px;
+                color: #64748b;
+                font-weight: 500;
+            }
+            .page-number {
+                font-size: 9px;
+                color: #94a3b8;
                 font-weight: 600;
+                text-align: right;
+                margin-top: auto;
+                margin-bottom: 4px;
             }
         </style>
     </head>
     <body>
-        ${categoryKeys.map((categoryName) => {
-            const items = categoryGroups[categoryName];
-            
-            let titleDisplay = categoryName.trim().toUpperCase().replace(/#+$/, "").trim();
-            if (!titleDisplay.endsWith("REPORT")) {
-                titleDisplay = `${titleDisplay} REPORT`;
+        ${reportPages.map((pageData, pageIndex) => {
+            const { categoryName, items, isLastInCat } = pageData;
+            const isLastPage = pageIndex === totalReportPages - 1;
+
+            let titleDisplay = categoryName.trim().replace(/#+$/, "").trim();
+            if (titleDisplay === titleDisplay.toUpperCase()) {
+                titleDisplay = titleDisplay.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
             }
 
-            const methodText = items[0]?.method && items[0].method !== "-" 
-                ? items[0].method 
+            const methodText = items[0]?.method && items[0].method !== "-"
+                ? items[0].method
                 : "Enzyme Kinetic Assay; Fully Automated Laboratory Analyzer";
 
             return `
-                <div class="report-page">
-                    <!-- Page Header: Demographics Table -->
-                    <div class="page-header">
-                        <table class="demographics-table">
-                            <tr>
-                                <td style="width: 58%;">
-                                    <span class="label">NAME :</span> <span class="val">${record.patientName}</span>
-                                </td>
-                                <td style="width: 42%;">
-                                    <span class="label">Age :</span> <span class="val">${patientAge}</span> &nbsp;&nbsp;&nbsp;&nbsp;
-                                    <span class="label">Sex :</span> <span class="val">${patientGender}</span>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <span class="label">Ref/Dr :</span> <span class="val">${record.referredBy || "SELF (Self)"}</span>
-                                </td>
-                                <td>
-                                    <span class="label">Registration Date :</span> <span class="val">${record.registrationDate || todayDate}</span>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <span class="label">Sample Drawn By :</span> <span class="val">${sampleDrawnByText}</span>
-                                </td>
-                                <td>
-                                    <span class="label">Report Issued Date :</span> <span class="val">${reportIssuedDate}</span>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <span class="label">SAMPLE :</span> <span class="val">${sampleTypeText}</span>
-                                </td>
-                                <td>
-                                    <span class="label">Report No :</span> <span class="val" style="font-family: monospace;">${record.registrationNumber}</span>
-                                </td>
-                            </tr>
-                        </table>
+                <div class="report-page ${isLastPage ? 'last-page' : ''}">
+                    ${includeWatermark && logoBase64 ? `
+                    <div class="watermark-layer">
+                        <img src="${logoBase64}" alt="Watermark" />
                     </div>
+                    ` : ""}
 
-                    <!-- Page Body: Category Test Results -->
-                    <div class="category-block">
-                        <div class="category-title">${titleDisplay}</div>
-                        <table class="results-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 42%;">Test Name</th>
-                                    <th style="width: 25%;">Observed Value</th>
-                                    <th style="width: 33%;">Reference Range</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${items.map(item => `
-                                    <tr>
-                                        <td style="font-weight: 700;">${item.testName}</td>
-                                        <td style="font-weight: 800;">${item.resultValue || "—"} ${item.unit || ""}</td>
-                                        <td style="white-space: pre-line;">${item.referenceRange || "-"}</td>
-                                    </tr>
-                                `).join("")}
-                            </tbody>
-                        </table>
+                    <!-- Header Banner -->
+                    ${includeHeaderFooter && headerBase64 ? `
+                    <div class="report-page-header-banner">
+                        <img src="${headerBase64}" alt="Medoraa Labs" />
+                    </div>
+                    ` : `
+                    <div class="letterhead-clearance-top"></div>
+                    `}
 
-                        <div class="test-method">
-                            <span class="test-method-label">Test Method :-</span> ${methodText}
-                        </div>
-
-                        <div class="footer-note">
-                            NOTE : Please Correlate Clinically. If Any Discrepancy, Please Contact.
-                        </div>
-
-                        ${record.notes ? `
-                            <div style="margin-top: 15px; font-size: 11px;">
-                                <span style="font-weight: 800; text-transform: uppercase;">Clinical Remarks:</span>
-                                <span style="font-style: italic;">${record.notes}</span>
+                    <!-- Content -->
+                    <div class="report-content">
+                        <div>
+                            <!-- Patient Demographics Card -->
+                            <div class="patient-card">
+                                <div class="patient-card-row">
+                                    <div class="patient-card-cell with-divider" style="width: 50%;">
+                                        <div class="meta-label">REGISTRATION NO.</div>
+                                        <div class="meta-val">${record.registrationNumber}</div>
+                                    </div>
+                                    <div class="patient-card-cell" style="width: 50%;">
+                                        <div class="meta-label">DATE &amp; TIME</div>
+                                        <div class="meta-val">${record.registrationDate || todayDate} ${record.registrationTime ? `| ${record.registrationTime}` : ""}</div>
+                                    </div>
+                                </div>
+                                <div class="patient-card-row">
+                                    <div class="patient-card-cell with-divider" style="width: 50%;">
+                                        <div class="meta-label">PATIENT NAME</div>
+                                        <div class="meta-val" style="text-transform: uppercase;">${record.patientName}</div>
+                                    </div>
+                                    <div class="patient-card-cell" style="width: 50%;">
+                                        <div class="meta-label">AGE / GENDER</div>
+                                        <div class="meta-val">${patientAge} / ${patientGender}</div>
+                                    </div>
+                                </div>
+                                <div class="patient-card-row last-row">
+                                    <div class="patient-card-cell with-divider" style="width: 50%;">
+                                        <div class="meta-label">REF. BY</div>
+                                        <div class="meta-val">${(record.referredBy || "Self").replace(/\s*\(Medoraa Labs\s*\(Our Lab\)\)/gi, "").replace(/\s*\(Our Lab\)/gi, "").replace(/\s*\(Medoraa Labs\)/gi, "").trim() || "Self"}</div>
+                                    </div>
+                                    <div class="patient-card-cell" style="width: 50%;">
+                                        <div class="meta-label">SAMPLE TYPE</div>
+                                        <div class="meta-val">${sampleTypeText}</div>
+                                    </div>
+                                </div>
                             </div>
-                        ` : ""}
 
-                        <!-- Pathologist Signature -->
-                        <div class="signature-block">
-                            <div class="signature-name">${pathologistName}</div>
-                            <div class="signature-title">Dr.Ravi Kumar Manyam; Ph.D</div>
-                            <div class="signature-sub">Biochemist & Pathologist</div>
+                            <!-- Category Section Heading -->
+                            <div class="category-heading">${titleDisplay}</div>
+
+                            <!-- Results Table -->
+                            <table class="results-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 42%;">Test</th>
+                                        <th style="width: 24%;">Result</th>
+                                        <th style="width: 34%;">Biological Reference Interval</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${items.map(item => `
+                                        <tr>
+                                            <td style="font-weight: 600;">${item.testName}</td>
+                                            <td class="result-val">${item.resultValue || "—"} ${item.unit || ""}</td>
+                                            <td class="ref-range">${item.referenceRange || "-"}</td>
+                                        </tr>
+                                    `).join("")}
+                                </tbody>
+                            </table>
+                            <div class="test-method-line">${sampleTypeText} | ${methodText}</div>
+
+                            ${isLastPage && record.notes ? `
+                                <div style="font-size: 10px; color: #334155; margin-bottom: 8px;">
+                                    <strong>Clinical Remarks:</strong> <em>${record.notes}</em>
+                                </div>
+                            ` : ""}
+
+                            <div class="footer-note">Note: Please correlate clinically. Contact us for any discrepancy.</div>
+
+                            <!-- Pathologist Signature Directly Below Note -->
+                            <div class="signature-section">
+                                <div class="approved-label">Approved by</div>
+                                <div class="sig-name">${pathologistName}</div>
+                                <div class="sig-details">Dr. Ravi Kumar Manyam, Ph.D</div>
+                                <div class="sig-role">Biochemist &amp; Pathologist</div>
+                            </div>
                         </div>
+
+                        <div class="page-number">Page ${pageIndex + 1} of ${totalReportPages}</div>
                     </div>
+
+                    <!-- Footer Banner -->
+                    ${includeHeaderFooter && footerBase64 ? `
+                    <div class="report-page-footer-banner">
+                        <img src="${footerBase64}" alt="Medoraa Labs Footer" />
+                    </div>
+                    ` : `
+                    <div class="letterhead-clearance-bottom"></div>
+                    `}
                 </div>
+
+
             `;
         }).join("")}
     </body>
     </html>
     `;
+
+    return htmlContent;
+}
+
+async function generatePathologyPDF(record, options = {}) {
+    const htmlContent = buildPathologyReportHTML(record, { ...options, forPdf: true });
 
     // Acquire singleton/reused browser instance
     let browser;
@@ -386,13 +611,13 @@ async function generatePathologyPDF(record) {
             format: "A4",
             printBackground: true,
             margin: {
-                top: "10mm",
-                bottom: "10mm",
-                left: "15mm",
-                right: "15mm"
+                top: "0mm",
+                bottom: "0mm",
+                left: "0mm",
+                right: "0mm"
             }
         });
-        return pdfBuffer;
+        return await attachDuplexBackside(pdfBuffer, options);
     } catch (err) {
         await resetBrowser();
         throw err;
@@ -703,7 +928,10 @@ async function generateTransferLabelPDF(record, hospitalDoc = null) {
  * @param {Object} record Patient registration document
  * @returns {string} HTML string
  */
-function buildReceiptHTML(record, autoPrint = false) {
+function buildReceiptHTML(record, autoPrint = false, options = {}) {
+    const includeHeaderFooter = options.includeHeaderFooter !== false;
+    const includeWatermark = options.watermark !== false;
+    const { headerBase64, footerBase64, logoBase64 } = getLetterheadAssets();
     const regNo = record.registrationNumber || record._id;
     const barcodeSVG = generateCode128SVG(regNo);
     const dateStr = record.registrationDate || new Date().toLocaleDateString("en-GB");
@@ -724,9 +952,7 @@ function buildReceiptHTML(record, autoPrint = false) {
     const totalAmount = (record.totalAmount !== undefined && record.totalAmount > 0 && record.totalAmount !== subtotal)
         ? record.totalAmount
         : computedTotalAmount;
-    const paidAmount = (record.paidAmount !== undefined && record.paidAmount > 0 && record.paidAmount !== subtotal)
-        ? record.paidAmount
-        : (record.paid !== undefined && record.paid > 0 ? record.paid : totalAmount);
+    const paidAmount = record.paidAmount !== undefined ? Number(record.paidAmount) : (record.paid !== undefined ? Number(record.paid) : totalAmount);
     const balanceDue = Math.max(0, totalAmount - paidAmount);
     const paymentMethod = record.paymentMethod || "Cash";
 
@@ -748,7 +974,7 @@ function buildReceiptHTML(record, autoPrint = false) {
         <style>
             @page {
                 size: A4;
-                margin: 10mm 12mm 10mm 12mm;
+                margin: 0;
             }
             * {
                 box-sizing: border-box;
@@ -756,11 +982,12 @@ function buildReceiptHTML(record, autoPrint = false) {
                 padding: 0;
             }
             body {
-                font-family: 'Georgia', 'Times New Roman', serif;
-                color: #000000;
-                background-color: #f5f5f5;
-                padding: 16px;
-                font-size: 12px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                color: #0f172a;
+                background-color: #ffffff;
+                padding: 0;
+                margin: 0;
+                font-size: 11.5px;
                 line-height: 1.4;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
@@ -769,332 +996,399 @@ function buildReceiptHTML(record, autoPrint = false) {
                 body {
                     background-color: #ffffff;
                     padding: 0;
+                    margin: 0;
                 }
                 .no-print { display: none !important; }
-                .page-break { page-break-after: always; }
-                .receipt-container { margin-bottom: 0 !important; }
+                .page-break { page-break-after: always; break-after: page; }
             }
-            .receipt-container {
-                border: 2px solid #000000;
-                padding: 16px;
+            .page-wrapper {
+                display: flex;
+                flex-direction: column;
+                min-height: 297mm;
+                max-height: 297mm;
+                height: 297mm;
+                position: relative;
+                box-sizing: border-box;
                 background: #ffffff;
+                overflow: hidden;
+            }
+            .page-wrapper.page-break {
+                page-break-after: always;
+                break-after: page;
+            }
+            .page-header-banner {
+                width: 100%;
+                flex-shrink: 0;
+                margin: 0;
+                padding: 0;
+                line-height: 0;
+            }
+            .page-header-banner img {
+                width: 100%;
+                display: block;
+            }
+            .page-footer-banner {
+                width: 100%;
+                flex-shrink: 0;
+                margin-top: auto;
+            }
+            .page-footer-banner img {
+                width: 100%;
+                display: block;
+            }
+            .page-letterhead-clearance-top {
+                height: 32mm;
+                flex-shrink: 0;
+            }
+            .page-letterhead-clearance-bottom {
+                height: 22mm;
+                flex-shrink: 0;
+                margin-top: auto;
+            }
+            .receipt-body {
+                flex: 1;
+                position: relative;
+                z-index: 1;
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
-                height: 276mm;
-                max-width: 185mm;
-                margin: 0 auto 20px auto;
+                padding: 0;
             }
-            .header-table {
+            .receipt-watermark {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 300px;
+                height: 300px;
+                opacity: 0.07;
+                pointer-events: none;
+                z-index: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .receipt-watermark img {
                 width: 100%;
-                border-bottom: 3px double #000000;
-                padding-bottom: 12px;
-                margin-bottom: 15px;
+                height: 100%;
+                object-fit: contain;
             }
-            .brand-title {
-                font-family: 'Helvetica Neue', Arial, sans-serif;
-                font-size: 24px;
-                font-weight: 900;
-                letter-spacing: 2px;
-                text-transform: uppercase;
-                color: #000000;
+            .receipt-content-inner {
+                position: relative;
+                z-index: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                flex: 1;
+                padding: 0 32px;
             }
-            .brand-sub {
-                font-family: 'Helvetica Neue', Arial, sans-serif;
-                font-size: 9px;
-                font-weight: 700;
-                letter-spacing: 1.5px;
-                text-transform: uppercase;
-                color: #333333;
-                margin-top: 2px;
+            /* Clean Patient Card matching exact user reference */
+            .patient-card {
+                border: 1.5px solid #cbd5e1;
+                border-radius: 8px;
+                background: #ffffff;
+                margin: 16px 0 18px 0;
+                overflow: hidden;
             }
-            .header-contact {
-                font-family: Arial, sans-serif;
-                font-size: 9.5px;
-                text-align: right;
-                color: #222222;
-                line-height: 1.4;
+            .patient-card-row {
+                display: flex;
+                border-bottom: 1px solid #cbd5e1;
             }
-            .title-banner {
-                text-align: center;
-                border: 1px solid #000000;
-                background-color: #f8f8f8;
-                padding: 6px;
-                font-family: Arial, sans-serif;
-                font-weight: 800;
-                font-size: 13px;
-                letter-spacing: 1.5px;
-                text-transform: uppercase;
-                margin-bottom: 15px;
+            .patient-card-row.last-row {
+                border-bottom: none;
             }
-            .meta-grid {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 15px;
+            .patient-card-cell {
+                padding: 7px 14px;
+                box-sizing: border-box;
             }
-            .meta-grid td {
-                padding: 6px 8px;
-                border: 1px solid #000000;
-                vertical-align: top;
-                font-size: 11px;
+            .patient-card-cell.with-divider {
+                border-right: 1px solid #cbd5e1;
             }
             .meta-label {
-                font-family: Arial, sans-serif;
+                font-size: 9px;
                 font-weight: 700;
+                color: #64748b;
+                letter-spacing: 0.5px;
                 text-transform: uppercase;
-                font-size: 10px;
-                color: #333333;
+                margin-bottom: 2px;
             }
             .meta-val {
-                font-weight: 700;
-                color: #000000;
+                font-size: 12.5px;
+                font-weight: 800;
+                color: #0f172a;
+                line-height: 1.25;
+            }
+            .section-title {
+                font-size: 10.5px;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                color: #1e293b;
+                margin-bottom: 6px;
             }
             .items-table {
                 width: 100%;
                 border-collapse: collapse;
-                margin-bottom: 15px;
-                font-size: 11px;
+                margin-bottom: 14px;
+                font-size: 10.5px;
             }
             .items-table th {
-                font-family: Arial, sans-serif;
-                background-color: #f0f0f0;
-                border: 1px solid #000000;
-                padding: 8px;
+                background-color: #f8fafc;
+                border-top: 1.5px solid #cbd5e1;
+                border-bottom: 1.5px solid #cbd5e1;
+                padding: 6px 8px;
                 text-align: left;
-                font-weight: 800;
-                font-size: 10px;
+                font-weight: 700;
+                font-size: 9.5px;
                 text-transform: uppercase;
+                color: #475569;
             }
             .items-table td {
-                border: 1px solid #000000;
-                padding: 8px;
+                padding: 6px 8px;
+                border-bottom: 1px solid #e2e8f0;
                 vertical-align: middle;
+                color: #0f172a;
             }
             .summary-table {
-                width: 45%;
+                width: 48%;
                 margin-left: auto;
                 border-collapse: collapse;
-                margin-bottom: 20px;
+                margin-bottom: 14px;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                overflow: hidden;
             }
             .summary-table td {
-                padding: 6px 10px;
-                border: 1px solid #000000;
-                font-size: 11px;
+                padding: 5px 10px;
+                border-bottom: 1px solid #e2e8f0;
+                font-size: 10.5px;
             }
             .summary-label {
-                font-family: Arial, sans-serif;
                 font-weight: 700;
                 text-align: right;
                 text-transform: uppercase;
-                font-size: 10px;
+                font-size: 9.5px;
+                color: #475569;
             }
             .summary-val {
                 text-align: right;
                 font-weight: 800;
-                font-family: monospace;
-                font-size: 12px;
+                font-size: 11px;
+                color: #0f172a;
             }
             .total-row td {
-                background-color: #f8f8f8;
-                font-size: 13px;
+                background-color: #f1f5f9;
+                font-size: 11.5px;
             }
             .barcode-section {
                 text-align: center;
-                margin-top: 15px;
-                margin-bottom: 25px;
+                margin-top: 10px;
+                margin-bottom: 16px;
             }
             .barcode-box {
                 display: inline-block;
-                width: 220px;
+                width: 210px;
             }
             .barcode-num {
                 font-family: monospace;
-                font-size: 11px;
+                font-size: 10.5px;
                 font-weight: 800;
                 letter-spacing: 2px;
                 margin-top: 3px;
+                color: #1e293b;
             }
             .signature-section {
                 display: flex;
                 justify-content: space-between;
                 align-items: flex-end;
-                margin-top: 30px;
-                padding-top: 10px;
-                font-family: Arial, sans-serif;
-                font-size: 10px;
+                margin-top: 20px;
+                padding-top: 8px;
+                font-size: 9.5px;
                 font-weight: 700;
+                color: #334155;
             }
             .sig-box {
                 text-align: center;
-                width: 200px;
+                width: 190px;
             }
             .sig-line {
-                border-top: 1px solid #000000;
-                margin-bottom: 5px;
+                border-top: 1px solid #94a3b8;
+                margin-bottom: 4px;
             }
             .footer-note {
-                font-family: Arial, sans-serif;
-                font-size: 9.5px;
+                font-size: 9px;
                 text-align: center;
-                font-weight: 700;
-                border-top: 1px dashed #000000;
-                padding-top: 8px;
-                margin-top: 20px;
+                color: #64748b;
+                border-top: 1px dashed #cbd5e1;
+                padding-top: 6px;
+                margin-top: 12px;
+                margin-bottom: 8px;
             }
         </style>
     </head>
     <body>
         ${testChunks.map((chunk, chunkIndex) => {
             const isLastPage = chunkIndex === testChunks.length - 1;
-            const pageBreakClass = !isLastPage ? "page-break" : "";
             
             return `
-        <div class="receipt-container ${pageBreakClass}">
-            <div>
-                <!-- Classic Header -->
-                <table class="header-table">
-                    <tr>
-                        <td>
-                            <div class="brand-title">MEDORAA LABS</div>
-                            <div class="brand-sub">DIAGNOSTIC & PATHOLOGY CLINICAL MANAGEMENT SYSTEM</div>
-                        </td>
-                        <td class="header-contact">
-                            <div>Medoraa HQ, Road No 10, Banjara Hills</div>
-                            <div>Hyderabad - 500034</div>
-                            <div>Tel: +91 40 2345 6789</div>
-                            <div>Email: contact@medoraalabs.com</div>
-                        </td>
-                    </tr>
-                </table>
+        <div class="page-wrapper ${!isLastPage ? 'page-break' : ''}">
 
-                <!-- Receipt Title -->
-                <div class="title-banner">
-                    Patient Registration Acknowledgement & Bill Receipt ${testChunks.length > 1 ? `(Page ${chunkIndex + 1} of ${testChunks.length})` : ""}
+            <!-- FULL-WIDTH HEADER BANNER -->
+            ${includeHeaderFooter && headerBase64 ? `
+            <div class="page-header-banner">
+                <img src="${headerBase64}" alt="Medoraa Labs" />
+            </div>
+            ` : `
+            <div class="page-letterhead-clearance-top"></div>
+            `}
+
+            <!-- RECEIPT BODY (No outer black border) -->
+            <div class="receipt-body">
+                ${includeWatermark && logoBase64 ? `
+                <div class="receipt-watermark">
+                    <img src="${logoBase64}" alt="Watermark" />
                 </div>
+                ` : ""}
 
-                <!-- Registration & Patient Demographics Grid -->
-                <table class="meta-grid">
-                    <tr>
-                        <td style="width: 50%;">
-                            <span class="meta-label">REGISTRATION NO:</span><br/>
-                            <span class="meta-val" style="font-family: monospace; font-size: 13px;">${regNo}</span>
-                        </td>
-                        <td style="width: 50%;">
-                            <span class="meta-label">DATE & TIME:</span><br/>
-                            <span class="meta-val">${dateStr} | ${timeStr}</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <span class="meta-label">PATIENT NAME:</span><br/>
-                            <span class="meta-val" style="font-size: 12px; text-transform: uppercase;">${record.patientName}</span>
-                        </td>
-                        <td>
-                            <span class="meta-label">AGE / GENDER:</span><br/>
-                            <span class="meta-val">${record.age?.value ? `${record.age.value} ${record.age.type}` : "N/A"} / ${record.gender || "N/A"}</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="2">
-                            <span class="meta-label">MOBILE NUMBER:</span><br/>
-                            <span class="meta-val">+91 ${record.mobileNumber || "N/A"}</span>
-                        </td>
-                    </tr>
-                </table>
+                <div class="receipt-content-inner">
+                    <div>
+                        <!-- Patient Card matching user sample image -->
+                        <div class="patient-card">
+                            <div class="patient-card-row">
+                                <div class="patient-card-cell with-divider" style="width: 50%;">
+                                    <div class="meta-label">REGISTRATION NO.</div>
+                                    <div class="meta-val">${regNo}</div>
+                                </div>
+                                <div class="patient-card-cell" style="width: 50%;">
+                                    <div class="meta-label">DATE &amp; TIME</div>
+                                    <div class="meta-val">${dateStr} | ${timeStr}</div>
+                                </div>
+                            </div>
+                            <div class="patient-card-row">
+                                <div class="patient-card-cell with-divider" style="width: 50%;">
+                                    <div class="meta-label">PATIENT NAME</div>
+                                    <div class="meta-val" style="text-transform: uppercase;">${record.patientName}</div>
+                                </div>
+                                <div class="patient-card-cell" style="width: 50%;">
+                                    <div class="meta-label">AGE / GENDER</div>
+                                    <div class="meta-val">${record.age?.value ? `${record.age.value} ${record.age.type}` : "N/A"} / ${record.gender || "N/A"}</div>
+                                </div>
+                            </div>
+                            <div class="patient-card-row last-row">
+                                <div class="patient-card-cell" style="width: 100%;">
+                                    <div class="meta-label">MOBILE NUMBER</div>
+                                    <div class="meta-val">+91 ${record.mobileNumber || "N/A"}</div>
+                                </div>
+                            </div>
+                        </div>
 
-                <!-- Prescribed Tests / Billing Table -->
-                <div style="font-family: Arial, sans-serif; font-weight: 800; font-size: 11px; text-transform: uppercase; margin-bottom: 6px;">
-                    Prescribed Investigations & Charges
+                        <!-- Prescribed Tests / Billing Table -->
+                        <div class="section-title">
+                            Prescribed Investigations &amp; Charges
+                        </div>
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 8%; text-align: center;">S.No</th>
+                                    <th style="width: 52%;">Test / Parameter Name</th>
+                                    <th style="width: 22%;">Category</th>
+                                    <th style="width: 18%; text-align: right;">Price (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${chunk.length > 0 ? chunk.map((t, idx) => `
+                                    <tr>
+                                        <td style="text-align: center; font-weight: 700;">${(chunkIndex * 6) + idx + 1}</td>
+                                        <td style="font-weight: 700;">${typeof t === 'string' ? t : (t.testName || t.name)}</td>
+                                        <td style="text-transform: uppercase; font-size: 9.5px; color: #475569;">${(typeof t === 'object' && t.category) ? t.category : "General"}</td>
+                                        <td style="text-align: right; font-weight: 800; font-family: monospace;">₹${parseFloat(t.patientPrice || 0).toFixed(2)}</td>
+                                    </tr>
+                                `).join("") : `
+                                    <tr>
+                                        <td colspan="4" style="text-align: center; color: #64748b; font-style: italic; padding: 12px;">
+                                            No tests selected for this registration.
+                                        </td>
+                                    </tr>
+                                `}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div>
+                        ${isLastPage ? `
+                        <!-- Billing Totals Summary -->
+                        <table class="summary-table">
+                            <tr>
+                                <td class="summary-label">Subtotal Amount:</td>
+                                <td class="summary-val">₹${parseFloat(subtotal).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td class="summary-label">Discount:</td>
+                                <td class="summary-val" style="color: #16a34a;">${discount > 0 ? `- ₹${parseFloat(discount).toFixed(2)}` : `₹0.00`}</td>
+                            </tr>
+                            <tr class="total-row">
+                                <td class="summary-label" style="font-weight: 900; color: #0f172a;">Total Net Amount:</td>
+                                <td class="summary-val" style="font-weight: 900; font-size: 12.5px;">₹${parseFloat(totalAmount).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td class="summary-label" style="font-weight: 800; color: #1e40af;">Amount Paid by Patient:</td>
+                                <td class="summary-val" style="font-weight: 900; color: #1e40af;">₹${parseFloat(paidAmount).toFixed(2)}</td>
+                            </tr>
+                            ${balanceDue > 0 ? `
+                            <tr>
+                                <td class="summary-label" style="color: #dc2626; font-weight: 800;">Balance Due:</td>
+                                <td class="summary-val" style="color: #dc2626; font-weight: 900;">₹${parseFloat(balanceDue).toFixed(2)}</td>
+                            </tr>
+                            ` : ""}
+                            <tr>
+                                <td class="summary-label">Payment Mode:</td>
+                                <td class="summary-val" style="text-transform: uppercase;">${paymentMethod}</td>
+                            </tr>
+                        </table>
+                        ` : `<div style="text-align: right; font-size: 10px; font-weight: 700; color: #64748b; margin-bottom: 16px;">Continued on next page...</div>`}
+
+                        <!-- Barcode Section -->
+                        <div class="barcode-section">
+                            <div class="barcode-box">
+                                ${barcodeSVG}
+                                <div class="barcode-num">* ${regNo} *</div>
+                            </div>
+                        </div>
+
+                        <!-- Signatures -->
+                        <div class="signature-section">
+                            <div class="sig-box">
+                                <div class="sig-line"></div>
+                                <div>ISSUED BY DESK OPERATOR</div>
+                            </div>
+                            <div class="sig-box">
+                                <div class="sig-line"></div>
+                                <div>AUTHORIZED SIGNATURE</div>
+                            </div>
+                        </div>
+
+                        <!-- Footer Disclaimer -->
+                        <div class="footer-note">
+                            Thank you for choosing Medoraa Labs. Please bring this receipt for sample status queries.
+                        </div>
+                    </div>
                 </div>
-                <table class="items-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 8%; text-align: center;">S.No</th>
-                            <th style="width: 52%;">Test / Parameter Name</th>
-                            <th style="width: 22%;">Category</th>
-                            <th style="width: 18%; text-align: right;">Price (₹)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${chunk.length > 0 ? chunk.map((t, idx) => `
-                            <tr>
-                                <td style="text-align: center; font-weight: 700;">${(chunkIndex * 6) + idx + 1}</td>
-                                <td style="font-weight: 700;">${typeof t === 'string' ? t : (t.testName || t.name)}</td>
-                                <td style="text-transform: uppercase; font-size: 10px;">${(typeof t === 'object' && t.category) ? t.category : "General"}</td>
-                                <td style="text-align: right; font-weight: 800; font-family: monospace;">₹${parseFloat(t.patientPrice || 0).toFixed(2)}</td>
-                            </tr>
-                        `).join("") : `
-                            <tr>
-                                <td colspan="4" style="text-align: center; color: #666; font-style: italic; padding: 12px;">
-                                    No tests selected for this registration.
-                                </td>
-                            </tr>
-                        `}
-                    </tbody>
-                </table>
             </div>
 
-            <div>
-                ${isLastPage ? `
-                <!-- Billing Totals Summary -->
-                <table class="summary-table">
-                    <tr>
-                        <td class="summary-label">Subtotal Amount:</td>
-                        <td class="summary-val">₹${parseFloat(subtotal).toFixed(2)}</td>
-                    </tr>
-                    <tr>
-                        <td class="summary-label">Discount:</td>
-                        <td class="summary-val" style="color: #008000;">${discount > 0 ? `- ₹${parseFloat(discount).toFixed(2)}` : `₹0.00`}</td>
-                    </tr>
-                    <tr class="total-row">
-                        <td class="summary-label" style="font-weight: 900; font-size: 11px;">Total Net Amount:</td>
-                        <td class="summary-val" style="font-weight: 900; font-size: 13px;">₹${parseFloat(totalAmount).toFixed(2)}</td>
-                    </tr>
-                    <tr>
-                        <td class="summary-label" style="font-weight: 800; color: #1e40af;">Amount Paid by Patient:</td>
-                        <td class="summary-val" style="font-weight: 900; color: #1e40af; font-size: 12px;">₹${parseFloat(paidAmount).toFixed(2)}</td>
-                    </tr>
-                    ${balanceDue > 0 ? `
-                    <tr>
-                        <td class="summary-label" style="color: #dc2626; font-weight: 800;">Balance Due:</td>
-                        <td class="summary-val" style="color: #dc2626; font-weight: 900; font-size: 12px;">₹${parseFloat(balanceDue).toFixed(2)}</td>
-                    </tr>
-                    ` : ""}
-                    <tr>
-                        <td class="summary-label">Payment Mode:</td>
-                        <td class="summary-val" style="text-transform: uppercase; font-size: 11px;">${paymentMethod}</td>
-                    </tr>
-                </table>
-                ` : `<div style="text-align: right; font-size: 11px; font-weight: 700; color: #666; margin-bottom: 20px;">Continued on next page...</div>`}
-
-                <!-- Barcode Section -->
-                <div class="barcode-section">
-                    <div class="barcode-box">
-                        ${barcodeSVG}
-                        <div class="barcode-num">* ${regNo} *</div>
-                    </div>
-                </div>
-
-                <!-- Signatures -->
-                <div class="signature-section">
-                    <div class="sig-box">
-                        <div class="sig-line"></div>
-                        <div>ISSUED BY DESK OPERATOR</div>
-                    </div>
-                    <div class="sig-box">
-                        <div class="sig-line"></div>
-                        <div>AUTHORIZED SIGNATURE</div>
-                    </div>
-                </div>
-
-                <!-- Footer Disclaimer -->
-                <div class="footer-note">
-                    Thank you for choosing Medoraa Labs. Please bring this receipt for sample status queries.
-                </div>
+            <!-- FULL-WIDTH FOOTER BANNER -->
+            ${includeHeaderFooter && footerBase64 ? `
+            <div class="page-footer-banner">
+                <img src="${footerBase64}" alt="Medoraa Labs Footer" />
             </div>
+            ` : `
+            <div class="page-letterhead-clearance-bottom"></div>
+            `}
+
         </div>
-        `;
-        }).join("")}
+
+
+    `;
+    }).join("")}
         ${autoPrint ? `<script>
             window.onload = function() {
                 window.print();
@@ -1106,13 +1400,8 @@ function buildReceiptHTML(record, autoPrint = false) {
     return htmlContent;
 }
 
-/**
- * Async wrapper: generates receipt PDF buffer using the shared HTML builder.
- * @param {Object} record Patient registration document
- * @returns {Promise<Buffer>} PDF Buffer
- */
-async function generateReceiptPDF(record) {
-    const htmlContent = buildReceiptHTML(record);
+async function generateReceiptPDF(record, options = {}) {
+    const htmlContent = buildReceiptHTML(record, false, { ...options, forPdf: true });
 
     let browser;
     let page;
@@ -1124,13 +1413,13 @@ async function generateReceiptPDF(record) {
             format: "A4",
             printBackground: true,
             margin: {
-                top: "8mm",
-                bottom: "8mm",
-                left: "10mm",
-                right: "10mm"
+                top: "0mm",
+                bottom: "0mm",
+                left: "0mm",
+                right: "0mm"
             }
         });
-        return pdfBuffer;
+        return await attachDuplexBackside(pdfBuffer, options);
     } catch (err) {
         await resetBrowser();
         throw err;
@@ -1154,6 +1443,7 @@ function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
     const pageW = "50mm";
     const pageH = "15mm";
 
+    const patientId = (record.registrationNumber || record.patientId || "").toUpperCase().trim();
     const patientName = (record.patientName || "").toUpperCase().trim() || "PATIENT";
     const ageVal = record.age?.value || "";
     let ageType = "Y";
@@ -1165,11 +1455,11 @@ function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
 
     // Dynamic scaling for name (+2px larger: base 8.0px)
     const nameLen = patientName.length;
-    let nameFontSize = "8.0px";
+    let nameFontSize = "7.2px";
     if (nameLen > 28) {
-        nameFontSize = "6.8px";
+        nameFontSize = "6.2px";
     } else if (nameLen > 20) {
-        nameFontSize = "7.4px";
+        nameFontSize = "6.8px";
     }
 
     // Extract all test names into a single list
@@ -1206,15 +1496,15 @@ function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
         testLineHeight = "1.08";
     }
 
-    const topPadding = testsLen > 180 ? "3.0mm" : "4.0mm";
-    const rowMargin = testsLen > 180 ? "0.05mm" : "0.1mm";
+    const topPadding = testsLen > 180 ? "2.2mm" : testsLen > 70 ? "2.8mm" : "3.2mm";
+    const rowMargin = testsLen > 180 ? "0.06mm" : "0.15mm";
 
     return `
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8" />
-        <title>Bottle Label - ${record.patientName || 'Specimen'}</title>
+        <title>Sample Label - ${record.patientName || 'Specimen'}</title>
         <style>
             @page {
                 size: ${pageW} ${pageH};
@@ -1288,7 +1578,13 @@ function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
                 line-height: 1.1;
                 margin: 0 0 ${rowMargin} 0;
                 padding: 0;
-                gap: 2.5mm;
+                gap: 1.8mm;
+            }
+            .id-val {
+                font-size: 6.2px;
+                font-weight: 700;
+                color: #000000;
+                letter-spacing: 0.1px;
             }
             .test-row {
                 display: block;
@@ -1343,8 +1639,9 @@ function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
                 <div class="label-row name-row">
                     <span class="lbl-key">N:</span>&nbsp;<span class="lbl-val name-val" style="font-size: ${nameFontSize};">${patientName}</span>
                 </div>
-                <!-- Line 2: AGE: and G: -->
+                <!-- Line 2: ID, AGE: and G: -->
                 <div class="label-row demo-row">
+                    <div><span class="lbl-key">ID:</span>&nbsp;<span class="lbl-val id-val">${patientId || 'N/A'}</span></div>
                     <div><span class="lbl-key">AGE:</span>&nbsp;<span class="lbl-val">${ageDisplay}</span></div>
                     <div><span class="lbl-key">G:</span>&nbsp;<span class="lbl-val">${genderDisplay}</span></div>
                 </div>
@@ -1367,7 +1664,7 @@ function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
     `;
 }
 
-module.exports = { generatePathologyPDF, generateTransferLabelPDF, generateReceiptPDF, buildReceiptHTML, buildBottleLabelHTML, getBrowser };
+module.exports = { buildPathologyReportHTML, generatePathologyPDF, generateTransferLabelPDF, generateReceiptPDF, buildReceiptHTML, buildBottleLabelHTML, attachDuplexBackside, getBrowser };
 
 
 

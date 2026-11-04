@@ -24,7 +24,6 @@ import {
     Save,
     ArrowLeft,
     Printer,
-    Trash2,
     Phone,
     ShieldAlert,
     Send,
@@ -677,12 +676,11 @@ export default function ExaminerDashboard() {
                         <table className="w-full text-left border-collapse font-sans">
                             <thead>
                                 <tr className="bg-slate-100/90 border-b border-slate-200 font-black text-slate-700 text-xs uppercase tracking-wider">
-                                    <th className="py-3.5 px-4 w-[28%]">Test Parameter Name</th>
-                                    <th className="py-3.5 px-4 w-[22%]">Observed Value</th>
-                                    <th className="py-3.5 px-4 w-[14%]">Unit</th>
-                                    <th className="py-3.5 px-4 w-[18%]">Reference Range</th>
-                                    <th className="py-3.5 px-4 w-[10%] text-center">Status</th>
-                                    <th className="py-3.5 px-4 w-[8%] text-right">Action</th>
+                                    <th className="py-3.5 px-4 w-[30%]">Test Parameter Name</th>
+                                    <th className="py-3.5 px-4 w-[24%]">Observed Value</th>
+                                    <th className="py-3.5 px-4 w-[15%]">Unit</th>
+                                    <th className="py-3.5 px-4 w-[19%]">Reference Range</th>
+                                    <th className="py-3.5 px-4 w-[12%] text-center">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
@@ -748,16 +746,7 @@ export default function ExaminerDashboard() {
                                                 )}
                                             </td>
 
-                                            <td className="py-3 px-3 text-right">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemoveTestRow(idx)}
-                                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-none transition-colors"
-                                                    title="Remove parameter"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </td>
+
                                         </tr>
                                     );
                                 })}

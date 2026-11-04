@@ -15,13 +15,17 @@ const {
     getRegistrations,
     getNextRegistrationNumber,
     updateRegistrationTests,
+    updateRegistrationPayment,
     updateRegistrationAuthorization,
     transferRegistrationSample,
     downloadReportPDF,
     downloadTransferLabelPDF,
     downloadReceiptPDF,
+    downloadReportHTML,
     downloadReceiptHTML,
-    downloadBottleLabelHTML
+    downloadBottleLabelHTML,
+    deleteAllRegistrations,
+    deleteRegistration
 } = require("../controllers/registration");
 
 // Samples Directory Routes
@@ -49,6 +53,7 @@ router.post("/login", login);
 router.get("/registrations/:id/pdf", downloadReportPDF);
 router.get("/registrations/:id/transfer-label-pdf", downloadTransferLabelPDF);
 router.get("/registrations/:id/receipt-pdf", downloadReceiptPDF);
+router.get("/registrations/:id/report-html", downloadReportHTML);
 router.get("/registrations/:id/receipt-html", downloadReceiptHTML);
 router.get("/registrations/:id/bottle-label-html", downloadBottleLabelHTML);
 
@@ -65,7 +70,10 @@ router.get("/admins", getAdmins);
 router.get("/registrations/next-id", getNextRegistrationNumber);
 router.post("/registrations", addRegistration);
 router.get("/registrations", getRegistrations);
+router.delete("/registrations", deleteAllRegistrations);
+router.delete("/registrations/:id", deleteRegistration);
 router.put("/registrations/:id/tests", updateRegistrationTests);
+router.put("/registrations/:id/payment", updateRegistrationPayment);
 router.put("/registrations/:id/authorization", updateRegistrationAuthorization);
 router.put("/registrations/:id/transfer-sample", transferRegistrationSample);
 

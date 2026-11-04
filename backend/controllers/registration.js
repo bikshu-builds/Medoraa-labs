@@ -251,6 +251,74 @@ exports.updateRegistrationTests = async (req, res) => {
 };
 
 // @desc    Update authorization status & test result values
+
+// @desc    Update payment and due amount for a registration
+// @route   PUT /api/admin/registrations/:id/payment
+exports.updateRegistrationPayment = async (req, res) => {
+  try {
+    const {
+      paidAmount,
+      amountToPay,
+      totalAmount,
+      paymentMethod,
+      paymentStatus,
+      paymentNotes,
+    } = req.body;
+
+    const registration = await PatientRegistration.findById(req.params.id).populate("tests");
+    if (!registration) {
+      return res.status(404).json({ success: false, message: "Registration record not found" });
+    }
+
+    if (totalAmount !== undefined && !isNaN(parseFloat(totalAmount))) {
+      registration.totalAmount = Math.max(0, parseFloat(totalAmount));
+    }
+
+    const billTotal = parseFloat(registration.totalAmount) || 0;
+    const currentPaid = parseFloat(registration.paidAmount) || 0;
+
+    let newPaid = currentPaid;
+    if (amountToPay !== undefined && !isNaN(parseFloat(amountToPay))) {
+      newPaid = currentPaid + parseFloat(amountToPay);
+    } else if (paidAmount !== undefined && !isNaN(parseFloat(paidAmount))) {
+      newPaid = parseFloat(paidAmount);
+    }
+
+    newPaid = Math.max(0, newPaid);
+    const newDue = Math.max(0, billTotal - newPaid);
+
+    let calculatedStatus = "PAID";
+    if (newDue > 0 && newPaid > 0) {
+      calculatedStatus = "PARTIAL";
+    } else if (newDue > 0 && newPaid === 0) {
+      calculatedStatus = "PENDING";
+    }
+
+    registration.paidAmount = newPaid;
+    registration.paymentStatus = paymentStatus || calculatedStatus;
+    if (paymentMethod) {
+      registration.paymentMethod = paymentMethod;
+    }
+
+    if (paymentNotes && typeof paymentNotes === "string" && paymentNotes.trim() !== "") {
+      const now = new Date();
+      const dateStr = `${String(now.getDate()).padStart(2, "0")}-${String(now.getMonth() + 1).padStart(2, "0")}-${now.getFullYear()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      const noteEntry = `[${dateStr}] Payment Updated: Paid ₹${newPaid.toFixed(2)}, Due ₹${newDue.toFixed(2)} (${paymentMethod || registration.paymentMethod || "Cash"}) - ${paymentNotes.trim()}`;
+      registration.notes = registration.notes ? `${registration.notes}\n${noteEntry}` : noteEntry;
+    }
+
+    await registration.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Payment and due amount updated successfully",
+      data: registration,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.updateRegistrationAuthorization = async (req, res) => {
   try {
     const {
@@ -356,13 +424,22 @@ exports.downloadReportPDF = async (req, res) => {
       });
     }
 
+    // Check header/footer options
+    const includeHeaderFooter = req.query.header !== 'false' && req.query.withHeader !== 'false';
+    const isDownload = req.query.download === 'true';
+
+    const autoPrint = req.query.autoprint === 'true' || req.query.print === 'true';
+
     // Generate PDF Buffer
-    const pdfBuffer = await generatePathologyPDF(registration);
+    const pdfBuffer = await generatePathologyPDF(registration, { includeHeaderFooter, autoPrint });
+
+    const baseName = `Pathology_Report_${registration.registrationNumber || registration._id}`;
+    const filename = includeHeaderFooter ? `${baseName}.pdf` : `${baseName}_Letterhead.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `inline; filename=Pathology_Report_${registration.registrationNumber || registration._id}.pdf`,
+      `${isDownload ? 'attachment' : 'inline'}; filename=${filename}`,
     );
     res.setHeader("Content-Length", pdfBuffer.length);
 
@@ -511,12 +588,20 @@ exports.downloadReceiptPDF = async (req, res) => {
         });
     }
 
-    const pdfBuffer = await generateReceiptPDF(registration);
+    const includeHeaderFooter = req.query.header !== 'false' && req.query.withHeader !== 'false';
+    const isDownload = req.query.download === 'true';
+
+    const autoPrint = req.query.autoprint === 'true' || req.query.print === 'true';
+
+    const pdfBuffer = await generateReceiptPDF(registration, { includeHeaderFooter, autoPrint });
+
+    const baseName = `Receipt_${registration.registrationNumber || registration._id}`;
+    const filename = includeHeaderFooter ? `${baseName}.pdf` : `${baseName}_Letterhead.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `inline; filename=Receipt_${registration.registrationNumber || registration._id}.pdf`,
+      `${isDownload ? 'attachment' : 'inline'}; filename=${filename}`,
     );
     res.setHeader("Content-Length", pdfBuffer.length);
 
@@ -529,6 +614,34 @@ exports.downloadReceiptPDF = async (req, res) => {
         success: false,
         message: "Error generating receipt PDF: " + err.message,
       });
+  }
+};
+
+// @desc    Instant HTML preview/print of Pathology Report (no Puppeteer — for in-page print)
+// @route   GET /api/admin/registrations/:id/report-html
+exports.downloadReportHTML = async (req, res) => {
+  try {
+    const { buildPathologyReportHTML } = require("../services/pdfGenerator");
+
+    const registration = await PatientRegistration.findById(
+      req.params.id,
+    ).populate("tests");
+
+    if (!registration) {
+      return res
+        .status(404)
+        .send("<h3>Registration not found</h3>");
+    }
+
+    const includeHeaderFooter = req.query.header !== 'false' && req.query.withHeader !== 'false';
+    const html = buildPathologyReportHTML(registration, { includeHeaderFooter });
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(html);
+  } catch (err) {
+    console.error("Report HTML Error:", err);
+    return res.status(500).send("<h3>Error generating report preview: " + err.message + "</h3>");
   }
 };
 
@@ -549,7 +662,8 @@ exports.downloadReceiptHTML = async (req, res) => {
     }
 
     const autoPrint = req.query.autoprint === 'true';
-    const html = buildReceiptHTML(registration, autoPrint);
+    const includeHeaderFooter = req.query.header !== 'false' && req.query.withHeader !== 'false';
+    const html = buildReceiptHTML(registration, autoPrint, { includeHeaderFooter });
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
@@ -585,5 +699,47 @@ exports.downloadBottleLabelHTML = async (req, res) => {
   } catch (err) {
     console.error("Bottle Label HTML Error:", err);
     return res.status(500).send("<h3>Error generating label: " + err.message + "</h3>");
+  }
+};
+
+
+// @desc    Delete a single patient registration
+// @route   DELETE /api/admin/registrations/:id
+exports.deleteRegistration = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const registration = await PatientRegistration.findByIdAndDelete(id);
+
+    if (!registration) {
+      return res.status(404).json({ success: false, message: "Registration not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Registration ${registration.registrationNumber || id} deleted successfully`,
+    });
+  } catch (err) {
+    console.error("Delete Registration Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Delete ALL patient registrations
+// @route   DELETE /api/admin/registrations
+exports.deleteAllRegistrations = async (req, res) => {
+  try {
+    const result = await PatientRegistration.deleteMany({});
+
+    // Also reset registration counter so sequence starts fresh
+    await Counter.deleteMany({ _id: { $regex: /^registrationCode-/ } });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully deleted all ${result.deletedCount} patient registrations`,
+      deletedCount: result.deletedCount,
+    });
+  } catch (err) {
+    console.error("Delete All Registrations Error:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };

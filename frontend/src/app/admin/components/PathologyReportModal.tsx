@@ -1,8 +1,9 @@
 "use client";
 import React, { useState } from "react";
-import { Download, X, FileText } from "lucide-react";
+import { Download, X, FileText, Check, Printer, CheckCircle2, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getApiUrl } from "@/lib/api";
+import { printPdfDirect } from "@/lib/pdfPrinter";
 
 interface TestResultEntry {
     testId?: any;
@@ -44,20 +45,11 @@ interface PathologyReportModalProps {
 }
 
 export default function PathologyReportModal({ record, isOpen, onClose }: PathologyReportModalProps) {
-    const [viewMode, setViewMode] = useState<"pdf" | "html">("pdf");
+    const [previewType, setPreviewType] = useState<"with-header" | "no-header">("with-header");
 
     if (!isOpen || !record) return null;
 
-    const handlePrint = () => {
-        if (record._id) {
-            const pdfUrl = getApiUrl(`/api/admin/registrations/${record._id}/pdf`);
-            window.open(pdfUrl, "_blank");
-        } else {
-            window.print();
-        }
-    };
-
-    // Extract test results and map with populated category classification (matching record.tests if available)
+    // Filter tests that have entered results
     const allResults = (record.testResults && record.testResults.length > 0)
         ? record.testResults
         : ((record.tests && record.tests.length > 0)
@@ -70,76 +62,32 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
                 category: typeof t === "object" ? (t.category || t.organ || "GENERAL PATHOLOGY") : "GENERAL PATHOLOGY",
                 method: typeof t === "object" ? (t.method || "") : ""
             }))
-            : [{ testName: "Routine Pathology Parameter", resultValue: "", unit: "", referenceRange: "-", category: "GENERAL PATHOLOGY", method: "" }]
+            : []
         );
 
-    // Strictly include ONLY tests that have an entered result value so pending unentered tests are NEVER printed in the report or PDF
-    const enteredOnly = allResults.filter((tr: any) => tr.resultValue && String(tr.resultValue).trim() !== "" && String(tr.resultValue).trim() !== "—");
-    const rawResults = enteredOnly;
+    const enteredResults = allResults.filter(
+        (tr: any) => tr.resultValue && String(tr.resultValue).trim() !== "" && String(tr.resultValue).trim() !== "—"
+    );
 
-    // Track total assigned tests vs entered tests to show clear status to the user
-    const totalOrderedTests = (record.tests && record.tests.length > 0)
-        ? record.tests.length
-        : (record.testResults && record.testResults.length > 0)
-        ? record.testResults.length
-        : 0;
-    const pendingOrderedTests = Math.max(0, totalOrderedTests - rawResults.length);
+    // Direct download helper (triggers browser download without opening blank tabs)
+    const handleDownload = (withHeader: boolean) => {
+        if (!record?._id) return;
+        const pdfUrl = getApiUrl(`/api/admin/registrations/${record._id}/pdf?header=${withHeader}&download=true`);
+        const link = document.createElement("a");
+        link.href = pdfUrl;
+        link.setAttribute("download", `Pathology_Report_${record.registrationNumber || record._id}${withHeader ? "" : "_Letterhead"}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
-    // Map each result to its specific Classification/Category (matching backend logic exactly)
-    const testResults = rawResults.map((tr: any) => {
-        const itemObj = tr;
-        const popTest = (typeof itemObj.testId === "object" && itemObj.testId !== null) ? itemObj.testId : null;
-        const matchedTest = popTest || (record.tests || []).find((t: any) => {
-            if (!t) return false;
-            const targetId = itemObj.testId ? (itemObj.testId._id ? itemObj.testId._id.toString() : itemObj.testId.toString()) : null;
-            if (t._id && targetId && t._id.toString() === targetId) return true;
-            if (t.testName && itemObj.testName && t.testName.trim().toLowerCase() === itemObj.testName.trim().toLowerCase()) return true;
-            return false;
-        });
+    // Print PDF using the exact same duplex PDF generated for Download
+    const handlePrint = async (withHeader: boolean) => {
+        if (!record?._id) return;
+        const pdfUrl = getApiUrl(`/api/admin/registrations/${record._id}/pdf?header=${withHeader}&autoprint=true&t=${Date.now()}`);
+        await printPdfDirect(pdfUrl);
+    };
 
-        let categoryName = "";
-        if (popTest && popTest.category && popTest.category !== "-") {
-            categoryName = popTest.category;
-        } else if (itemObj.category && itemObj.category !== "-") {
-            categoryName = itemObj.category;
-        } else if (matchedTest && matchedTest.category && matchedTest.category !== "-") {
-            categoryName = matchedTest.category;
-        } else if (popTest && popTest.organ && popTest.organ !== "-") {
-            categoryName = popTest.organ;
-        } else if (itemObj.organ && itemObj.organ !== "-") {
-            categoryName = itemObj.organ;
-        } else if (matchedTest && matchedTest.organ && matchedTest.organ !== "-") {
-            categoryName = matchedTest.organ;
-        } else {
-            categoryName = "GENERAL PATHOLOGY";
-        }
-
-        const methodStr = (popTest && popTest.method && popTest.method !== "-")
-            ? popTest.method
-            : ((itemObj.method && itemObj.method !== "-")
-                ? itemObj.method
-                : (matchedTest && matchedTest.method && matchedTest.method !== "-" ? matchedTest.method : ""));
-
-        return {
-            ...itemObj,
-            category: categoryName.trim().toUpperCase(),
-            method: methodStr
-        };
-    });
-
-    // Group test items strictly by Category / Classification
-    const categoryGroups: { [key: string]: typeof testResults } = {};
-    testResults.forEach(item => {
-        let catKey = item.category || "GENERAL PATHOLOGY";
-        if (!categoryGroups[catKey]) {
-            categoryGroups[catKey] = [];
-        }
-        categoryGroups[catKey].push(item);
-    });
-
-    const categoryKeys = Object.keys(categoryGroups);
-
-    // Sample type text
     let sampleTypeText = "Clot-Act, Blood / Urine";
     if (record.sampleReceived) {
         if (typeof record.sampleReceived === "string") {
@@ -149,266 +97,282 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
         }
     }
 
-    const todayDate = new Date().toLocaleDateString("en-GB");
+    const currentWithHeader = previewType === "with-header";
 
     return (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[200] flex items-center justify-center p-2 sm:p-4 overflow-y-auto font-sans">
-            {/* Main Modal Outer Box */}
-            <div className="bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white w-full max-w-5xl max-h-[95vh] shadow-2xl overflow-hidden flex flex-col my-auto border border-slate-300 dark:border-slate-800 rounded-xl print:shadow-none print:border-none print:w-full print:max-w-none print:m-0 print:bg-white">
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[200] flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200">
+            {/* Modal Container */}
+            <div className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white rounded-2xl shadow-2xl w-full max-w-5xl lg:max-w-6xl overflow-hidden flex flex-col h-[88vh] max-h-[92vh] border border-slate-200 dark:border-slate-800">
                 
-                {/* Non-Printable Header Toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-900 text-white print:hidden shrink-0">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between px-5 py-3.5 bg-slate-900 text-white border-b border-slate-800 shrink-0">
                     <div className="flex items-center gap-3">
-                        <FileText className="w-5 h-5 text-amber-400 shrink-0" />
+                        <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                            <FileText className="w-5 h-5" />
+                        </div>
                         <div>
-                            <span className="text-xs font-black uppercase tracking-wider block">Official Pathology Report — {record.registrationNumber}</span>
-                            <span className="text-[10px] text-slate-400 font-medium">
-                                Patient: {record.patientName} | {rawResults.length} Entered Test{rawResults.length !== 1 ? 's' : ''} Included in Report
-                                {pendingOrderedTests > 0 && (
-                                    <span className="text-amber-400 font-semibold ml-1.5">
-                                        ({pendingOrderedTests} pending test{pendingOrderedTests !== 1 ? 's' : ''} omitted from PDF)
-                                    </span>
-                                )}
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-sm font-extrabold tracking-wide uppercase">
+                                    Official Pathology Report
+                                </h3>
+                                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-slate-800 text-blue-400 border border-slate-700">
+                                    {record.registrationNumber}
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                Patient: <span className="font-bold text-slate-200">{record.patientName}</span>
+                                {" • "}{record.age?.value || "N/A"} {record.age?.type || "Y"} / {record.gender}
+                                {" • "}Ref: <span className="text-slate-300">{record.referredBy || "Self"}</span>
+                            </p>
                         </div>
                     </div>
 
-                    {/* Action Controls */}
-                    <div className="flex items-center flex-wrap gap-2">
-                        <button
-                            onClick={handlePrint}
-                            disabled={rawResults.length === 0}
-                            className={cn(
-                                "flex items-center gap-1.5 px-4 py-1.5 text-white text-xs font-extrabold shadow-sm transition-all rounded-lg",
-                                rawResults.length > 0
-                                    ? "bg-emerald-600 hover:bg-emerald-700 active:scale-95 cursor-pointer"
-                                    : "bg-slate-700 text-slate-400 opacity-60 cursor-not-allowed"
-                            )}
-                            title={rawResults.length === 0 ? "No test results entered yet to print" : "Print / Download PDF"}
-                        >
-                            <Download className="w-4 h-4" />
-                            <span>Print / Download PDF</span>
-                        </button>
+                    <div className="flex items-center gap-3">
+                        <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/80">
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            Authorized
+                        </span>
 
                         <button
+                            type="button"
                             onClick={onClose}
-                            className="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer rounded-full"
+                            className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white cursor-pointer"
+                            title="Close modal"
                         >
                             <X className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
 
-                {/* Empty State when 0 tests entered */}
-                {rawResults.length === 0 ? (
-                    <div className="p-12 flex flex-col items-center justify-center gap-3 text-center bg-slate-900 text-white min-h-[400px]">
-                        <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                            <FileText className="w-6 h-6" />
-                        </div>
-                        <h3 className="text-sm font-black uppercase tracking-wider text-slate-200">No Entered Test Results To Print</h3>
-                        <p className="text-xs text-slate-400 max-w-md">
-                            All assigned tests for this patient are currently pending in the Examiner Desk. Reports can only be generated and printed once test observations have been entered.
-                        </p>
-                    </div>
-                ) : viewMode === "pdf" && record._id ? (
-                    /* View Mode 1: PDF Iframe Viewer */
-                    <div className="p-3 bg-slate-900/90 flex-1 flex flex-col min-h-[550px] sm:min-h-[650px] h-[75vh]">
-                        <iframe
-                            src={getApiUrl(`/api/admin/registrations/${record._id}/pdf#toolbar=0&navpanes=0&scrollbar=0&view=FitH`)}
-                            className="w-full flex-1 rounded-lg border border-slate-700 shadow-md bg-white"
-                            title={`Official Pathology Report ${record.registrationNumber}`}
-                        />
-                    </div>
-                ) : (
-                    /* View Mode 2: HTML Page Cards Preview */
-                    <div className="p-4 sm:p-6 bg-slate-200/70 print:p-0 font-serif text-slate-900 space-y-6 print:space-y-0 print:bg-white">
-                    {categoryKeys.map((categoryName, idx) => {
-                        const items = categoryGroups[categoryName];
-                        let titleDisplay = categoryName.trim().toUpperCase().replace(/#+$/, "").trim();
-                        if (!titleDisplay.endsWith("REPORT")) {
-                            titleDisplay = `${titleDisplay} REPORT`;
-                        }
+                {/* 2-Column Body */}
+                <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-100 dark:bg-slate-950">
+                    
+                    {/* LEFT PANEL: Action Cards & Information */}
+                    <div className="w-full md:w-[340px] lg:w-[360px] p-4 sm:p-5 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between overflow-y-auto space-y-4 shrink-0">
+                        <div className="space-y-4">
+                            <div>
+                                <div className="text-[11px] font-extrabold tracking-wider text-slate-500 uppercase">
+                                    REPORT DOWNLOAD &amp; PRINT OPTIONS
+                                </div>
+                                <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                                    Choose your desired format below to download or print
+                                </p>
+                            </div>
 
-                        const methodText = items[0]?.method && items[0].method !== "-"
-                            ? items[0].method
-                            : "Enzyme Kinetic Assay; Fully Automated Laboratory Analyzer";
-
-                        return (
-                            <div
-                                key={categoryName}
-                                className={cn(
-                                    "bg-white shadow-xl border border-slate-300 rounded-sm p-6 sm:p-8 flex flex-col justify-start space-y-6 min-h-[265mm] print:min-h-[270mm] print:shadow-none print:border-none print:rounded-none print:p-0",
-                                    idx > 0 && "break-before-page print:break-before-page"
-                                )}
-                                style={{ pageBreakBefore: idx > 0 ? "always" : "auto", breakBefore: idx > 0 ? "page" : "auto" }}
-                            >
-                                <div className="space-y-5">
-                                    {/* Preview Page Number Indicator (Non-Printable) */}
-                                    <div className="flex items-center justify-between pb-2 border-b border-slate-200 text-[11px] font-sans text-slate-500 font-bold uppercase tracking-wider print:hidden">
-                                        <span>Page {idx + 1} of {categoryKeys.length}</span>
-                                        <span className="text-indigo-600 font-black">{categoryName}</span>
-                                    </div>
-
-                                    {/* TOP PATIENT DEMOGRAPHICS BOXED TABLE */}
-                                    <div className="border border-slate-900 text-xs font-sans">
-                                        {/* Row 1 */}
-                                        <div className="grid grid-cols-12 border-b border-slate-900">
-                                            <div className="col-span-7 px-3 py-2 border-r border-slate-900 flex items-center gap-2">
-                                                <span className="font-extrabold uppercase tracking-tight text-slate-900">NAME :</span>
-                                                <span className="font-bold text-slate-900">{record.patientName}</span>
-                                            </div>
-                                            <div className="col-span-5 px-3 py-2 flex items-center justify-between">
-                                                <div>
-                                                    <span className="font-extrabold text-slate-900">Age : </span>
-                                                    <span className="font-bold">{record.age?.value || "N/A"} {record.age?.type || "Years"}</span>
-                                                </div>
-                                                <div className="ml-4">
-                                                    <span className="font-extrabold text-slate-900">Sex : </span>
-                                                    <span className="font-bold">{record.gender}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Row 2 */}
-                                        <div className="grid grid-cols-12 border-b border-slate-900">
-                                            <div className="col-span-7 px-3 py-2 border-r border-slate-900 flex items-center gap-2">
-                                                <span className="font-extrabold uppercase tracking-tight text-slate-900">Ref/Dr :</span>
-                                                <span className="font-bold text-slate-900">{record.referredBy || "SELF (Self)"}</span>
-                                            </div>
-                                            <div className="col-span-5 px-3 py-2 flex items-center gap-2">
-                                                <span className="font-extrabold text-slate-900">Registration Date :</span>
-                                                <span className="font-bold">{record.registrationDate || todayDate}</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Row 3 */}
-                                        <div className="grid grid-cols-12 border-b border-slate-900">
-                                            <div className="col-span-7 px-3 py-2 border-r border-slate-900 flex items-center gap-2">
-                                                <span className="font-extrabold uppercase tracking-tight text-slate-900">Sample Drawn By :</span>
-                                                <span className="font-bold text-slate-900">{record.sampleReceived?.person || "Zedlabs, Eluru"}</span>
-                                            </div>
-                                            <div className="col-span-5 px-3 py-2 flex items-center gap-2">
-                                                <span className="font-extrabold text-slate-900">Report Issued Date :</span>
-                                                <span className="font-bold">{record.authorizedAt || record.registrationDate || todayDate}</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Row 4 */}
-                                        <div className="grid grid-cols-12">
-                                            <div className="col-span-7 px-3 py-2 border-r border-slate-900 flex items-center gap-2">
-                                                <span className="font-extrabold uppercase tracking-tight text-slate-900">SAMPLE :</span>
-                                                <span className="font-bold text-slate-900">{sampleTypeText}</span>
-                                            </div>
-                                            <div className="col-span-5 px-3 py-2 flex items-center gap-2">
-                                                <span className="font-extrabold text-slate-900">Report No :</span>
-                                                <span className="font-bold font-mono text-slate-900">{record.registrationNumber}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* CATEGORY TITLE & PARAMETER TABLE */}
-                                    <div className="space-y-4">
-                                        <div className="text-center my-4">
-                                            <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 underline underline-offset-4 decoration-2 font-sans">
-                                                {titleDisplay}
-                                            </h2>
-                                        </div>
-
-                                        <table className="w-full text-left border-collapse font-sans text-xs">
-                                            <thead>
-                                                <tr className="border-b-2 border-slate-900 text-slate-900 font-extrabold uppercase tracking-wide">
-                                                    <th className="py-2 px-2 w-[40%] text-left">Test Name</th>
-                                                    <th className="py-2 px-2 w-[25%] text-left">Observed Value</th>
-                                                    <th className="py-2 px-2 w-[35%] text-left">Reference Range</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-200 text-slate-900">
-                                                {items.map((item, i) => (
-                                                    <tr key={i} className="align-top">
-                                                        <td className="py-2 px-2 font-bold text-slate-900">
-                                                            {item.testName}
-                                                        </td>
-                                                        <td className="py-2 px-2 font-extrabold text-slate-900">
-                                                            {item.resultValue || "—"} {item.unit}
-                                                        </td>
-                                                        <td className="py-2 px-2 font-semibold text-slate-700 whitespace-pre-line">
-                                                            {item.referenceRange || "-"}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-
-                                        {/* Test Method Note */}
-                                        <div className="pt-3 font-sans text-[11px] text-slate-800 flex items-start gap-1">
-                                            <span className="font-black text-slate-900">Test Method :-</span>
-                                            <span className="font-semibold text-slate-700">
-                                                {methodText}
+                            {/* Option 1: Official Report (With Header & Footer) */}
+                            <div className={cn(
+                                "bg-white dark:bg-slate-800 border-2 rounded-xl transition-all shadow-xs overflow-hidden",
+                                previewType === "with-header"
+                                    ? "border-emerald-500 ring-2 ring-emerald-500/20"
+                                    : "border-slate-200 dark:border-slate-700 hover:border-emerald-400"
+                            )}>
+                                <div className="p-3.5 space-y-2.5">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
+                                            Official Branded
+                                        </span>
+                                        {previewType === "with-header" && (
+                                            <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                                                <Check className="w-3.5 h-3.5" /> Active Preview
                                             </span>
-                                        </div>
-
-                                        {/* Clinical Disclaimer Note */}
-                                        <div className="font-sans text-[10.5px] font-extrabold text-slate-900 pt-1">
-                                            NOTE : Please Correlate Clinically. If Any Discrepancy, Please Contact.
-                                        </div>
-
-                                        {/* Clinical Remarks */}
-                                        {record.notes && (
-                                            <div className="pt-2 border-t border-slate-200 font-sans text-xs">
-                                                <span className="font-bold text-slate-900 uppercase">Clinical Remarks: </span>
-                                                <span className="text-slate-800 italic">{record.notes}</span>
-                                            </div>
                                         )}
+                                    </div>
 
-                                        {/* DOCTOR / PATHOLOGIST SIGNATURE BLOCK */}
-                                        <div className="pt-6 font-sans">
-                                            <div className="flex flex-col items-end justify-end space-y-1 text-right">
-                                                <div className="text-2xl font-serif italic font-extrabold text-slate-900 pr-4 select-none tracking-tighter" style={{ fontFamily: 'Georgia, serif' }}>
-                                                    {record.authorizedBy || "Dr. Ravi Kumar Manyam"}
-                                                </div>
-                                                <div className="border-t border-slate-800 w-48 mt-1 pt-1 ml-auto" />
-                                                <div className="font-extrabold text-xs text-slate-900">
-                                                    Dr. Ravi Kumar Manyam; Ph.D
-                                                </div>
-                                                <div className="text-[11px] font-semibold text-slate-600">
-                                                    Biochemist & Pathologist
-                                                </div>
-                                            </div>
+                                    <div>
+                                        <div className="font-extrabold text-sm text-slate-900 dark:text-white">
+                                            Report (With Header &amp; Footer)
                                         </div>
+                                        <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                            Includes Medoraa Labs header banner, footer contact details, and watermark. Automatically merged with back design for double-sided printing.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDownload(true)}
+                                            className="flex-1 py-2 px-3 text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-98 rounded-lg transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                                            title="Download official PDF report with header and footer"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            <span>Download PDF</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setPreviewType("with-header");
+                                                handlePrint(true);
+                                            }}
+                                            className="py-2 px-3 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 active:scale-98 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
+                                            title="Print in-page with header"
+                                        >
+                                            <Printer className="w-3.5 h-3.5" />
+                                            <span>Print</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
-                        );
-                    })}
+
+                            {/* Option 2: Pre-Printed Letterhead (No Header) */}
+                            <div className={cn(
+                                "bg-white dark:bg-slate-800 border-2 rounded-xl transition-all shadow-xs overflow-hidden",
+                                previewType === "no-header"
+                                    ? "border-blue-500 ring-2 ring-blue-500/20"
+                                    : "border-slate-200 dark:border-slate-700 hover:border-blue-400"
+                            )}>
+                                <div className="p-3.5 space-y-2.5">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 uppercase tracking-wide">
+                                            Letterhead Paper
+                                        </span>
+                                        {previewType === "no-header" && (
+                                            <span className="text-[11px] font-bold text-blue-600 flex items-center gap-1">
+                                                <Check className="w-3.5 h-3.5" /> Active Preview
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <div className="font-extrabold text-sm text-slate-900 dark:text-white">
+                                            Report (No Header)
+                                        </div>
+                                        <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                            Leaves exact spacing for pre-printed stationary. Automatically merged with back design for double-sided printing.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDownload(false)}
+                                            className="flex-1 py-2 px-3 text-xs font-extrabold text-white bg-blue-600 hover:bg-blue-700 active:scale-98 rounded-lg transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                                            title="Download PDF without header for letterhead paper"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            <span>Download PDF</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setPreviewType("no-header");
+                                                handlePrint(false);
+                                            }}
+                                            className="py-2 px-3 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 active:scale-98 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
+                                            title="Print in-page for letterhead"
+                                        >
+                                            <Printer className="w-3.5 h-3.5" />
+                                            <span>Print</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Duplex Printing Notice Banner */}
+                        <div className="bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-xl p-2.5 text-xs text-emerald-900 dark:text-emerald-200">
+                            <div className="font-bold flex items-center gap-1.5 text-[11.5px]">
+                                <span>📄 Automatic Double-Sided (Duplex) Ready</span>
+                            </div>
+                            <p className="text-[11px] text-emerald-800 dark:text-emerald-300 mt-0.5">
+                                Every front page is followed by the standard back design. Ensure <strong>&quot;Print on both sides&quot;</strong> (Flip on long edge) is enabled in your printer settings.
+                            </p>
+                        </div>
+
+                        {/* Patient & Report Details Footer Box */}
+                        <div className="bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-xl p-3 text-xs space-y-1.5 text-slate-600 dark:text-slate-300">
+                            <div className="flex justify-between font-medium">
+                                <span className="text-slate-400">Sample:</span>
+                                <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[170px]">{sampleTypeText}</span>
+                            </div>
+                            <div className="flex justify-between font-medium">
+                                <span className="text-slate-400">Entered Tests:</span>
+                                <span className="font-bold text-emerald-600">{enteredResults.length} Parameter(s)</span>
+                            </div>
+                            <div className="flex justify-between font-medium">
+                                <span className="text-slate-400">Authorized By:</span>
+                                <span className="font-bold text-slate-800 dark:text-slate-200">{record.authorizedBy || "Dr. Ravi Kumar Manyam"}</span>
+                            </div>
+                            {record.registrationDate && (
+                                <div className="flex justify-between font-medium">
+                                    <span className="text-slate-400">Date:</span>
+                                    <span>{record.registrationDate} {record.registrationTime || ""}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* RIGHT PANEL: Live Interactive PDF Preview */}
+                    <div className="flex-1 flex flex-col bg-slate-900 overflow-hidden">
+                        
+                        {/* Preview Toolbar */}
+                        <div className="flex items-center justify-between px-4 py-2.5 bg-slate-800 border-b border-slate-700 text-xs">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-slate-400 font-semibold mr-2">Preview Mode:</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewType("with-header")}
+                                    className={cn(
+                                        "px-3 py-1 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                                        previewType === "with-header"
+                                            ? "bg-emerald-600 text-white shadow-xs"
+                                            : "text-slate-300 hover:text-white hover:bg-slate-700"
+                                    )}
+                                >
+                                    {previewType === "with-header" && <Check className="w-3.5 h-3.5" />}
+                                    <span>With Header &amp; Footer</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewType("no-header")}
+                                    className={cn(
+                                        "px-3 py-1 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                                        previewType === "no-header"
+                                            ? "bg-blue-600 text-white shadow-xs"
+                                            : "text-slate-300 hover:text-white hover:bg-slate-700"
+                                    )}
+                                >
+                                    {previewType === "no-header" && <Check className="w-3.5 h-3.5" />}
+                                    <span>No Header (Letterhead)</span>
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => handleDownload(currentWithHeader)}
+                                    className="px-3 py-1 text-xs font-bold text-white bg-slate-700 hover:bg-slate-600 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer"
+                                    title="Download currently previewed PDF"
+                                >
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">Download</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handlePrint(currentWithHeader)}
+                                    className="px-3 py-1 text-xs font-bold text-white bg-slate-700 hover:bg-slate-600 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer"
+                                    title="Print currently previewed PDF"
+                                >
+                                    <Printer className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">Print</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* PDF Iframe Viewer */}
+                        <div className="flex-1 p-2 sm:p-3 bg-slate-900/95 flex flex-col min-h-0">
+                            <iframe
+                                key={`report-pdf-viewer-${previewType}-${record._id}`}
+                                src={getApiUrl(`/api/admin/registrations/${record._id}/pdf?header=${currentWithHeader}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`)}
+                                className="w-full flex-1 rounded-lg border border-slate-700 shadow-md bg-white"
+                                title={`Official Pathology Report ${record.registrationNumber}`}
+                            />
+                        </div>
+                    </div>
                 </div>
-                )}
-
             </div>
-
-            {/* Print Media Styles */}
-            <style jsx global>{`
-                @media print {
-                    body * {
-                        visibility: hidden;
-                    }
-                    .fixed, .backdrop-blur-xs {
-                        position: static !important;
-                        background: transparent !important;
-                        padding: 0 !important;
-                    }
-                    body {
-                        background: white !important;
-                    }
-                    /* Show only report canvas */
-                    .print\\:shadow-none, .print\\:shadow-none * {
-                        visibility: visible;
-                    }
-                    .break-before-page {
-                        page-break-before: always !important;
-                        break-before: page !important;
-                    }
-                }
-            `}</style>
         </div>
     );
 }

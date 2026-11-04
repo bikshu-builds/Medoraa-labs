@@ -67,7 +67,7 @@ const Sidebar: React.FC = () => {
   const [success, setSuccess] = useState(false);
 
   // QR Code States
-  const [upiQrCode, setUpiQrCode] = useState<string>("");
+  const [upiQrCode, setUpiQrCode] = useState<string>("/scanner.jpeg");
   const [upiId, setUpiId] = useState<string>("");
   const [isUploadingQr, setIsUploadingQr] = useState(false);
   const [qrSuccessMsg, setQrSuccessMsg] = useState("");
@@ -200,8 +200,10 @@ const Sidebar: React.FC = () => {
       });
       const data = await res.json();
       if (data.success && data.data) {
-        setUpiQrCode(data.data.upiQrCode || "");
+        setUpiQrCode(data.data.upiQrCode || "/scanner.jpeg");
         setUpiId(data.data.upiId || "");
+      } else {
+        setUpiQrCode("/scanner.jpeg");
       }
     } catch (err) {
       console.error("Failed to fetch settings", err);
@@ -264,7 +266,7 @@ const Sidebar: React.FC = () => {
       });
       const data = await res.json();
       if (data.success) {
-        setUpiQrCode("");
+        setUpiQrCode("/scanner.jpeg");
         setQrSuccessMsg("UPI QR Code deleted successfully!");
         setTimeout(() => setQrSuccessMsg(""), 3000);
       } else {
@@ -694,24 +696,30 @@ const Sidebar: React.FC = () => {
                   Active Payment QR Code
                 </h4>
 
-                {upiQrCode ? (
+                {(upiQrCode || "/scanner.jpeg") ? (
                   <div className="flex flex-col items-center gap-3">
                     <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-sm inline-block">
                       <img
-                        src={upiQrCode}
-                        alt="Active UPI QR Code"
-                        className="w-44 h-44 object-contain rounded-lg"
+                        src={upiQrCode || "/scanner.jpeg"}
+                        alt="Active UPI QR Code Scanner"
+                        className="w-48 h-48 object-contain rounded-lg"
                       />
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleDeleteQr}
-                      disabled={isUploadingQr}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold rounded-lg text-xs transition-colors border border-rose-200 cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Delete Uploaded QR
-                    </button>
+                    {upiQrCode && upiQrCode !== "/scanner.jpeg" ? (
+                      <button
+                        type="button"
+                        onClick={handleDeleteQr}
+                        disabled={isUploadingQr}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold rounded-lg text-xs transition-colors border border-rose-200 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Reset to Default Scanner
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        Default Lab Scanner Active
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <div className="py-6 flex flex-col items-center justify-center gap-2 text-slate-400">

@@ -25,8 +25,9 @@ export default function Footer() {
                                 <span className="text-xl font-bold tracking-tight text-white group-hover:text-cyan-200 transition-colors">Medoraa Labs</span>
                             </Link>
                             <p className="text-blue-100/70 text-sm leading-relaxed">
-                                Empowering your health journey with world-class diagnostic expertise and cutting-edge technology. NABL Accredited and trusted by 5000+ patients.
+                               Your health deserves accurate answers. We deliver reliable diagnostic testing, advanced laboratory services, and trusted results to support better healthcare decisions.
                             </p>
+                            <p className="text-blue-100/70 text-sm leading-relaxed">Trusted Diagnostics. Healthier Tomorrow.</p>
                             <div className="flex items-center gap-3">
                                 {["facebook", "twitter", "instagram", "linkedin"].map((social) => (
                                     <a
@@ -74,7 +75,7 @@ export default function Footer() {
                                 {[
                                     { name: "Full Body Checkup", href: "/#services" },
                                     { name: "Diabetes Screening", href: "/#services" },
-                                    { name: "Heart Care Packages", href: "/#services" },
+                                    
                                     { name: "Home Sample Collection", href: "/#process" },
                                     { name: "Corporate Wellness", href: "/#services" }
                                 ].map((service) => (
@@ -100,7 +101,7 @@ export default function Footer() {
                                         </svg>
                                     </div>
                                     <span className="text-blue-100/70 text-sm">
-                                        123 Diagnostic Lane, Medical Square, Cityville, State 560001
+                                       13-598/1, Tulasinagar 1st Lane, Pantakaluvva Road, Beside Federal Bank Lane, Kanuru, Vijayawada - 520 007.
                                     </span>
                                 </li>
                                 <li className="flex gap-3">
@@ -109,7 +110,7 @@ export default function Footer() {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                                         </svg>
                                     </div>
-                                    <span className="text-blue-100/70 text-sm">+91 63018 51252</span>
+                                    <span className="text-blue-100/70 text-sm">0866-2551236 / +91 9490261236</span>
                                 </li>
                             </ul>
                         </div>
