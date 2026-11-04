@@ -1,4 +1,5 @@
 const puppeteer = require("puppeteer");
+const { attachDuplexBackside } = require("./pdfDuplexMerger");
 const fs = require("fs");
 const path = require("path");
 
@@ -91,7 +92,7 @@ async function resetBrowser() {
  * @param {Object} record Patient registration document
  * @returns {Promise<Buffer>} PDF Buffer
  */
-async function generatePathologyPDF(record, options = {}) {
+function buildPathologyReportHTML(record, options = {}) {
     const includeHeaderFooter = options.includeHeaderFooter !== false;
     const includeWatermark = options.watermark !== false;
     const { headerBase64, footerBase64, logoBase64 } = getLetterheadAssets();
@@ -177,6 +178,46 @@ async function generatePathologyPDF(record, options = {}) {
     });
 
     const categoryKeys = Object.keys(categoryGroups);
+
+    // Build paginated report pages: strictly maximum 8 tests per page, category-wise
+    const TESTS_PER_PAGE = 8;
+    const reportPages = [];
+
+    categoryKeys.forEach((categoryName) => {
+        const catItems = categoryGroups[categoryName] || [];
+        const totalCatTests = catItems.length;
+
+        if (totalCatTests === 0) {
+            reportPages.push({
+                categoryName,
+                items: [],
+                pageInCat: 1,
+                totalCatPages: 1,
+                isContinuation: false,
+                isLastInCat: true,
+            });
+            return;
+        }
+
+        const totalCatPages = Math.ceil(totalCatTests / TESTS_PER_PAGE);
+        for (let i = 0; i < totalCatTests; i += TESTS_PER_PAGE) {
+            const pageItems = catItems.slice(i, i + TESTS_PER_PAGE);
+            const pageInCat = Math.floor(i / TESTS_PER_PAGE) + 1;
+            const isContinuation = i > 0;
+            const isLastInCat = (i + TESTS_PER_PAGE) >= totalCatTests;
+
+            reportPages.push({
+                categoryName,
+                items: pageItems,
+                pageInCat,
+                totalCatPages,
+                isContinuation,
+                isLastInCat,
+            });
+        }
+    });
+
+    const totalReportPages = reportPages.length;
 
     // Format sample text
     let sampleTypeText = "Clot-Act, Urine";
@@ -425,9 +466,9 @@ async function generatePathologyPDF(record, options = {}) {
         </style>
     </head>
     <body>
-        ${categoryKeys.map((categoryName, catIndex) => {
-            const items = categoryGroups[categoryName];
-            const isLastPage = catIndex === categoryKeys.length - 1;
+        ${reportPages.map((pageData, pageIndex) => {
+            const { categoryName, items, isLastInCat } = pageData;
+            const isLastPage = pageIndex === totalReportPages - 1;
 
             let titleDisplay = categoryName.trim().replace(/#+$/, "").trim();
             if (titleDisplay === titleDisplay.toUpperCase()) {
@@ -483,7 +524,7 @@ async function generatePathologyPDF(record, options = {}) {
                                 <div class="patient-card-row last-row">
                                     <div class="patient-card-cell with-divider" style="width: 50%;">
                                         <div class="meta-label">REF. BY</div>
-                                        <div class="meta-val">${record.referredBy || "Self"}</div>
+                                        <div class="meta-val">${(record.referredBy || "Self").replace(/\s*\(Medoraa Labs\s*\(Our Lab\)\)/gi, "").replace(/\s*\(Our Lab\)/gi, "").replace(/\s*\(Medoraa Labs\)/gi, "").trim() || "Self"}</div>
                                     </div>
                                     <div class="patient-card-cell" style="width: 50%;">
                                         <div class="meta-label">SAMPLE TYPE</div>
@@ -516,7 +557,7 @@ async function generatePathologyPDF(record, options = {}) {
                             </table>
                             <div class="test-method-line">${sampleTypeText} | ${methodText}</div>
 
-                            ${record.notes ? `
+                            ${isLastPage && record.notes ? `
                                 <div style="font-size: 10px; color: #334155; margin-bottom: 8px;">
                                     <strong>Clinical Remarks:</strong> <em>${record.notes}</em>
                                 </div>
@@ -533,9 +574,7 @@ async function generatePathologyPDF(record, options = {}) {
                             </div>
                         </div>
 
-                        ${categoryKeys.length > 1 ? `
-                        <div class="page-number">Page ${catIndex + 1} of ${categoryKeys.length}</div>
-                        ` : ""}
+                        <div class="page-number">Page ${pageIndex + 1} of ${totalReportPages}</div>
                     </div>
 
                     <!-- Footer Banner -->
@@ -547,11 +586,19 @@ async function generatePathologyPDF(record, options = {}) {
                     <div class="letterhead-clearance-bottom"></div>
                     `}
                 </div>
+
+
             `;
         }).join("")}
     </body>
     </html>
     `;
+
+    return htmlContent;
+}
+
+async function generatePathologyPDF(record, options = {}) {
+    const htmlContent = buildPathologyReportHTML(record, { ...options, forPdf: true });
 
     // Acquire singleton/reused browser instance
     let browser;
@@ -570,7 +617,7 @@ async function generatePathologyPDF(record, options = {}) {
                 right: "0mm"
             }
         });
-        return pdfBuffer;
+        return await attachDuplexBackside(pdfBuffer, options);
     } catch (err) {
         await resetBrowser();
         throw err;
@@ -1338,6 +1385,8 @@ function buildReceiptHTML(record, autoPrint = false, options = {}) {
             `}
 
         </div>
+
+
     `;
     }).join("")}
         ${autoPrint ? `<script>
@@ -1352,7 +1401,7 @@ function buildReceiptHTML(record, autoPrint = false, options = {}) {
 }
 
 async function generateReceiptPDF(record, options = {}) {
-    const htmlContent = buildReceiptHTML(record, false, options);
+    const htmlContent = buildReceiptHTML(record, false, { ...options, forPdf: true });
 
     let browser;
     let page;
@@ -1370,7 +1419,7 @@ async function generateReceiptPDF(record, options = {}) {
                 right: "0mm"
             }
         });
-        return pdfBuffer;
+        return await attachDuplexBackside(pdfBuffer, options);
     } catch (err) {
         await resetBrowser();
         throw err;
@@ -1394,6 +1443,7 @@ function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
     const pageW = "50mm";
     const pageH = "15mm";
 
+    const patientId = (record.registrationNumber || record.patientId || "").toUpperCase().trim();
     const patientName = (record.patientName || "").toUpperCase().trim() || "PATIENT";
     const ageVal = record.age?.value || "";
     let ageType = "Y";
@@ -1405,11 +1455,11 @@ function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
 
     // Dynamic scaling for name (+2px larger: base 8.0px)
     const nameLen = patientName.length;
-    let nameFontSize = "8.0px";
+    let nameFontSize = "7.2px";
     if (nameLen > 28) {
-        nameFontSize = "6.8px";
+        nameFontSize = "6.2px";
     } else if (nameLen > 20) {
-        nameFontSize = "7.4px";
+        nameFontSize = "6.8px";
     }
 
     // Extract all test names into a single list
@@ -1446,15 +1496,15 @@ function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
         testLineHeight = "1.08";
     }
 
-    const topPadding = testsLen > 180 ? "3.0mm" : "4.0mm";
-    const rowMargin = testsLen > 180 ? "0.05mm" : "0.1mm";
+    const topPadding = testsLen > 180 ? "2.2mm" : testsLen > 70 ? "2.8mm" : "3.2mm";
+    const rowMargin = testsLen > 180 ? "0.06mm" : "0.15mm";
 
     return `
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8" />
-        <title>Bottle Label - ${record.patientName || 'Specimen'}</title>
+        <title>Sample Label - ${record.patientName || 'Specimen'}</title>
         <style>
             @page {
                 size: ${pageW} ${pageH};
@@ -1528,7 +1578,13 @@ function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
                 line-height: 1.1;
                 margin: 0 0 ${rowMargin} 0;
                 padding: 0;
-                gap: 2.5mm;
+                gap: 1.8mm;
+            }
+            .id-val {
+                font-size: 6.2px;
+                font-weight: 700;
+                color: #000000;
+                letter-spacing: 0.1px;
             }
             .test-row {
                 display: block;
@@ -1583,8 +1639,9 @@ function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
                 <div class="label-row name-row">
                     <span class="lbl-key">N:</span>&nbsp;<span class="lbl-val name-val" style="font-size: ${nameFontSize};">${patientName}</span>
                 </div>
-                <!-- Line 2: AGE: and G: -->
+                <!-- Line 2: ID, AGE: and G: -->
                 <div class="label-row demo-row">
+                    <div><span class="lbl-key">ID:</span>&nbsp;<span class="lbl-val id-val">${patientId || 'N/A'}</span></div>
                     <div><span class="lbl-key">AGE:</span>&nbsp;<span class="lbl-val">${ageDisplay}</span></div>
                     <div><span class="lbl-key">G:</span>&nbsp;<span class="lbl-val">${genderDisplay}</span></div>
                 </div>
@@ -1607,7 +1664,7 @@ function buildBottleLabelHTML(record, autoPrint = false, rotation = 0) {
     `;
 }
 
-module.exports = { generatePathologyPDF, generateTransferLabelPDF, generateReceiptPDF, buildReceiptHTML, buildBottleLabelHTML, getBrowser };
+module.exports = { buildPathologyReportHTML, generatePathologyPDF, generateTransferLabelPDF, generateReceiptPDF, buildReceiptHTML, buildBottleLabelHTML, attachDuplexBackside, getBrowser };
 
 
 

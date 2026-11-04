@@ -428,8 +428,10 @@ exports.downloadReportPDF = async (req, res) => {
     const includeHeaderFooter = req.query.header !== 'false' && req.query.withHeader !== 'false';
     const isDownload = req.query.download === 'true';
 
+    const autoPrint = req.query.autoprint === 'true' || req.query.print === 'true';
+
     // Generate PDF Buffer
-    const pdfBuffer = await generatePathologyPDF(registration, { includeHeaderFooter });
+    const pdfBuffer = await generatePathologyPDF(registration, { includeHeaderFooter, autoPrint });
 
     const baseName = `Pathology_Report_${registration.registrationNumber || registration._id}`;
     const filename = includeHeaderFooter ? `${baseName}.pdf` : `${baseName}_Letterhead.pdf`;
@@ -589,7 +591,9 @@ exports.downloadReceiptPDF = async (req, res) => {
     const includeHeaderFooter = req.query.header !== 'false' && req.query.withHeader !== 'false';
     const isDownload = req.query.download === 'true';
 
-    const pdfBuffer = await generateReceiptPDF(registration, { includeHeaderFooter });
+    const autoPrint = req.query.autoprint === 'true' || req.query.print === 'true';
+
+    const pdfBuffer = await generateReceiptPDF(registration, { includeHeaderFooter, autoPrint });
 
     const baseName = `Receipt_${registration.registrationNumber || registration._id}`;
     const filename = includeHeaderFooter ? `${baseName}.pdf` : `${baseName}_Letterhead.pdf`;
@@ -610,6 +614,34 @@ exports.downloadReceiptPDF = async (req, res) => {
         success: false,
         message: "Error generating receipt PDF: " + err.message,
       });
+  }
+};
+
+// @desc    Instant HTML preview/print of Pathology Report (no Puppeteer — for in-page print)
+// @route   GET /api/admin/registrations/:id/report-html
+exports.downloadReportHTML = async (req, res) => {
+  try {
+    const { buildPathologyReportHTML } = require("../services/pdfGenerator");
+
+    const registration = await PatientRegistration.findById(
+      req.params.id,
+    ).populate("tests");
+
+    if (!registration) {
+      return res
+        .status(404)
+        .send("<h3>Registration not found</h3>");
+    }
+
+    const includeHeaderFooter = req.query.header !== 'false' && req.query.withHeader !== 'false';
+    const html = buildPathologyReportHTML(registration, { includeHeaderFooter });
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    return res.send(html);
+  } catch (err) {
+    console.error("Report HTML Error:", err);
+    return res.status(500).send("<h3>Error generating report preview: " + err.message + "</h3>");
   }
 };
 
@@ -667,5 +699,47 @@ exports.downloadBottleLabelHTML = async (req, res) => {
   } catch (err) {
     console.error("Bottle Label HTML Error:", err);
     return res.status(500).send("<h3>Error generating label: " + err.message + "</h3>");
+  }
+};
+
+
+// @desc    Delete a single patient registration
+// @route   DELETE /api/admin/registrations/:id
+exports.deleteRegistration = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const registration = await PatientRegistration.findByIdAndDelete(id);
+
+    if (!registration) {
+      return res.status(404).json({ success: false, message: "Registration not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Registration ${registration.registrationNumber || id} deleted successfully`,
+    });
+  } catch (err) {
+    console.error("Delete Registration Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Delete ALL patient registrations
+// @route   DELETE /api/admin/registrations
+exports.deleteAllRegistrations = async (req, res) => {
+  try {
+    const result = await PatientRegistration.deleteMany({});
+
+    // Also reset registration counter so sequence starts fresh
+    await Counter.deleteMany({ _id: { $regex: /^registrationCode-/ } });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully deleted all ${result.deletedCount} patient registrations`,
+      deletedCount: result.deletedCount,
+    });
+  } catch (err) {
+    console.error("Delete All Registrations Error:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };

@@ -41,8 +41,10 @@ import {
   ArrowUpDown,
   RotateCcw,
   SlidersHorizontal,
+  Trash2,
 } from "lucide-react";
 import { getApiUrl } from "@/lib/api";
+import { printPdfDirect } from "@/lib/pdfPrinter";
 import { cn } from "@/lib/utils";
 import JsBarcode from "jsbarcode";
 import * as XLSX from "xlsx";
@@ -86,7 +88,7 @@ const Barcode: React.FC<BarcodeProps> = ({
   return <svg ref={svgRef}></svg>;
 };
 
-// Container badge color and text parser for thermal bottle labels
+// Container badge color and text parser for thermal sample labels
 const getContainerBadgeInfo = (test: any, samplesList: any[] = []) => {
   let containerStr = "";
   let testNameStr = "";
@@ -468,6 +470,7 @@ const PatientRegistrationForm: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [isLoadingRegistrations, setIsLoadingRegistrations] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [patientSearchQuery, setPatientSearchQuery] = useState("");
   const [userRole, setUserRole] = useState<string>("registration");
 
@@ -549,7 +552,7 @@ const PatientRegistrationForm: React.FC = () => {
         referredBy: found.referredBy || "Self",
         sampleDrawnBy: found.sampleDrawnBy || "",
         referralMode: found.referralMode || "Self",
-        selectedLab: found.selectedLab || "Medoraa Labs (Our Lab)",
+        selectedLab: found.selectedLab || "",
       }));
     } else {
       setIsExistingPatientLoaded(false);
@@ -572,7 +575,7 @@ const PatientRegistrationForm: React.FC = () => {
     referredBy: "Self",
     sampleDrawnBy: "",
     referralMode: "Self" as "Self" | "Hospital",
-    selectedLab: "Medoraa Labs (Our Lab)",
+    selectedLab: "",
     selectedHospital: "",
     selectedDoctor: "",
     sampleReceived: {
@@ -695,6 +698,82 @@ const PatientRegistrationForm: React.FC = () => {
     password: "",
   });
 
+
+  const handleDeleteAllRegistrations = async () => {
+    if (!registrations || registrations.length === 0) {
+      alert("No patient registration records available to delete.");
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      `⚠️ CRITICAL WARNING: Are you sure you want to PERMANENTLY DELETE ALL ${registrations.length} patient registrations?\n\nThis will remove all patient details, billing records, and test reports.\n\nThis action CANNOT be undone. Click OK to proceed.`
+    );
+    if (!confirmDelete) return;
+
+    const secondConfirm = window.prompt(
+      `Please type "DELETE" to confirm permanent deletion of all ${registrations.length} patient records:`
+    );
+    if (secondConfirm !== "DELETE") {
+      alert("Batch deletion canceled. Confirmation text did not match.");
+      return;
+    }
+
+    setIsDeletingAll(true);
+    try {
+      const token = localStorage.getItem("adminToken");
+      const res = await fetch(getApiUrl("/api/admin/registrations"), {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message || "All patient registrations deleted successfully.");
+        fetchRegistrations();
+        fetchNextPatientId();
+      } else {
+        alert(data.message || "Failed to delete patient registrations.");
+      }
+    } catch (err: any) {
+      console.error("Batch delete error:", err);
+      alert(err.message || "An unexpected error occurred while deleting registrations.");
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
+
+  const handleDeleteRegistration = async (
+    id: string,
+    patientName: string,
+    regNo: string,
+  ) => {
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete patient registration ${regNo} (${patientName || "Patient"})?\n\nThis action cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const token = localStorage.getItem("adminToken");
+      const res = await fetch(getApiUrl(`/api/admin/registrations/${id}`), {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchRegistrations();
+        fetchNextPatientId();
+      } else {
+        alert(data.message || "Failed to delete patient registration.");
+      }
+    } catch (err: any) {
+      console.error("Delete registration error:", err);
+      alert(err.message || "An unexpected error occurred while deleting registration.");
+    }
+  };
+
   const fetchRegistrations = async () => {
     setIsLoadingRegistrations(true);
     try {
@@ -816,31 +895,16 @@ const PatientRegistrationForm: React.FC = () => {
     }
   };
 
-  const handlePrintReceipt = (recordToPrint?: any, includeHeader: boolean = true) => {
+  const handlePrintReceipt = async (recordToPrint?: any, includeHeader: boolean = true) => {
     const target = recordToPrint || savedRecord;
     if (!target?._id) return;
 
-    // Print directly from current screen via a hidden iframe (no new browser tab opened)
-    let iframe = document.getElementById("receipt-print-hidden-frame") as HTMLIFrameElement;
-    if (!iframe) {
-      iframe = document.createElement("iframe");
-      iframe.id = "receipt-print-hidden-frame";
-      iframe.style.position = "fixed";
-      iframe.style.top = "-9999px";
-      iframe.style.left = "-9999px";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "none";
-      iframe.style.visibility = "hidden";
-      document.body.appendChild(iframe);
-    }
-
-    // Set src with autoprint=true and header parameter to trigger the print dialog in-page
-    iframe.src = getApiUrl(
-      `/api/admin/registrations/${target._id}/receipt-html?v=${Date.now()}&autoprint=true&header=${includeHeader}`,
+    // Print PDF using the exact same duplex PDF generated for Download
+    const pdfUrl = getApiUrl(
+      `/api/admin/registrations/${target._id}/receipt-pdf?header=${includeHeader}&autoprint=true&t=${Date.now()}`,
     );
+    await printPdfDirect(pdfUrl);
   };
-
   const generateBottleLabelHTML = (
     record: any,
     _rotation: any = 0,
@@ -850,6 +914,7 @@ const PatientRegistrationForm: React.FC = () => {
     const pageW = "50mm";
     const pageH = "15mm";
 
+    const patientId = (record.registrationNumber || record.patientId || "").toUpperCase().trim();
     const patientName = (record.patientName || "").toUpperCase().trim() || "PATIENT";
     const ageVal = record.age?.value || "";
     let ageType = "Y";
@@ -863,11 +928,11 @@ const PatientRegistrationForm: React.FC = () => {
 
     // Dynamic scaling for name (+2px larger: base 8.0px)
     const nameLen = patientName.length;
-    let nameFontSize = "7.0px";
+    let nameFontSize = "7.2px";
     if (nameLen > 28) {
-      nameFontSize = "6.8px";
+      nameFontSize = "6.2px";
     } else if (nameLen > 20) {
-      nameFontSize = "7.4px";
+      nameFontSize = "6.8px";
     }
 
     // Extract all test names into a single unified list
@@ -906,14 +971,14 @@ const PatientRegistrationForm: React.FC = () => {
       testLineHeight = "1.08";
     }
 
-    const topPadding = testsLen > 180 ? "3.0mm" : "4.0mm";
-    const rowMargin = testsLen > 180 ? "0.05mm" : "0.1mm";
+    const topPadding = testsLen > 180 ? "2.2mm" : testsLen > 70 ? "2.8mm" : "3.2mm";
+    const rowMargin = testsLen > 180 ? "0.06mm" : "0.15mm";
 
     return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Bottle Label - ${record.patientName || "Specimen"}</title>
+  <title>Sample Label - ${record.patientName || "Specimen"}</title>
   <style>
     @page {
       size: ${pageW} ${pageH};
@@ -1005,7 +1070,13 @@ const PatientRegistrationForm: React.FC = () => {
       line-height: 1.1;
       margin: 0 0 ${rowMargin} 0;
       padding: 0;
-      gap: 2.5mm;
+      gap: 1.8mm;
+    }
+    .id-val {
+      font-size: 6.2px;
+      font-weight: 700;
+      color: #000000;
+      letter-spacing: 0.1px;
     }
     .test-row {
       display: block;
@@ -1060,8 +1131,9 @@ const PatientRegistrationForm: React.FC = () => {
       <div class="label-row name-row">
         <span class="lbl-key">N:</span>&nbsp;<span class="lbl-val name-val" style="font-size: ${nameFontSize};">${patientName}</span>
       </div>
-      <!-- Line 2: AGE: and G: -->
+      <!-- Line 2: ID, AGE, and G: -->
       <div class="label-row demo-row">
+        <div><span class="lbl-key">ID:</span>&nbsp;<span class="lbl-val id-val">${patientId || "N/A"}</span></div>
         <div><span class="lbl-key">AGE:</span>&nbsp;<span class="lbl-val">${ageDisplay}</span></div>
         <div><span class="lbl-key">G:</span>&nbsp;<span class="lbl-val">${genderDisplay}</span></div>
       </div>
@@ -1116,7 +1188,7 @@ const PatientRegistrationForm: React.FC = () => {
           iframe.contentWindow?.focus();
           iframe.contentWindow?.print();
         } catch (e) {
-          console.error("Bottle label print error:", e);
+          console.error("Sample Label print error:", e);
         }
       }, 150);
     }
@@ -1384,7 +1456,7 @@ const PatientRegistrationForm: React.FC = () => {
 
     const refVal = record.referredBy || "Self";
     let referralMode: "Self" | "Hospital" = "Self";
-    let selectedLab = "Medoraa Labs (Our Lab)";
+    let selectedLab = "";
     let selectedHospital = "";
     let selectedDoctor = "";
 
@@ -1393,7 +1465,8 @@ const PatientRegistrationForm: React.FC = () => {
       const startIndex = refVal.indexOf("(");
       const endIndex = refVal.lastIndexOf(")");
       if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-        selectedLab = refVal.slice(startIndex + 1, endIndex);
+        const labInside = refVal.slice(startIndex + 1, endIndex);
+        selectedLab = labInside === "Medoraa Labs (Our Lab)" ? "" : labInside;
 
         // Parse hospital name if present in the lab name, e.g. "Apollo Lab (Apollo Hospital)"
         const labOpenParen = selectedLab.lastIndexOf(" (");
@@ -1506,7 +1579,7 @@ const PatientRegistrationForm: React.FC = () => {
       referredBy: "Self",
       sampleDrawnBy: "",
       referralMode: "Self",
-      selectedLab: "Medoraa Labs (Our Lab)",
+      selectedLab: "",
       selectedHospital: "",
       selectedDoctor: "",
       sampleReceived: {
@@ -1604,7 +1677,9 @@ const PatientRegistrationForm: React.FC = () => {
       const referredByValue =
         (formData.referralMode || "Self") === "Hospital"
           ? `${formData.selectedDoctor || ""} (${formData.selectedHospital || ""})`
-          : `Self (${formData.selectedLab || "Medoraa Labs (Our Lab)"})`;
+          : formData.selectedLab && formData.selectedLab !== "Medoraa Labs (Our Lab)"
+            ? `Self (${formData.selectedLab})`
+            : "Self";
 
       // Clean up sampleReceived depending on what is selected
       const cleanedSampleReceived = { ...formData.sampleReceived };
@@ -1743,7 +1818,6 @@ const PatientRegistrationForm: React.FC = () => {
     ...staff.map((s) => `${s.name} (${s.role || "Staff"})`),
   ];
   const labOptions = [
-    "Medoraa Labs (Our Lab)",
     ...hospitals.flatMap((h) =>
       (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`),
     ),
@@ -1778,7 +1852,6 @@ const PatientRegistrationForm: React.FC = () => {
       ]
       : [
         "Self",
-        "Medoraa Labs (Our Lab)",
         // All labs (with hospital name)
         ...hospitals.flatMap((h) =>
           (h.labs || []).map((l: any) => `${l.labName} (${h.hospitalName})`),
@@ -1804,12 +1877,10 @@ const PatientRegistrationForm: React.FC = () => {
   const currentReferredBy = (() => {
     if ((formData.referralMode || "Self") === "Self") {
       if (
-        (formData.selectedLab || "Medoraa Labs (Our Lab)") ===
-        "Medoraa Labs (Our Lab)"
+        !formData.selectedLab ||
+        formData.selectedLab === "Medoraa Labs (Our Lab)"
       ) {
-        return formData.selectedHospital === "Self"
-          ? "Self"
-          : "Medoraa Labs (Our Lab)";
+        return "Self";
       }
       if (formData.selectedHospital && formData.selectedHospital !== "Self") {
         const suffix = ` (${formData.selectedHospital})`;
@@ -1817,7 +1888,7 @@ const PatientRegistrationForm: React.FC = () => {
           return formData.selectedLab.slice(0, -suffix.length);
         }
       }
-      return formData.selectedLab || "";
+      return formData.selectedLab || "Self";
     }
     if (formData.selectedHospital && formData.selectedHospital !== "Self") {
       return formData.selectedDoctor || "";
@@ -1838,10 +1909,10 @@ const PatientRegistrationForm: React.FC = () => {
     if (val === "Self" || val === "Medoraa Labs (Our Lab)") {
       setFormData((prev) => ({
         ...prev,
-        selectedHospital: val === "Self" ? "Self" : "",
+        selectedHospital: "Self",
         selectedDoctor: "Self",
         referralMode: "Self",
-        selectedLab: "Medoraa Labs (Our Lab)",
+        selectedLab: "",
       }));
     } else {
       if (formData.selectedHospital && formData.selectedHospital !== "Self") {
@@ -2160,6 +2231,11 @@ const PatientRegistrationForm: React.FC = () => {
                                       {sample.organ}
                                     </span>
                                   )}
+                                  {sample.container && sample.container !== "-" && (
+                                    <span className="px-2 py-0.5 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 text-[8px] font-extrabold uppercase tracking-wide rounded border border-teal-200/60 dark:border-teal-800/60">
+                                      Container: {sample.container}
+                                    </span>
+                                  )}
                                 </div>
                                 <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight truncate font-bold">
                                   {sample.testName}
@@ -2168,7 +2244,7 @@ const PatientRegistrationForm: React.FC = () => {
                                   <span>Method: {sample.method || "-"}</span>
                                   <span>•</span>
                                   <span>
-                                    Specimen: {sample.sampleUsedForTest || "-"}
+                                    Sample Used: {sample.sampleUsedForTest || "-"}
                                   </span>
                                 </div>
                               </div>
@@ -2236,8 +2312,9 @@ const PatientRegistrationForm: React.FC = () => {
                             <p className="font-bold text-slate-800 dark:text-slate-200 truncate uppercase tracking-tight">
                               {t.testName}
                             </p>
-                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 truncate">
                               {t.category}
+                              {t.container && t.container !== "-" ? ` • ${t.container}` : ""}
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
@@ -2534,16 +2611,25 @@ const PatientRegistrationForm: React.FC = () => {
                 billing slips.
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
               {userRole === "admin" && (
                 <button
                   onClick={handleExportRegistrations}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-lg text-xs text-slate-700 dark:text-slate-350 transition-all active:scale-95 cursor-pointer shadow-sm"
+                  className="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-lg text-xs text-slate-700 dark:text-slate-350 transition-all active:scale-95 cursor-pointer shadow-sm"
                 >
                   <FileSpreadsheet className="w-4 h-4" />
                   <span>Export Excel</span>
                 </button>
               )}
+              <button
+                onClick={handleDeleteAllRegistrations}
+                disabled={isDeletingAll || registrations.length === 0}
+                className="flex items-center gap-1.5 px-3.5 py-2 border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 text-rose-700 dark:text-rose-400 font-bold rounded-lg text-xs transition-all active:scale-95 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Permanently delete all patient registrations"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isDeletingAll ? "Deleting..." : "Delete All"}</span>
+              </button>
               <button
                 onClick={() => {
                   resetFormFields(true);
@@ -3637,11 +3723,24 @@ const PatientRegistrationForm: React.FC = () => {
                                       handlePrintLabels(undefined, reg);
                                     }}
                                     className="p-1.5 bg-teal-50 dark:bg-teal-900/30 text-teal-650 dark:text-teal-400 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                                    title="Print Bottle Labels"
+                                    title="Print Sample Labels"
                                   >
                                     <Activity className="w-3.5 h-3.5" />
                                   </button>
                                 )}
+                                <button
+                                  onClick={() =>
+                                    handleDeleteRegistration(
+                                      reg._id,
+                                      reg.patientName,
+                                      reg.registrationNumber,
+                                    )
+                                  }
+                                  className="p-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                  title="Delete Registration"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -4654,8 +4753,10 @@ const PatientRegistrationForm: React.FC = () => {
             {/* 2-Column Layout: Left Side = Options Panel, Right Side = PDF Preview */}
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-100 dark:bg-slate-950">
               {/* LEFT PANEL: Options & Action Cards (No Scrollbar) */}
-              <div className="w-full md:w-[310px] lg:w-[330px] p-4 sm:p-5 bg-slate-50/90 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 print:hidden flex flex-col justify-between overflow-hidden space-y-4 shrink-0">
-                <div className="space-y-4">
+              <div className="w-full md:w-[320px] lg:w-[340px] p-3 sm:p-4 bg-slate-50/90 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 print:hidden flex flex-col h-full overflow-hidden shrink-0">
+                {/* Scrollable Options List */}
+                <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-0">
+
                   {/* Section Title */}
                   <div>
                     <div className="text-xs font-black tracking-wider text-slate-500 uppercase">
@@ -4684,7 +4785,7 @@ const PatientRegistrationForm: React.FC = () => {
                               Receipt (With Header)
                             </div>
                             <div className="text-[10.5px] font-normal text-slate-400">
-                              Official banners & logo watermark
+                              Official banners & logo watermark • Duplex (Front + Back)
                             </div>
                           </div>
                         </div>
@@ -4737,7 +4838,7 @@ const PatientRegistrationForm: React.FC = () => {
                               Receipt (No Header)
                             </div>
                             <div className="text-[10.5px] font-normal text-slate-400">
-                              Clearance for pre-printed letterhead
+                              Clearance for pre-printed letterhead • Duplex (Front + Back)
                             </div>
                           </div>
                         </div>
@@ -4774,19 +4875,19 @@ const PatientRegistrationForm: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Option 2: Print Bottle Labels (Exact 50x15mm) */}
+                    {/* Option 2: Print Sample Labels (Exact 50x15mm) */}
                     <div className="bg-white dark:bg-slate-800 border-2 border-emerald-400/80 hover:border-emerald-500 rounded-xl transition-all shadow-xs overflow-hidden">
                       <button
                         type="button"
                         onClick={() => handlePrintLabels(0)}
                         className="w-full py-2.5 px-3.5 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 transition-all active:scale-[0.99] flex items-center justify-between cursor-pointer"
-                        title="Print 50×15mm Bottle Label"
+                        title="Print 50×15mm Sample Label"
                       >
                         <div className="flex items-center gap-2.5">
                           <Printer className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                           <div className="text-left">
                             <div className="font-bold text-xs sm:text-sm flex items-center gap-1.5">
-                              <span>Print Bottle Label</span>
+                              <span>Print Sample Label</span>
                               <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-extrabold px-1.5 py-0.5 rounded">
                                 50×15mm
                               </span>
@@ -4849,7 +4950,8 @@ const PatientRegistrationForm: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="space-y-3 pt-2">
+                {/* Always-visible Pinned Bottom Action Buttons */}
+                <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-800 space-y-2 shrink-0 bg-slate-50/90 dark:bg-slate-900">
                   {/* Divider OR */}
                   <div className="relative flex items-center">
                     <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
@@ -4930,7 +5032,7 @@ const PatientRegistrationForm: React.FC = () => {
                           : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700",
                       )}
                     >
-                      Bottle Label (50×15mm)
+                      Sample Label (50×15mm)
                     </button>
                   </div>
                   <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline">
@@ -4979,7 +5081,7 @@ const PatientRegistrationForm: React.FC = () => {
                           type="button"
                           onClick={() => handlePrintLabels(0)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer ml-auto"
-                          title="Print 50×15mm Bottle Label"
+                          title="Print 50×15mm Sample Label"
                         >
                           <Printer className="w-3.5 h-3.5" />
                           <span>Print Label</span>
@@ -5002,7 +5104,7 @@ const PatientRegistrationForm: React.FC = () => {
                             height: "108px",
                           }}
                           className="rounded-lg border-2 border-emerald-500 shadow-md bg-white overflow-hidden transition-all duration-300"
-                          title="Bottle Label Live Preview"
+                          title="Sample Label Live Preview"
                         />
                       </div>
 
@@ -5014,7 +5116,7 @@ const PatientRegistrationForm: React.FC = () => {
                           className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                         >
                           <Printer className="w-4 h-4" />
-                          <span>Print Bottle Label (50×15mm)</span>
+                          <span>Print Sample Label (50×15mm)</span>
                         </button>
                       </div>
 
@@ -5083,6 +5185,7 @@ const PatientRegistrationForm: React.FC = () => {
               : "Y";
             const ageDisplay = ageValue ? `${ageValue} ${ageType}` : "N/A";
             const genderDisplay = (savedRecord.gender || "N/A").toUpperCase();
+            const patientId = (savedRecord.registrationNumber || savedRecord.patientId || "").toUpperCase().trim();
             const patientName = (savedRecord.patientName || "PATIENT").toUpperCase().trim();
 
             // Dynamic scaling for name to fit within 44mm without truncation
@@ -5123,8 +5226,11 @@ const PatientRegistrationForm: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Line 2: AGE: and G: */}
+                  {/* Line 2: ID, AGE: and G: */}
                   <div className="label-text-row demo-row">
+                    <div>
+                      <span className="label-field-key">ID:</span>&nbsp;<span className="label-field-val label-id-val">{patientId || "N/A"}</span>
+                    </div>
                     <div>
                       <span className="label-field-key">AGE:</span>&nbsp;<span className="label-field-val">{ageDisplay}</span>
                     </div>
@@ -5225,7 +5331,7 @@ const PatientRegistrationForm: React.FC = () => {
         max-width: 48.5mm !important;
         box-sizing: border-box !important;
         margin: 0 !important;
-        padding: 4.0mm 0.8mm 0 0.8mm !important;
+        padding: 3.2mm 0.8mm 0 0.8mm !important;
         display: block !important;
         text-align: left !important;
         background: white !important;
@@ -5249,7 +5355,7 @@ const PatientRegistrationForm: React.FC = () => {
 
       .name-row {
         white-space: nowrap !important;
-        line-height: 1.15 !important;
+        line-height: 1.1 !important;
         margin-bottom: 0.15mm !important;
       }
 
@@ -5257,7 +5363,14 @@ const PatientRegistrationForm: React.FC = () => {
         white-space: nowrap !important;
         line-height: 1.15 !important;
         margin-bottom: 0.15mm !important;
-        gap: 2.5mm !important;
+        gap: 1.8mm !important;
+      }
+
+      .label-id-val {
+        font-size: 6.2px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.1px !important;
+        color: black !important;
       }
 
       .label-test-row {

@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Download, X, FileText, Check, Printer, CheckCircle2, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getApiUrl } from "@/lib/api";
+import { printPdfDirect } from "@/lib/pdfPrinter";
 
 interface TestResultEntry {
     testId?: any;
@@ -80,30 +81,11 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
         document.body.removeChild(link);
     };
 
-    // Direct in-page print helper (no extra blank tabs)
-    const handlePrint = (withHeader: boolean) => {
+    // Print PDF using the exact same duplex PDF generated for Download
+    const handlePrint = async (withHeader: boolean) => {
         if (!record?._id) return;
-        const pdfUrl = getApiUrl(`/api/admin/registrations/${record._id}/pdf?header=${withHeader}`);
-        const existing = document.getElementById("report-print-iframe");
-        if (existing) existing.remove();
-        const iframe = document.createElement("iframe");
-        iframe.id = "report-print-iframe";
-        iframe.style.position = "fixed";
-        iframe.style.right = "0";
-        iframe.style.bottom = "0";
-        iframe.style.width = "0";
-        iframe.style.height = "0";
-        iframe.style.border = "none";
-        iframe.src = pdfUrl;
-        document.body.appendChild(iframe);
-        iframe.onload = () => {
-            try {
-                iframe.contentWindow?.focus();
-                iframe.contentWindow?.print();
-            } catch (e) {
-                console.error(e);
-            }
-        };
+        const pdfUrl = getApiUrl(`/api/admin/registrations/${record._id}/pdf?header=${withHeader}&autoprint=true&t=${Date.now()}`);
+        await printPdfDirect(pdfUrl);
     };
 
     let sampleTypeText = "Clot-Act, Blood / Urine";
@@ -201,7 +183,7 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
                                             Report (With Header &amp; Footer)
                                         </div>
                                         <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                            Includes Medoraa Labs header banner, footer contact details, and watermark.
+                                            Includes Medoraa Labs header banner, footer contact details, and watermark. Automatically merged with back design for double-sided printing.
                                         </p>
                                     </div>
 
@@ -256,7 +238,7 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
                                             Report (No Header)
                                         </div>
                                         <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                            No header/footer graphics. Leaves exact spacing for printing onto pre-printed stationary.
+                                            Leaves exact spacing for pre-printed stationary. Automatically merged with back design for double-sided printing.
                                         </p>
                                     </div>
 
@@ -286,6 +268,16 @@ export default function PathologyReportModal({ record, isOpen, onClose }: Pathol
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Duplex Printing Notice Banner */}
+                        <div className="bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-xl p-2.5 text-xs text-emerald-900 dark:text-emerald-200">
+                            <div className="font-bold flex items-center gap-1.5 text-[11.5px]">
+                                <span>📄 Automatic Double-Sided (Duplex) Ready</span>
+                            </div>
+                            <p className="text-[11px] text-emerald-800 dark:text-emerald-300 mt-0.5">
+                                Every front page is followed by the standard back design. Ensure <strong>&quot;Print on both sides&quot;</strong> (Flip on long edge) is enabled in your printer settings.
+                            </p>
                         </div>
 
                         {/* Patient & Report Details Footer Box */}

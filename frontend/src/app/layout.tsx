@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import { CartProvider } from "@/context/CartContext";
 import { CartDrawer } from "@/components/ui/CartDrawer";
+import SessionGuard from "@/components/SessionGuard";
 
 const mavenPro = localFont({
   src: [
@@ -88,6 +89,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn("h-full overflow-x-hidden max-w-full", "antialiased", mavenPro.variable)} suppressHydrationWarning>
       <body className="min-h-full flex flex-col font-sans overflow-x-hidden max-w-full w-full">
+        <SessionGuard />
         <CartProvider>
           {children}
           <CartDrawer />
