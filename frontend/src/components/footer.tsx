@@ -1,6 +1,7 @@
 "use client"
 import React from "react";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function Footer() {
     return (
@@ -11,12 +12,18 @@ export default function Footer() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
                         {/* Column 1: Brand */}
                         <div className="flex flex-col gap-4">
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-                                    <div className="w-5 h-5 bg-[#015971] rounded-sm" />
+                            <Link href="/" className="flex items-center gap-3 w-fit group">
+                                <div className="relative w-9 h-9 rounded-xl overflow-hidden shadow-md ring-1 ring-white/20 shrink-0">
+                                    <Image
+                                        src="/logo.jpeg"
+                                        alt="Medoraa Labs Logo"
+                                        fill
+                                        sizes="36px"
+                                        className="object-cover"
+                                    />
                                 </div>
-                                <span className="text-xl font-bold tracking-tight text-white">Medoraa Labs</span>
-                            </div>
+                                <span className="text-xl font-bold tracking-tight text-white group-hover:text-cyan-200 transition-colors">Medoraa Labs</span>
+                            </Link>
                             <p className="text-blue-100/70 text-sm leading-relaxed">
                                 Empowering your health journey with world-class diagnostic expertise and cutting-edge technology. NABL Accredited and trusted by 5000+ patients.
                             </p>

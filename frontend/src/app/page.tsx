@@ -15,6 +15,7 @@ import { PopularCheckupPackages } from "@/components/ui/popular-checkup-packages
 import { VitalBodySystems } from "@/components/ui/vital-body-systems";
 import Footer from "@/components/footer";
 
+
 const RecentActivityNotification = () => {
   const activities = [
     { name: "Raju", action: "booked a CBC Test", time: "2 mins ago" },
@@ -81,99 +82,99 @@ const RecentActivityNotification = () => {
   );
 };
 
-const FloatingBadge = ({ avatar, name, role, className, delay = 0 }: FloatingBadgeProps) => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: 20, scale: 0.8 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      transition={{
-        duration: 0.6,
-        delay: delay,
-        ease: [0.23, 1, 0.32, 1],
-      }}
-      className={`absolute z-20 flex items-center gap-3 p-2 pr-6 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border border-white/20 dark:border-neutral-800/50 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.12)] ${className}`}
-    >
-      <div className="relative">
-        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white dark:border-neutral-800 shadow-sm">
-          <img src={avatar} alt={name} className="w-full h-full object-cover" />
-        </div>
-        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-neutral-900 rounded-full"></div>
-      </div>
-      <div className="flex flex-col">
-        <span className="text-sm font-bold text-[#015971] dark:text-cyan-400 leading-tight">
-          {name}
-        </span>
-        <span className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 leading-tight">
-          {role}
-        </span>
-      </div>
-    </motion.div>
-  );
-};
+// const FloatingBadge = ({ avatar, name, role, className, delay = 0 }: FloatingBadgeProps) => {
+//   return (
+//     <motion.div
+//       initial={{ opacity: 0, x: 20, scale: 0.8 }}
+//       animate={{ opacity: 1, x: 0, scale: 1 }}
+//       transition={{
+//         duration: 0.6,
+//         delay: delay,
+//         ease: [0.23, 1, 0.32, 1],
+//       }}
+//       className={`absolute z-20 flex items-center gap-3 p-2 pr-6 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border border-white/20 dark:border-neutral-800/50 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.12)] ${className}`}
+//     >
+//       <div className="relative">
+//         <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white dark:border-neutral-800 shadow-sm">
+//           <img src={avatar} alt={name} className="w-full h-full object-cover" />
+//         </div>
+//         <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-neutral-900 rounded-full"></div>
+//       </div>
+//       <div className="flex flex-col">
+//         <span className="text-sm font-bold text-[#015971] dark:text-cyan-400 leading-tight">
+//           {name}
+//         </span>
+//         <span className="text-[10px] font-semibold text-neutral-500 dark:text-neutral-400 leading-tight">
+//           {role}
+//         </span>
+//       </div>
+//     </motion.div>
+//   );
+// };
 
 
 
 // ── TESTIMONIALS DATA ──
-const testimonials = [
-  {
-    text: "I got my blood test results within hours! The online report access made it so convenient. Highly recommend this lab for their speed and accuracy.",
-    image: "https://randomuser.me/api/portraits/women/1.jpg",
-    name: "Briana Patton",
-    role: "Verified Patient",
-  },
-  {
-    text: "Booking my tests online was super easy, and the home sample collection service saved me so much time. Reports were accurate and delivered right on time.",
-    image: "https://randomuser.me/api/portraits/men/2.jpg",
-    name: "Bilal Ahmed",
-    role: "Verified Patient",
-  },
-  {
-    text: "The staff was incredibly polite and professional. My reports came with a detailed breakdown that my doctor truly appreciated. Will always use this lab!",
-    image: "https://randomuser.me/api/portraits/women/3.jpg",
-    name: "Saman Malik",
-    role: "Verified Patient",
-  },
-  {
-    text: "I was nervous about my MRI scan, but the technicians were so reassuring and gentle. The facility was spotless and the results were crystal clear.",
-    image: "https://randomuser.me/api/portraits/men/4.jpg",
-    name: "Omar Raza",
-    role: "Verified Patient",
-  },
-  {
-    text: "Affordable pricing with no compromise on quality. My full body checkup package was thorough and the doctor consultation included was a great bonus!",
-    image: "https://randomuser.me/api/portraits/women/5.jpg",
-    name: "Zainab Hussain",
-    role: "Verified Patient",
-  },
-  {
-    text: "The phlebotomist was gentle and skilled — I barely felt the blood draw! Reports were available on the app within 4 hours. Absolutely flawless experience.",
-    image: "https://randomuser.me/api/portraits/women/6.jpg",
-    name: "Aliza Khan",
-    role: "Verified Patient",
-  },
-  {
-    text: "I use this lab for all my family's health checkups. The WhatsApp report delivery and friendly reminders for follow-up tests are features I truly love.",
-    image: "https://randomuser.me/api/portraits/men/7.jpg",
-    name: "Farhan Siddiqui",
-    role: "Verified Patient",
-  },
-  {
-    text: "Visited for a thyroid panel and was impressed by how organized everything was. Zero wait time, clean environment, and my results matched my specialist's expectations perfectly.",
-    image: "https://randomuser.me/api/portraits/women/8.jpg",
-    name: "Sana Sheikh",
-    role: "Verified Patient",
-  },
-  {
-    text: "The home collection team arrived right on schedule and were extremely professional. Getting my diabetes test done from home was a game changer for me.",
-    image: "https://randomuser.me/api/portraits/men/9.jpg",
-    name: "Hassan Ali",
-    role: "Verified Patient",
-  },
-];
+// const testimonials = [
+//   {
+//     text: "I got my blood test results within hours! The online report access made it so convenient. Highly recommend this lab for their speed and accuracy.",
+//     image: "https://randomuser.me/api/portraits/women/1.jpg",
+//     name: "Briana Patton",
+//     role: "Verified Patient",
+//   },
+//   {
+//     text: "Booking my tests online was super easy, and the home sample collection service saved me so much time. Reports were accurate and delivered right on time.",
+//     image: "https://randomuser.me/api/portraits/men/2.jpg",
+//     name: "Bilal Ahmed",
+//     role: "Verified Patient",
+//   },
+//   {
+//     text: "The staff was incredibly polite and professional. My reports came with a detailed breakdown that my doctor truly appreciated. Will always use this lab!",
+//     image: "https://randomuser.me/api/portraits/women/3.jpg",
+//     name: "Saman Malik",
+//     role: "Verified Patient",
+//   },
+//   {
+//     text: "I was nervous about my MRI scan, but the technicians were so reassuring and gentle. The facility was spotless and the results were crystal clear.",
+//     image: "https://randomuser.me/api/portraits/men/4.jpg",
+//     name: "Omar Raza",
+//     role: "Verified Patient",
+//   },
+//   {
+//     text: "Affordable pricing with no compromise on quality. My full body checkup package was thorough and the doctor consultation included was a great bonus!",
+//     image: "https://randomuser.me/api/portraits/women/5.jpg",
+//     name: "Zainab Hussain",
+//     role: "Verified Patient",
+//   },
+//   {
+//     text: "The phlebotomist was gentle and skilled — I barely felt the blood draw! Reports were available on the app within 4 hours. Absolutely flawless experience.",
+//     image: "https://randomuser.me/api/portraits/women/6.jpg",
+//     name: "Aliza Khan",
+//     role: "Verified Patient",
+//   },
+//   {
+//     text: "I use this lab for all my family's health checkups. The WhatsApp report delivery and friendly reminders for follow-up tests are features I truly love.",
+//     image: "https://randomuser.me/api/portraits/men/7.jpg",
+//     name: "Farhan Siddiqui",
+//     role: "Verified Patient",
+//   },
+//   {
+//     text: "Visited for a thyroid panel and was impressed by how organized everything was. Zero wait time, clean environment, and my results matched my specialist's expectations perfectly.",
+//     image: "https://randomuser.me/api/portraits/women/8.jpg",
+//     name: "Sana Sheikh",
+//     role: "Verified Patient",
+//   },
+//   {
+//     text: "The home collection team arrived right on schedule and were extremely professional. Getting my diabetes test done from home was a game changer for me.",
+//     image: "https://randomuser.me/api/portraits/men/9.jpg",
+//     name: "Hassan Ali",
+//     role: "Verified Patient",
+//   },
+// ];
 
-const firstColumn = testimonials.slice(0, 3);
-const secondColumn = testimonials.slice(3, 6);
-const thirdColumn = testimonials.slice(6, 9);
+// const firstColumn = testimonials.slice(0, 3);
+// const secondColumn = testimonials.slice(3, 6);
+// const thirdColumn = testimonials.slice(6, 9);
 
 export default function Home() {
   const sharedIconUrl = "https://i.pinimg.com/736x/d0/6a/13/d06a13ce1f4da8d86989657faabf6276.jpg";
@@ -210,6 +211,7 @@ export default function Home() {
 
   return (
     <>
+      
       <ScrollNavigationMenu />
 
       
@@ -732,7 +734,7 @@ export default function Home() {
       </section>
 
       {/* ── TESTIMONIALS SECTION ── */}
-      <section id="testimonials" className="bg-background pt-0 pb-20 relative">
+      {/* <section id="testimonials" className="bg-background pt-0 pb-20 relative">
         <div className="container z-10 mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -752,13 +754,9 @@ export default function Home() {
             </p>
           </motion.div>
 
-          <div className="flex justify-center gap-6 mt-10 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] max-h-[740px] overflow-hidden">
-            <TestimonialsColumn testimonials={firstColumn} duration={15} />
-            <TestimonialsColumn testimonials={secondColumn} className="hidden md:block" duration={19} />
-            <TestimonialsColumn testimonials={thirdColumn} className="hidden lg:block" duration={17} />
-          </div>
+          
         </div>
-      </section>
+      </section> */}
       <Footer />
 
       <RecentActivityNotification />

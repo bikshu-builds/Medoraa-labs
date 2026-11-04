@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -413,16 +414,23 @@ const Sidebar: React.FC = () => {
           isCollapsed ? "px-0 justify-center" : "px-6 justify-between",
         )}
       >
-        <div className="flex items-center min-w-0">
-          <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center shrink-0">
-            <ActivityIcon className="w-5 h-5 text-white" />
+        <Link href="/admin/dashboard" className="flex items-center min-w-0 hover:opacity-90 transition-opacity">
+          <div className="relative w-9 h-9 rounded-xl overflow-hidden shadow-md ring-1 ring-white/10 shrink-0">
+            <Image
+              src="/logo.jpeg"
+              alt="Medoraa Labs Logo"
+              fill
+              sizes="36px"
+              className="object-cover"
+              priority
+            />
           </div>
           {!isCollapsed && (
             <span className="ml-3 text-white font-bold text-lg tracking-tight truncate animate-in fade-in duration-200">
               Medoraa Labs
             </span>
           )}
-        </div>
+        </Link>
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className={cn(

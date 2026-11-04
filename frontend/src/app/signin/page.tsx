@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
     Phone,
     Lock,
@@ -81,11 +82,18 @@ export default function UnifiedSignIn() {
                 <div className="absolute bottom-0 left-0 w-64 h-64 bg-cyan-400/20 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
 
                 <div className="relative z-10">
-                    <Link href="/" className="flex items-center gap-3 mb-16 hover:opacity-90 transition-opacity w-fit">
-                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-[#015971] shadow-xl">
-                            <Activity className="w-6 h-6" />
+                    <Link href="/" className="flex items-center gap-3 mb-16 hover:opacity-90 transition-opacity w-fit group">
+                        <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-xl ring-1 ring-white/20 shrink-0">
+                            <Image
+                                src="/logo.jpeg"
+                                alt="Medoraa Labs Logo"
+                                fill
+                                sizes="48px"
+                                className="object-cover"
+                                priority
+                            />
                         </div>
-                        <span className="text-2xl font-black tracking-tight">Medoraa Labs</span>
+                        <span className="text-2xl font-black tracking-tight group-hover:text-cyan-200 transition-colors">Medoraa Labs</span>
                     </Link>
 
                     <h1 className="text-5xl font-black leading-tight mb-6">
@@ -118,10 +126,18 @@ export default function UnifiedSignIn() {
                     </Link>
                     <div className="text-center md:text-left mb-2">
                         <div className="md:hidden flex justify-center mb-6">
-                            <Link href="/">
-                                <div className="w-12 h-12 bg-[#015971] rounded-2xl flex items-center justify-center text-white shadow-xl shadow-[#015971]/20">
-                                    <Activity className="w-7 h-7" />
+                            <Link href="/" className="flex items-center gap-3">
+                                <div className="relative w-12 h-12 rounded-2xl overflow-hidden shadow-xl shadow-[#015971]/20 ring-1 ring-black/5 shrink-0">
+                                    <Image
+                                        src="/logo.jpeg"
+                                        alt="Medoraa Labs Logo"
+                                        fill
+                                        sizes="48px"
+                                        className="object-cover"
+                                        priority
+                                    />
                                 </div>
+                                <span className="text-2xl font-black tracking-tight text-[#015971]">Medoraa Labs</span>
                             </Link>
                         </div>
                         <h2 className="text-3xl font-black text-slate-900 tracking-tight">Welcome Back</h2>
