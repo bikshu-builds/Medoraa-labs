@@ -13,6 +13,7 @@ function getLetterheadAssets(forceReload = false) {
   let headerBase64 = "";
   let footerBase64 = "";
   let logoBase64 = "";
+  let signatureBase64 = "";
 
   const candidateDirs = [
     path.join(__dirname, "../assets/logos"),
@@ -40,7 +41,28 @@ function getLetterheadAssets(forceReload = false) {
     }
   }
 
-  cachedAssets = { headerBase64, footerBase64, logoBase64 };
+  // Load Pathologist Signature image (Dr. M. Ravi Kumar)
+  const signatureCandidates = [
+    path.join(__dirname, "../public/Dr._M._Ravi_Kumar_Signature.png"),
+    path.join(__dirname, "../assets/logos/Dr._M._Ravi_Kumar_Signature.png"),
+    path.join(__dirname, "../../frontend/public/Dr._M._Ravi_Kumar_Signature.png"),
+    path.resolve(process.cwd(), "public/Dr._M._Ravi_Kumar_Signature.png"),
+    path.resolve(process.cwd(), "backend/public/Dr._M._Ravi_Kumar_Signature.png"),
+    path.resolve(process.cwd(), "frontend/public/Dr._M._Ravi_Kumar_Signature.png"),
+  ];
+
+  for (const sPath of signatureCandidates) {
+    try {
+      if (!signatureBase64 && fs.existsSync(sPath)) {
+        signatureBase64 = `data:image/png;base64,${fs.readFileSync(sPath).toString("base64")}`;
+        break;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  cachedAssets = { headerBase64, footerBase64, logoBase64, signatureBase64 };
   return cachedAssets;
 }
 
@@ -95,7 +117,7 @@ async function resetBrowser() {
 function buildPathologyReportHTML(record, options = {}) {
     const includeHeaderFooter = options.includeHeaderFooter !== false;
     const includeWatermark = options.watermark !== false;
-    const { headerBase64, footerBase64, logoBase64 } = getLetterheadAssets();
+    const { headerBase64, footerBase64, logoBase64, signatureBase64 } = getLetterheadAssets();
     const todayDate = new Date().toLocaleDateString("en-GB");
 
     // Extract test results and map with populated test details for category / classification
@@ -436,6 +458,17 @@ function buildPathologyReportHTML(record, options = {}) {
                 letter-spacing: 0.5px;
                 margin-bottom: 2px;
             }
+            .sig-img-container {
+                display: block;
+                margin: 2px 0 3px 0;
+            }
+            .sig-image {
+                height: 38px;
+                width: auto;
+                max-width: 145px;
+                object-fit: contain;
+                display: block;
+            }
             .sig-name {
                 font-family: Georgia, 'Times New Roman', serif;
                 font-style: italic;
@@ -568,7 +601,13 @@ function buildPathologyReportHTML(record, options = {}) {
                             <!-- Pathologist Signature Directly Below Note -->
                             <div class="signature-section">
                                 <div class="approved-label">Approved by</div>
+                                ${signatureBase64 ? `
+                                <div class="sig-img-container">
+                                    <img src="${signatureBase64}" class="sig-image" alt="Dr. M. Ravi Kumar Signature" />
+                                </div>
+                                ` : `
                                 <div class="sig-name">${pathologistName}</div>
+                                `}
                                 <div class="sig-details">Dr. Ravi Kumar Manyam, Ph.D</div>
                                 <div class="sig-role">Biochemist &amp; Pathologist</div>
                             </div>
@@ -931,7 +970,7 @@ async function generateTransferLabelPDF(record, hospitalDoc = null) {
 function buildReceiptHTML(record, autoPrint = false, options = {}) {
     const includeHeaderFooter = options.includeHeaderFooter !== false;
     const includeWatermark = options.watermark !== false;
-    const { headerBase64, footerBase64, logoBase64 } = getLetterheadAssets();
+    const { headerBase64, footerBase64, logoBase64, signatureBase64 } = getLetterheadAssets();
     const regNo = record.registrationNumber || record._id;
     const barcodeSVG = generateCode128SVG(regNo);
     const dateStr = record.registrationDate || new Date().toLocaleDateString("en-GB");
