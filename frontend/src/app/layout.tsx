@@ -32,7 +32,7 @@ const mavenPro = localFont({
 export const metadata: Metadata = {
   title: "Medoraa Labs | Best Diagnostics & Blood Tests in Vijayawada",
   description: "Medoraa Labs provides top diagnostic services, accurate blood tests, and complete health checkup packages in Vijayawada. Book lab tests online with home collection.",
-  keywords: "Medoraa Labs, pathology lab Vijayawada, diagnostics Vijayawada, blood test Gollapudi, medical laboratory Andhra Pradesh, full body checkup Vijayawada, NABL accredited lab Vijayawada, health test home collection",
+  keywords: "Medoraa Labs, pathology lab Vijayawada, diagnostics Vijayawada, blood test Gollapudi, medical laboratory Andhra Pradesh, full body checkup Vijayawada,  health test home collection",
   authors: [{ name: "Medoraa Labs" }],
   creator: "Medoraa Labs",
   publisher: "Medoraa Labs",
@@ -43,9 +43,9 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    icon: "/logo.png",
-    shortcut: "/logo.png",
-    apple: "/logo.png",
+    icon: "/logo.jpeg",
+    shortcut: "/logo.jpeg",
+    apple: "/logo.jpeg",
   },
   robots: {
     index: true,
@@ -63,10 +63,10 @@ export const metadata: Metadata = {
     locale: "en_IN",
     url: "https://medoraa.com",
     title: "Medoraa Labs | Best Diagnostics & Blood Tests in Vijayawada",
-    description: "Your trusted NABL-accredited laboratory for advanced medical diagnostics, comprehensive health checkups, and expert medical care in Vijayawada and Gollapudi.",
+    description: "Your trusted Laboratory for advanced medical diagnostics, comprehensive health checkups, and expert medical care in Vijayawada and Gollapudi.",
     siteName: "Medoraa Labs",
     images: [{
-      url: "/logo.png",
+      url: "/logo.jpeg",
       width: 800,
       height: 600,
       alt: "Medoraa Labs Logo",
@@ -76,7 +76,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Medoraa Labs | Best Diagnostics & Blood Tests in Vijayawada",
     description: "Your trusted laboratory for advanced medical diagnostics, comprehensive health checkups, and expert medical care in Vijayawada.",
-    images: ["/logo.png"],
+    images: ["/logo.jpeg"],
   },
 };
 

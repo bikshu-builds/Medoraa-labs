@@ -700,7 +700,7 @@ export function CheckupCategories() {
               <div className="p-3 sm:p-4 bg-white dark:bg-zinc-900 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                  <span>Free doorstep collection • NABL certified accuracy</span>
+                  <span>Free doorstep collection </span>
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto">

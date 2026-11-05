@@ -217,9 +217,7 @@ export function PopularCheckupPackages() {
                 {/* Bottom Row: Trust Badge & Actions (NO PRICES SHOWN) */}
                 <div className="mt-2.5 rounded-xl bg-[#f0f8fa] dark:bg-zinc-800/60 p-2 sm:p-2.5 px-2.5 sm:px-3 flex items-center justify-between gap-1.5">
                   <div className="leading-tight">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> NABL Certified
-                    </span>
+                    
                     <span className="text-[11px] font-bold text-[#0c2340] dark:text-white block mt-0.5">
                       Home Pickup Available
                     </span>

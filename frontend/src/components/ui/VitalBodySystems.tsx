@@ -245,9 +245,10 @@ export function VitalBodySystems() {
               >
                 <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-26 md:h-26 rounded-full flex items-center justify-center group-hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
                   <Image
-                    src={system.image}
+                    src={`${system.image}?v=2`}
                     alt={system.name}
                     fill
+                    unoptimized
                     sizes="(max-width: 640px) 80px, 104px"
                     className="object-contain group-hover:scale-105 transition-transform duration-300"
                   />
@@ -288,9 +289,10 @@ export function VitalBodySystems() {
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full overflow-hidden relative flex-shrink-0">
                     <Image
-                      src={selectedSystem.image}
+                      src={`${selectedSystem.image}?v=2`}
                       alt={selectedSystem.name}
                       fill
+                      unoptimized
                       className="object-contain"
                     />
                   </div>

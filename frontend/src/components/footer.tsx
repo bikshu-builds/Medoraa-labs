@@ -25,9 +25,11 @@ export default function Footer() {
                                 <span className="text-xl font-bold tracking-tight text-white group-hover:text-cyan-200 transition-colors">Medoraa Labs</span>
                             </Link>
                             <p className="text-blue-100/70 text-sm leading-relaxed">
-                               Your health deserves accurate answers. We deliver reliable diagnostic testing, advanced laboratory services, and trusted results to support better healthcare decisions.
+                               At Medoraa Labs, we believe better healthcare begins with accurate diagnosis. We are committed to delivering reliable diagnostic services through advanced technology, quality testing practices and a patient-first approach.
+
+From routine health check-ups to specialised diagnostic investigations, our focus is on accuracy, timely reports and compassionate care.
                             </p>
-                            <p className="text-blue-100/70 text-sm leading-relaxed">Trusted Diagnostics. Healthier Tomorrow.</p>
+                            <p className="text-blue-100/70 text-sm leading-relaxed">Your Health. Our Commitment.</p>
                             <div className="flex items-center gap-3">
                                 {["facebook", "twitter", "instagram", "linkedin"].map((social) => (
                                     <a

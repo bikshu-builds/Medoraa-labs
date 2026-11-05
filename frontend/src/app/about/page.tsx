@@ -90,7 +90,7 @@ export default function AboutPage() {
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-500 uppercase tracking-widest font-bold mb-1">Call Us</p>
-                                        <p className="text-xl font-bold text-gray-900 dark:text-white">+91 90140 93137</p>
+                                        <p className="text-xl font-bold text-gray-900 dark:text-white">0866-2551236 / +91 9490261236</p>
                                     </div>
                                 </div>
                                 <div className="flex gap-6">
@@ -99,7 +99,7 @@ export default function AboutPage() {
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-500 uppercase tracking-widest font-bold mb-1">Email Us</p>
-                                        <p className="text-xl font-bold text-gray-900 dark:text-white">support@medoraalabs.com</p>
+                                        <p className="text-xl font-bold text-gray-900 dark:text-white">contact@medoraalabs.com</p>
                                     </div>
                                 </div>
                                 <div className="flex gap-6">
@@ -109,8 +109,9 @@ export default function AboutPage() {
                                     <div>
                                         <p className="text-sm text-gray-500 uppercase tracking-widest font-bold mb-1">Visit Us</p>
                                         <p className="text-xl font-bold text-gray-900 dark:text-white">
-                                            Y.V.R. Estate, Gollapudi,<br />
-                                            Vijayawada, Andhra Pradesh 521225
+                                            13-598/1, Tulasinagar 1st Lane, <br />
+                                            Pantakaluvva Road, Beside Federal Bank Lane, <br/>
+                                             Kanuru, Vijayawada - 520 007.
                                         </p>
                                     </div>
                                 </div>
@@ -129,14 +130,14 @@ export default function AboutPage() {
                         {/* Google Map */}
                         <div className="rounded-3xl overflow-hidden border-4 border-white dark:border-zinc-900 shadow-2xl h-[500px]">
                             <iframe
-                                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3825.143242044814!2d80.59850027514338!3d16.518888984218683!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a35f1f96440263f%3A0xc682390a18712a23!2sGollapudi%2C%20Vijayawada%2C%20Andhra%20Pradesh!5e0!3m2!1sen!2sin!4v1714041490212!5m2!1sen!2sin"
-                                width="100%"
-                                height="100%"
-                                style={{ border: 0 }}
-                                allowFullScreen
-                                loading="lazy"
-                                referrerPolicy="no-referrer-when-downgrade"
-                            ></iframe>
+    src="https://www.google.com/maps?q=13-598%2F1%2C+Tulasinagar+1st+Lane%2C+Pantakaluvva+Road%2C+Beside+Federal+Bank+Lane%2C+Kanuru%2C+Vijayawada+-+520007&output=embed"
+    width="100%"
+    height="100%"
+    style={{ border: 0 }}
+    allowFullScreen
+    loading="lazy"
+    referrerPolicy="no-referrer-when-downgrade"
+></iframe>
                         </div>
                     </div>
                 </div>

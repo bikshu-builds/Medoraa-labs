@@ -41,12 +41,12 @@ const defaultMenuItems: MenuItem[] = [
     url: "/#process",
     icon: <Info className="w-5 h-5" />,
   },
-  {
-    id: 5,
-    title: "Reviews",
-    url: "/#testimonials",
-    icon: <User className="w-5 h-5" />,
-  },
+  // {
+  //   id: 5,
+  //   title: "Reviews",
+  //   url: "/#testimonials",
+  //   icon: <User className="w-5 h-5" />,
+  // },
   {
     id: 6,
     title: "About",

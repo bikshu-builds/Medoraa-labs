@@ -418,9 +418,13 @@ export default function Home() {
                   <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div className="text-left">
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider">Accredited</p>
-                  <p className="text-xs sm:text-sm font-extrabold text-[#015971] dark:text-cyan-300">NABL Quality</p>
-                </div>
+  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+    Our Commitment
+  </p>
+  <p className="text-xs sm:text-sm font-extrabold text-[#015971] dark:text-cyan-300">
+    Diagnostic Excellence
+  </p>
+</div>
               </motion.div>
 
               {/* Floating Speed & Technology Badge (Bottom-Right) */}
@@ -484,14 +488,15 @@ export default function Home() {
                 subtitle: "Trusted & on time",
               },
               {
-                icon: (
-                  <svg className="w-7 h-7 text-[#015971] dark:text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                ),
-                title: "NABL Certified Lab",
-                subtitle: "Quality you can trust",
-              },
+  icon: (
+    <svg className="w-7 h-7 text-[#015971] dark:text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 3l7 3v5c0 4.5-3 7.5-7 10-4-2.5-7-5.5-7-10V6l7-3z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4" />
+    </svg>
+  ),
+  title: "Safe Sample Handling",
+  subtitle: "Care at every testing stage",
+},
             ].map((card, i) => (
               <motion.div
                 key={i}

@@ -17,6 +17,7 @@ import {
   Stethoscope,
   Sparkles,
   ArrowUpRight,
+  TestTube,
 } from "lucide-react";
 
 interface FeatureCard {
@@ -71,12 +72,12 @@ const featureCards: FeatureCard[] = [
     accentGlow: "from-rose-500/10 via-pink-500/5 to-transparent",
   },
   {
-    title: "Doctor Consultation",
-    description: "Consult with qualified doctors for test guidance and next steps.",
-    icon: <Stethoscope className="w-5 h-5 sm:w-6 sm:h-6 text-sky-600" />,
-    iconBg: "bg-gradient-to-br from-sky-50 to-blue-100/70 border-sky-200/70 text-sky-600",
-    accentGlow: "from-sky-500/10 via-blue-500/5 to-transparent",
-  },
+  title: "Laboratory Testing",
+  description: "Get accurate diagnostic tests with reliable results and professional laboratory care.",
+  icon: <TestTube className="w-5 h-5 sm:w-6 sm:h-6 text-teal-600" />,
+  iconBg: "bg-gradient-to-br from-teal-50 to-cyan-100/70 border-teal-200/70 text-teal-600",
+  accentGlow: "from-teal-500/10 via-cyan-500/5 to-transparent",
+},
   {
     title: "Trusted & Secure",
     description: "Your health data is kept private, safe and fully confidential.",
